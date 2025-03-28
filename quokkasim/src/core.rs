@@ -1,0 +1,500 @@
+pub use std::fs::File;
+pub use std::{future::Future, time::Duration};
+
+pub use csv::Writer;
+pub use crate::common::{Distribution, NotificationMetadata, EventLog, DistributionConfig, DistributionFactory, DistributionParametersError};
+pub use nexosim::model::{Context, Model};
+pub use nexosim::time::MonotonicTime;
+pub use nexosim::ports::{EventBuffer, Output, Requestor};
+pub use nexosim::simulation::{ActionKey, Mailbox, SimInit};
+
+
+pub trait StateEq {
+    fn is_same_state(&self, other: &Self) -> bool;
+}
+
+pub trait Stock: Model {
+
+    type ResourceType;
+    type AddType;
+    type RemoveType;
+    type RemoveParameterType;
+    type StateType: StateEq;
+
+    fn new() -> Self;
+    fn check_update_state<'a>(
+        &mut self,
+        notif_meta: NotificationMetadata,
+        cx: &'a mut Context<Self>
+    ) -> impl Future<Output = ()> + Send;
+    fn add(
+        &mut self,
+        data: (Self::AddType, NotificationMetadata),
+        cx: &mut Context<Self>
+    ) -> impl Future<Output = ()> + Send;
+    fn remove(
+        &mut self,
+        data: (Self::RemoveParameterType, NotificationMetadata),
+        cx: &mut Context<Self>
+    ) -> impl Future<Output=Self::RemoveType> + Send;
+    fn notify_change(
+        &mut self,
+        notif_meta: NotificationMetadata,
+        cx: &mut Context<Self>
+    ) -> impl Future<Output = ()> + Send;
+    fn get_state(&mut self) -> impl Future<Output=Self::StateType> + Send;
+}
+
+#[macro_export]
+macro_rules! define_stock {
+    (
+        name = $struct_name:ident,
+        resource_type = $resource_type:ty,
+        initial_resource = $initial_resource:expr,
+        add_type = $add_type:ty,
+        remove_type = $remove_type:ty,
+        remove_parameter_type = $remove_parameter_type:ty,
+        state_type = $state_type:ty,
+        fields = {
+            $($field_name:ident : $field_type:ty),*
+        },
+        get_state_method = $get_state_method:expr,
+        check_update_method = $check_update_state:expr
+    ) => {
+        use nexosim::model::Model;
+        use quokkasim::core::Stock;
+
+        pub struct $struct_name {
+            element_name: String,
+            resource: $resource_type,
+            $(pub $field_name: $field_type),*,
+            log_emitter: Output<EventLog>,
+        }
+
+        impl Model for $struct_name {}
+
+        impl Stock for $struct_name {
+            type ResourceType = $resource_type;
+            type AddType = $add_type;
+            type RemoveType = $remove_type;
+            type RemoveParameterType = $remove_parameter_type;
+            type StateType = $state_type;
+
+            fn new() -> Self {
+                $struct_name {
+                    element_name: "Stock".to_string(),
+                    resource: $initial_resource,
+                    $($field_name: 0),*,
+                    log_emitter: Output::new(),
+                }
+            }
+
+            fn check_update_state<'a>(
+                &mut self,
+                notif_meta: NotificationMetadata,
+                cx: &'a mut Context<Self>
+            ) -> impl Future<Output = ()> + Send {
+                async {
+                    let previous_state = self.get_state().await;
+                    $check_update_state(self, cx);
+                    let current_state = self.get_state().await;
+    
+                    if !previous_state.is_same_state(&current_state) {
+                        self.notify_change(notif_meta, cx).await;
+                    }
+                }
+            }
+
+            async fn add(
+                &mut self,
+                data: (Self::AddType, NotificationMetadata),
+                cx: &mut Context<Self>
+            ) {
+                println!("Adding data to stock");
+            }
+
+            async fn remove(
+                &mut self,
+                data: (Self::RemoveParameterType, NotificationMetadata),
+                cx: &mut Context<Self>
+            ) -> Self::RemoveType {
+                println!("Removing data from stock");
+                self.resource.clone()
+            }
+
+            async fn notify_change(
+                &mut self,
+                notif_meta: NotificationMetadata,
+                cx: &mut Context<Self>
+            ) {
+                println!("Notifying change");
+            }
+        
+            fn get_state(&mut self) -> impl Future<Output=Self::StateType> + Send {
+                let get_state_fn = $get_state_method;
+                async move {
+                    get_state_fn(self)
+                }
+            }
+        }
+    };
+}
+
+pub trait Source: Model {
+
+    type AddType;
+    type AddParameterType;
+
+    fn create(&mut self, args: Self::AddParameterType) -> Self::AddType;
+
+    fn check_update_state<'a>(
+        &'a mut self,
+        notif_meta: NotificationMetadata,
+        cx: &'a mut Context<Self>
+    ) -> impl Future<Output = ()> + Send + 'a;
+}
+
+#[macro_export]
+macro_rules! define_source {
+    (
+        name = $struct_name:ident,
+        resource_type = $resource_type:ty,
+        stock_state_type = $stock_state_type:ty,
+        add_type = $add_type:ty,
+        add_parameter_type = $add_parameter_type:ty,
+        create_method = $create_method:expr,
+        check_update_method = $check_update_method:expr,
+        fields = {
+            $($field_name:ident : $field_type:ty),*
+        }
+    ) => {
+        use nexosim::ports::Requestor;
+        use nexosim::simulation::ActionKey;
+        use quokkasim::core::{Source, Duration};
+        use quokkasim::common::DistributionConfig;
+
+        pub struct $struct_name {
+            element_name: String,
+            element_type: String,
+            resource: $resource_type,
+            
+            $(pub $field_name: $field_type,)*
+
+            previous_check_time: Option<MonotonicTime>,
+
+            pub log_emitter: Output<EventLog>,
+            next_scheduled_event_time: Option<MonotonicTime>,
+            next_scheduled_event_key: Option<ActionKey>,
+
+            time_to_new_remaining: Duration,
+            time_to_new_dist: Distribution,
+
+            pub req_downstream: Requestor<(), $stock_state_type>,
+            pub push_downstream: Output<($add_type, NotificationMetadata)>,
+        }
+
+        impl Model for $struct_name {}
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
+                $struct_name {
+                    element_name: "Source".to_string(),
+                    element_type: "Source".to_string(),
+                    resource: Default::default(),
+                    $($field_name: Default::default(),)*
+                    previous_check_time: None,
+                    log_emitter: Output::new(),
+                    next_scheduled_event_time: None,
+                    next_scheduled_event_key: None,
+                    time_to_new_remaining: Duration::ZERO,
+                    time_to_new_dist: df.create(DistributionConfig::Constant(1.)).unwrap(),
+                    req_downstream: Requestor::new(),
+                    push_downstream: Output::new(),
+                }
+            }
+        }
+
+        impl Source for $struct_name {
+            
+            type AddType = $add_type;
+            type AddParameterType = $add_parameter_type;
+
+            fn create(&mut self, params: Self::AddParameterType) -> Self::AddType {
+                $create_method(self, params)
+            }
+
+            fn check_update_state<'a>(
+                &'a mut self,
+                notif_meta: NotificationMetadata,
+                cx: &'a mut Context<Self>
+            ) -> impl Future<Output = ()> + Send + 'a {
+                async move {
+                    println!("{:?}::check_update_state for {:?} at {:?}", stringify!($struct_name), self.element_name, cx.time());
+                    let current_time = cx.time();
+                    let elapsed_time: Duration = match self.previous_check_time {
+                        None => Duration::MAX,
+                        Some(t) => current_time.duration_since(t),
+                    };
+                    self.time_to_new_remaining = self.time_to_new_remaining.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+    
+                    if self.time_to_new_remaining.is_zero() {
+
+                        // Swap self for a default instance, so it can be moved into the async block, before passing it back
+                        let self_moved = std::mem::take(self);
+                        *self = $check_update_method(self_moved, cx.time().clone()).await;
+    
+                        self.time_to_new_remaining = Duration::from_secs_f64(self.time_to_new_dist.sample());
+                        self.next_scheduled_event_time = Some(current_time + self.time_to_new_remaining);
+                        let notif_meta = NotificationMetadata {
+                            time: current_time,
+                            element_from: self.element_name.clone(),
+                            message: "Check update state".to_string(),
+                        };
+                        self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                            self.next_scheduled_event_time.unwrap(),
+                            Self::check_update_state,
+                            notif_meta
+                        ).unwrap());
+                    }
+    
+                    self.previous_check_time = Some(current_time);
+                }
+            }
+        }
+    };
+}
+
+pub trait Sink: Model {
+    
+    type SubtractType;
+    type SubtractParameterType;
+
+    fn destroy(&mut self, args: Self::SubtractParameterType) -> Self::SubtractType;
+
+    fn check_update_state<'a>(
+        &'a mut self,
+        notif_meta: NotificationMetadata,
+        cx: &'a mut Context<Self>
+    ) -> impl Future<Output = ()> + Send + 'a;
+}
+
+#[macro_export]
+macro_rules! define_sink {
+    (
+        name = $struct_name:ident,
+        resource_type = $resource_type:ty,
+        stock_state_type = $stock_state_type:ty,
+        subtract_type = $subtract_type:ty,
+        subtract_parameters_type = $subtract_parameters_type:ty,
+        destroy_method = $destroy_method:expr,
+        check_update_method = $check_update_method:expr,
+        fields = {
+            $($field_name:ident : $field_type:ty),*
+        },
+    ) => {
+        use quokkasim::core::Sink;
+
+        pub struct $struct_name {
+            element_name: String,
+            element_type: String,
+            resource: $resource_type,
+
+            $(pub $field_name: $field_type,)*
+
+            previous_check_time: Option<MonotonicTime>,
+
+            pub log_emitter: Output<EventLog>,
+            next_scheduled_event_time: Option<MonotonicTime>,
+            next_scheduled_event_key: Option<ActionKey>,
+
+            time_to_destroy_remaining: Duration,
+            time_to_destroy_dist: Distribution,
+
+            pub req_upstream: Requestor<(), $stock_state_type>,
+            pub withdraw_upstream: Requestor<($subtract_parameters_type, NotificationMetadata), $subtract_type>,
+        }
+
+        impl Model for $struct_name {}
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
+                $struct_name {
+                    element_name: "Sink".to_string(),
+                    element_type: "Sink".to_string(),
+                    resource: Default::default(),
+                    $($field_name: Default::default(),)*
+                    previous_check_time: None,
+                    log_emitter: Output::new(),
+                    next_scheduled_event_time: None,
+                    next_scheduled_event_key: None,
+                    time_to_destroy_remaining: Duration::ZERO,
+                    time_to_destroy_dist: df.create(DistributionConfig::Constant(1.)).unwrap(),
+
+                    req_upstream: Requestor::new(),
+                    withdraw_upstream: Requestor::new(),
+                }
+            }
+        }
+
+        impl Sink for $struct_name {
+            type SubtractType = $subtract_type;
+            type SubtractParameterType = $subtract_parameters_type;
+
+            fn destroy(&mut self, params: Self::SubtractParameterType) -> Self::SubtractType {
+                $destroy_method(self, params)
+            }
+
+            fn check_update_state<'a>(
+                &'a mut self,
+                notif_meta: NotificationMetadata,
+                cx: &'a mut Context<Self>
+            ) -> impl Future<Output = ()> + Send + 'a {
+            
+                async move {
+                    let current_time = cx.time();
+                    let elapsed_time: Duration = match self.previous_check_time {
+                        None => Duration::MAX,
+                        Some(t) => current_time.duration_since(t),
+                    };
+                    self.time_to_destroy_remaining = self.time_to_destroy_remaining.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+
+                    if self.time_to_destroy_remaining.is_zero() {
+
+                        let self_moved = std::mem::take(self);
+                        *self = $check_update_method(self_moved, current_time.clone()).await;
+
+                        self.time_to_destroy_remaining = Duration::from_secs_f64(self.time_to_destroy_dist.sample());
+                        self.next_scheduled_event_time = Some(current_time + self.time_to_destroy_remaining);
+                        let notif_meta = NotificationMetadata {
+                            time: current_time,
+                            element_from: self.element_name.clone(),
+                            message: "Check update state".to_string(),
+                        };
+                        self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                            self.next_scheduled_event_time.unwrap(),
+                            Self::check_update_state,
+                            notif_meta
+                        ).unwrap());
+                    }
+                    self.previous_check_time = Some(current_time);
+                }
+            }
+        }
+
+    }
+}
+
+
+pub trait Process: Model {
+
+    type ResourceInType;
+    type ResourceInParameterType;
+
+    type ResourceOutType;
+    
+    type StockStateType;
+
+    fn check_update_state<'a>(
+        &'a mut self,
+        notif_meta: NotificationMetadata,
+        cx: &'a mut Context<Self>
+    ) -> impl Future<Output = ()> + Send + 'a;
+
+}
+
+#[macro_export]
+macro_rules! define_process {
+    (
+        name = $struct_name:ident,
+
+        stock_state_type = $stock_state_type:ty,
+        resource_in_type = $resource_in_type:ty,
+        resource_in_parameter_type = $resource_in_parameter_type:ty,
+        resource_out_type = $resource_out_type:ty,
+        resource_out_parameter_type = $resource_out_parameter_type:ty,
+
+        check_update_method = $check_update_method:expr,
+        fields = {
+            $($field_name:ident : $field_type:ty),*
+        },
+    ) => {
+
+        use quokkasim::core::Process;
+
+        pub struct $struct_name {
+            element_name: String,
+            element_type: String,
+            resource: $resource_in_type,
+
+            previous_check_time: Option<MonotonicTime>,
+
+            pub log_emitter: Output<EventLog>,
+            next_scheduled_event_time: Option<MonotonicTime>,
+            next_scheduled_event_key: Option<ActionKey>,
+            time_to_next_event_counter: Duration,
+
+            pub req_upstream: Requestor<(), $stock_state_type>,
+            pub withdraw_upstream: Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
+
+            pub req_downstream: Requestor<(), $stock_state_type>,
+            pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
+
+            $($field_name: $field_type),*
+        }
+
+        impl Model for $struct_name {}
+
+        impl Process for $struct_name {
+
+            type ResourceInType = $resource_in_type;
+            type ResourceInParameterType = $resource_in_parameter_type;
+            type ResourceOutType = $resource_out_type;
+            type StockStateType = $stock_state_type;
+
+            fn check_update_state<'a>(
+                &'a mut self,
+                notif_meta: NotificationMetadata,
+                cx: &'a mut Context<Self>,
+            ) -> impl Future<Output = ()> + Send + 'a {
+                async move {
+                    let current_time = cx.time();
+                    let elapsed_time: Duration = match self.previous_check_time {
+                        None => Duration::MAX,
+                        Some(t) => current_time.duration_since(t),
+                    };
+                    self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+                    if self.time_to_next_event_counter.is_zero() {
+                        // let us_state = self.req_upstream.send(()).await.next();
+                        // let ds_state = self.req_downstream.send(()).await.next();
+
+                        let self_moved = std::mem::take(self);
+                        *self = $check_update_method(self_moved, current_time.clone()).await; 
+                    }
+                }
+            }
+        }
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
+                $struct_name {
+                    element_name: "Process".to_string(),
+                    element_type: "Process".to_string(),
+                    resource: Default::default(),
+                    $($field_name: Default::default(),)*
+                    previous_check_time: None,
+                    log_emitter: Output::new(),
+                    next_scheduled_event_time: None,
+                    next_scheduled_event_key: None,
+                    time_to_next_event_counter: Duration::ZERO,
+                    req_upstream: Requestor::new(),
+                    withdraw_upstream: Requestor::new(),
+                    req_downstream: Requestor::new(),
+                    push_downstream: Output::new(),
+                }
+            }
+        }
+    }
+}
