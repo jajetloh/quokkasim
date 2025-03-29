@@ -1,5 +1,5 @@
 use nexosim::{model::Context, ports::{EventBuffer, Output}, time::MonotonicTime};
-use quokkasim::{common::{Distribution, DistributionFactory, EventLog, NotificationMetadata}, core::{Mailbox, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
+use quokkasim::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum QueueState {
@@ -272,18 +272,19 @@ define_process!(
 
 fn main() {
     let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
-    let mut log_stream: EventBuffer<EventLog> = EventBuffer::with_capacity(1_000_000);
+
+    let logger = EventLogger::new(1_000_000);
 
     let mut source = MyQueueSource::new()
         .with_name("Hello".to_string())
         .with_time_to_new_dist(df.create(DistributionConfig::Exponential { mean: 1.0 }).unwrap())
-        .with_log_consumer(&log_stream);
+        .with_log_consumer(&logger);
     let source_mbox: Mailbox<MyQueueSource> = Mailbox::new();
     let source_addr = source_mbox.address();
 
     let mut stock = MyQueueStock::new()
         .with_name("Stock1".to_string())
-        .with_log_consumer(&log_stream);
+        .with_log_consumer(&logger);
     stock.low_capacity = 1;
     stock.max_capacity = 20;
 
@@ -293,7 +294,7 @@ fn main() {
     let mut sink = MyQueueSink::new()
         .with_name("Sink1".to_string())
         .with_time_to_destroy_dist(df.create(DistributionConfig::Exponential { mean: 1.0 }).unwrap())
-        .with_log_consumer(&log_stream);
+        .with_log_consumer(&logger);
     let sink_mbox: Mailbox<MyQueueSink> = Mailbox::new();
     let sink_addr = sink_mbox.address();
 
@@ -315,4 +316,6 @@ fn main() {
         &source_addr
     ).unwrap();
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(120)).unwrap();
+
+    logger.write_csv("logs.csv").unwrap();
 }
