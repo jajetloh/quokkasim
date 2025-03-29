@@ -91,8 +91,8 @@ macro_rules! define_stock {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, log_consumer: &EventBuffer<EventLog>) -> Self {
-                self.log_emitter.connect_sink(log_consumer);
+            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+                self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
         }
@@ -256,8 +256,8 @@ macro_rules! define_source {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, log_consumer: &EventBuffer<EventLog>) -> Self {
-                self.log_emitter.connect_sink(log_consumer);
+            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+                self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
         }
@@ -399,8 +399,8 @@ macro_rules! define_sink {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, log_consumer: &EventBuffer<EventLog>) -> Self {
-                self.log_emitter.connect_sink(log_consumer);
+            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+                self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
         }

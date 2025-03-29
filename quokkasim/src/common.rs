@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}};
 
-use nexosim::time::MonotonicTime;
+use nexosim::{ports::EventBuffer, time::MonotonicTime};
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
 
@@ -11,6 +11,37 @@ pub struct EventLog {
     pub element_type: String,
     pub log_type: String,
     pub json_data: String,
+}
+
+#[derive()]
+pub struct EventLogger {
+    pub buffer: EventBuffer<EventLog>
+}
+
+impl EventLogger {
+    pub fn new(capacity: usize) -> Self {
+        EventLogger {
+            buffer: EventBuffer::with_capacity(capacity)
+        }
+    }
+
+    pub fn write_csv(self, filename: &str) -> Result<(), std::io::Error> {
+        let file = std::fs::File::create(filename)?;
+        let mut writer = csv::Writer::from_writer(file);
+        self.buffer.for_each(|log| {
+            let record = [
+                log.time.as_secs().to_string(),
+                log.time.subsec_nanos().to_string(),
+                log.element_name.clone(),
+                log.element_type.clone(),
+                log.log_type.clone(),
+                log.json_data.clone()
+            ];
+            writer.write_record(&record).expect("Failed to write record");
+        });
+        writer.flush().expect("Failed to flush writer");
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
