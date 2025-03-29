@@ -19,7 +19,7 @@ pub trait Stock: Model {
     type AddType;
     type RemoveType;
     type RemoveParameterType;
-    type StateType: StateEq;
+    type StateType: StateEq + std::fmt::Debug;
 
     fn new() -> Self;
     fn check_update_state<'a>(
@@ -73,6 +73,30 @@ macro_rules! define_stock {
 
         impl Model for $struct_name {}
 
+        impl $struct_name {
+            pub fn build() -> Self {
+                $struct_name::new()
+            }
+            pub fn new() -> Self {
+                $struct_name {
+                    element_name: "Stock".to_string(),
+                    resource: $initial_resource,
+                    $($field_name: Default::default()),*,
+                    log_emitter: Output::new(),
+                }
+            }
+
+            pub fn with_name(mut self, name: String) -> Self {
+                self.element_name = name;
+                return self
+            }
+
+            pub fn with_log_consumer(mut self, log_consumer: &EventBuffer<EventLog>) -> Self {
+                self.log_emitter.connect_sink(log_consumer);
+                return self
+            }
+        }
+
         impl Stock for $struct_name {
             type ResourceType = $resource_type;
             type AddType = $add_type;
@@ -100,6 +124,14 @@ macro_rules! define_stock {
                     let current_state = self.get_state().await;
     
                     if !previous_state.is_same_state(&current_state) {
+                        self.log_emitter.send(EventLog {
+                            time: cx.time(),
+                            element_name: self.element_name.clone(),
+                            element_type: stringify!($struct_name).to_string(),
+                            log_type: "StateChange".to_string(),
+                            json_data: format!("State changed from {:?} to {:?}", previous_state, current_state),
+                        }).await;
+                        println!("State changed from {:?} to {:?}", previous_state, current_state);
                         self.notify_change(notif_meta, cx).await;
                     }
                 }
@@ -195,9 +227,9 @@ macro_rules! define_source {
 
         impl Model for $struct_name {}
 
-        impl Default for $struct_name {
-            fn default() -> Self {
-                let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
+        impl $struct_name {
+
+            pub fn new() -> Self {
                 $struct_name {
                     element_name: "Source".to_string(),
                     element_type: "Source".to_string(),
@@ -208,10 +240,31 @@ macro_rules! define_source {
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_new_remaining: Duration::ZERO,
-                    time_to_new_dist: df.create(DistributionConfig::Constant(1.)).unwrap(),
+                    time_to_new_dist: Distribution::Constant(1.),
                     req_downstream: Requestor::new(),
                     push_downstream: Output::new(),
                 }
+            }
+
+            pub fn with_name(mut self, name: String) -> Self {
+                self.element_name = name;
+                return self
+            }
+
+            pub fn with_time_to_new_dist(mut self, dist: Distribution) -> Self {
+                self.time_to_new_dist = dist;
+                return self
+            }
+
+            pub fn with_log_consumer(mut self, log_consumer: &EventBuffer<EventLog>) -> Self {
+                self.log_emitter.connect_sink(log_consumer);
+                return self
+            }
+        }
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                $struct_name::new()
             }
         }
 
@@ -317,9 +370,8 @@ macro_rules! define_sink {
 
         impl Model for $struct_name {}
 
-        impl Default for $struct_name {
-            fn default() -> Self {
-                let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
+        impl $struct_name {
+            fn new() -> Self {
                 $struct_name {
                     element_name: "Sink".to_string(),
                     element_type: "Sink".to_string(),
@@ -330,11 +382,32 @@ macro_rules! define_sink {
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_destroy_remaining: Duration::ZERO,
-                    time_to_destroy_dist: df.create(DistributionConfig::Constant(1.)).unwrap(),
+                    time_to_destroy_dist: Distribution::Constant(1.),
 
                     req_upstream: Requestor::new(),
                     withdraw_upstream: Requestor::new(),
                 }
+            }
+
+            fn with_name(mut self, name: String) -> Self {
+                self.element_name = name;
+                return self
+            }
+
+            fn with_time_to_destroy_dist(mut self, dist: Distribution) -> Self {
+                self.time_to_destroy_dist = dist;
+                return self
+            }
+
+            pub fn with_log_consumer(mut self, log_consumer: &EventBuffer<EventLog>) -> Self {
+                self.log_emitter.connect_sink(log_consumer);
+                return self
+            }
+        }
+
+        impl Default for $struct_name {
+            fn default() -> Self {
+                $struct_name::new()
             }
         }
 

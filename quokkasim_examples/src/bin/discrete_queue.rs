@@ -1,6 +1,7 @@
 use nexosim::{model::Context, ports::{EventBuffer, Output}, time::MonotonicTime};
-use quokkasim::{{define_stock, define_source, define_sink, define_process}, core::StateEq, common::{EventLog, NotificationMetadata, Distribution, DistributionFactory}};
+use quokkasim::{common::{Distribution, DistributionFactory, EventLog, NotificationMetadata}, core::{Mailbox, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
 
+#[derive(Debug, Clone)]
 pub enum QueueState {
     Empty {
         occupied: i32,
@@ -272,4 +273,46 @@ define_process!(
 fn main() {
     let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
     let mut log_stream: EventBuffer<EventLog> = EventBuffer::with_capacity(1_000_000);
+
+    let mut source = MyQueueSource::new()
+        .with_name("Hello".to_string())
+        .with_time_to_new_dist(df.create(DistributionConfig::Exponential { mean: 1.0 }).unwrap())
+        .with_log_consumer(&log_stream);
+    let source_mbox: Mailbox<MyQueueSource> = Mailbox::new();
+    let source_addr = source_mbox.address();
+
+    let mut stock = MyQueueStock::new()
+        .with_name("Stock1".to_string())
+        .with_log_consumer(&log_stream);
+    stock.low_capacity = 1;
+    stock.max_capacity = 20;
+
+    let stock_mbox: Mailbox<MyQueueStock> = Mailbox::new();
+    let stock_addr = stock_mbox.address();
+
+    let mut sink = MyQueueSink::new()
+        .with_name("Sink1".to_string())
+        .with_time_to_destroy_dist(df.create(DistributionConfig::Exponential { mean: 1.0 }).unwrap())
+        .with_log_consumer(&log_stream);
+    let sink_mbox: Mailbox<MyQueueSink> = Mailbox::new();
+    let sink_addr = sink_mbox.address();
+
+    source.push_downstream.connect(MyQueueStock::add, &stock_addr);
+    source.req_downstream.connect(MyQueueStock::get_state, &stock_addr);
+
+    sink.withdraw_upstream.connect(MyQueueStock::remove, &stock_addr);
+    sink.req_upstream.connect(MyQueueStock::get_state, &stock_addr);
+
+    let sim_builder = SimInit::new()
+        .add_model(source, source_mbox, "Source")
+        .add_model(stock, stock_mbox, "Stock")
+        .add_model(sink, sink_mbox, "Sink");
+
+    let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+    simu.process_event(
+        MyQueueSource::check_update_state,
+        NotificationMetadata { time: MonotonicTime::EPOCH, element_from: "init".into(), message: "init".into() },
+        &source_addr
+    ).unwrap();
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(120)).unwrap();
 }
