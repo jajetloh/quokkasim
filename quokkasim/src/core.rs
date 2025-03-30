@@ -282,6 +282,18 @@ macro_rules! define_source {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
+
+            pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
+                async move {
+                    self.log_emitter.send(EventLog {
+                        time,
+                        element_name: self.element_name.clone(),
+                        element_type: self.element_type.clone(),
+                        log_type,
+                        json_data,
+                    }).await
+                }
+            }
         }
 
         impl Default for $struct_name {
@@ -344,7 +356,7 @@ pub trait Sink: Model {
     type SubtractType;
     type SubtractParameterType;
 
-    fn destroy(&mut self, args: Self::SubtractParameterType) -> Self::SubtractType;
+    fn destroy(&mut self, args: Self::SubtractParameterType, time: MonotonicTime) -> impl Future<Output = Self::SubtractType>;
 
     fn check_update_state<'a>(
         &'a mut self,
@@ -424,6 +436,18 @@ macro_rules! define_sink {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
+
+            pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
+                async move {
+                    self.log_emitter.send(EventLog {
+                        time,
+                        element_name: self.element_name.clone(),
+                        element_type: self.element_type.clone(),
+                        log_type,
+                        json_data,
+                    }).await
+                }
+            }
         }
 
         impl Default for $struct_name {
@@ -436,8 +460,11 @@ macro_rules! define_sink {
             type SubtractType = $subtract_type;
             type SubtractParameterType = $subtract_parameters_type;
 
-            fn destroy(&mut self, params: Self::SubtractParameterType) -> Self::SubtractType {
-                $destroy_method(self, params)
+            fn destroy(&mut self, params: Self::SubtractParameterType, time: MonotonicTime) -> impl Future<Output = Self::SubtractType> {
+                async move {
+                    self.log(time, "Destroy".into(), format!("{:?}", params)).await;
+                    $destroy_method(self, params)
+                }
             }
 
             fn check_update_state<'a>(

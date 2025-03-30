@@ -188,6 +188,7 @@ define_sink!(
                         log_type: "info".into(),
                         json_data: format!("{{\"message\": \"Received item\", \"item\": {:?}}}", item),
                     }).await;
+                    sink.log(time, "Destroy".into(), format!("{:?}", item)).await;
                 },
                 Some(QueueState::Empty {..}) => {
                     // Do nothing
