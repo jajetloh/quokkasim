@@ -1,5 +1,7 @@
+use std::ops::Add;
+
 use nexosim::{model::Context, ports::{EventBuffer, Output}, time::MonotonicTime};
-use quokkasim::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
+use quokkasim::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum QueueState {
@@ -34,10 +36,36 @@ impl StateEq for QueueState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct QueueVector {
+    pub queue: Vec<i32>,
+}
+
+impl ResourceAdd<Vec<i32>> for QueueVector {
+    fn add(&mut self, other: Vec<i32>) {
+        self.queue.extend(other);
+    }
+}
+
+impl ResourceRemove<i32, Vec<i32>> for QueueVector {
+    fn sub(&mut self, other: i32) -> Vec<i32> {
+        let mut removed_items = vec![];
+        for _ in 0..other {
+            if let Some(item) = self.queue.pop() {
+                removed_items.push(item);
+            } else {
+                break;
+            }
+        }
+        removed_items
+    }
+}
+
+
 define_stock!(
     name = MyQueueStock,
-    resource_type = Vec<i32>,
-    initial_resource = vec![],
+    resource_type = QueueVector,
+    initial_resource = QueueVector { queue: vec![] },
     add_type = Vec<i32>,
     remove_type = Vec<i32>,
     remove_parameter_type = i32,
@@ -47,7 +75,7 @@ define_stock!(
         max_capacity: i32
     },
     get_state_method = |x: &MyQueueStock| -> QueueState {
-        let occupied = x.resource.len() as i32;
+        let occupied = x.resource.queue.len() as i32;
         let empty = (x.max_capacity - occupied).max(0);
         if occupied <= x.low_capacity {
             return QueueState::Empty {
@@ -145,6 +173,7 @@ define_sink!(
     },
     check_update_method = |mut sink: Self, time: MonotonicTime| {
         async move {
+            println!("Checking update state for sink");
             let us_state = sink.req_upstream.send(()).await.next();
 
             match us_state {
@@ -276,7 +305,7 @@ fn main() {
     let logger = EventLogger::new(1_000_000);
 
     let mut source = MyQueueSource::new()
-        .with_name("Hello".to_string())
+        .with_name("Source1".to_string())
         .with_time_to_new_dist(df.create(DistributionConfig::Exponential { mean: 1.0 }).unwrap())
         .with_log_consumer(&logger);
     let source_mbox: Mailbox<MyQueueSource> = Mailbox::new();
@@ -300,9 +329,11 @@ fn main() {
 
     source.push_downstream.connect(MyQueueStock::add, &stock_addr);
     source.req_downstream.connect(MyQueueStock::get_state, &stock_addr);
+    stock.state_emitter.connect(MyQueueSource::check_update_state, &source_addr);
 
     sink.withdraw_upstream.connect(MyQueueStock::remove, &stock_addr);
     sink.req_upstream.connect(MyQueueStock::get_state, &stock_addr);
+    stock.state_emitter.connect(MyQueueSink::check_update_state, &sink_addr);
 
     let sim_builder = SimInit::new()
         .add_model(source, source_mbox, "Source")
@@ -315,7 +346,7 @@ fn main() {
         NotificationMetadata { time: MonotonicTime::EPOCH, element_from: "init".into(), message: "init".into() },
         &source_addr
     ).unwrap();
-    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(120)).unwrap();
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(30)).unwrap();
 
     logger.write_csv("logs.csv").unwrap();
 }
