@@ -86,15 +86,6 @@ macro_rules! define_stock {
             pub fn build() -> Self {
                 $struct_name::new()
             }
-            // pub fn new() -> Self {
-            //     $struct_name {
-            //         element_name: "Stock".to_string(),
-            //         resource: $initial_resource,
-            //         $($field_name: Default::default()),*,
-            //         log_emitter: Output::new(),
-            //         prev_state: None,
-            //     }
-            // }
 
             pub fn with_name(mut self, name: String) -> Self {
                 self.element_name = name;
@@ -104,6 +95,18 @@ macro_rules! define_stock {
             pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
+            }
+
+            pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
+                async move {
+                    self.log_emitter.send(EventLog {
+                        time,
+                        element_name: self.element_name.clone(),
+                        element_type: stringify!($struct_name).to_string(),
+                        log_type,
+                        json_data,
+                    }).await
+                }
             }
         }
 
@@ -131,47 +134,23 @@ macro_rules! define_stock {
                 cx: &'a mut Context<Self>
             ) -> impl Future<Output = ()> + Send {
                 async {
-                    println!("Stock::check_update_state for {:?} at {:?}", self.element_name, cx.time());
-                    // let previous_state = self.get_state().await;
                     $check_update_state(self, cx);
                     let current_state = self.get_state().await;
     
                     match &self.prev_state {
                         None => {
-                            println!("No state -> {:?}", current_state);
                         },
                         Some(ps) => {
                             if !ps.is_same_state(&current_state) {
-                                self.log_emitter.send(EventLog {
-                                    time: cx.time(),
-                                    element_name: self.element_name.clone(),
-                                    element_type: stringify!($struct_name).to_string(),
-                                    log_type: "StateChange".to_string(),
-                                    json_data: format!("State changed from {:?} to {:?}", ps, current_state),
-                                }).await;
-                                println!("State changed from {:?} to {:?}", ps, current_state);
+                                self.log(cx.time(), "StateChange".to_string(), format!("State changed from {:?} to {:?}", ps, current_state)).await;
                                 cx.schedule_event(
                                     cx.time() + Duration::from_nanos(1), $struct_name::notify_change, notif_meta
                                 ).unwrap();
                             } else {
-                                println!("State unchanged: {:?}", current_state);
                             }
                         }
                     }
                     self.prev_state = Some(current_state);
-                    //     !self.prev_state.un.is_same_state(&current_state) {
-                    //     self.log_emitter.send(EventLog {
-                    //         time: cx.time(),
-                    //         element_name: self.element_name.clone(),
-                    //         element_type: stringify!($struct_name).to_string(),
-                    //         log_type: "StateChange".to_string(),
-                    //         json_data: format!("State changed from {:?} to {:?}", previous_state, current_state),
-                    //     }).await;
-                    //     println!("State changed from {:?} to {:?}", previous_state, current_state);
-                    //     self.notify_change(notif_meta, cx).await;
-                    // } else {
-                    //     println!("State unchanged: {:?}", current_state);
-                    // }
                 }
             }
 
@@ -182,7 +161,7 @@ macro_rules! define_stock {
             ) {
                 self.prev_state = Some(self.get_state().await);
                 self.resource.add(data.0.clone());
-                println!("Resource after adding: {:?}", self.resource);
+                self.log(cx.time(), "Add".to_string(), format!("Added {:?}. Resources: {:?}", data.0, self.resource)).await;
                 self.check_update_state(data.1, cx).await;
             }
 
@@ -192,7 +171,7 @@ macro_rules! define_stock {
                 cx: &mut Context<Self>
             ) -> Self::RemoveType {
                 let result = self.resource.sub(data.0.clone());
-                println!("Resource after removing: {:?}. Moved: {:?}", self.resource, result);
+                self.log(cx.time(), "Add".to_string(), format!("Added {:?}. Resources: {:?}", data.0, self.resource)).await;
                 self.check_update_state(data.1, cx).await;
                 result
             }
@@ -326,7 +305,6 @@ macro_rules! define_source {
                 cx: &'a mut Context<Self>
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
-                    println!("{:?}::check_update_state for {:?} at {:?}", stringify!($struct_name), self.element_name, cx.time());
                     let current_time = cx.time();
                     let elapsed_time: Duration = match self.previous_check_time {
                         None => Duration::MAX,

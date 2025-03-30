@@ -1,6 +1,4 @@
-use std::ops::Add;
-
-use nexosim::{model::Context, ports::{EventBuffer, Output}, time::MonotonicTime};
+use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 use quokkasim::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
@@ -95,7 +93,6 @@ define_stock!(
         }
     },
     check_update_method = |x: &mut MyQueueStock, cx: &mut Context<MyQueueStock>| {
-        println!("Checking update state");
     }
 );
 
@@ -116,7 +113,8 @@ define_source!(
             let ds_state = x.req_downstream.send(()).await.next();
             match ds_state {
                 Some(QueueState::Empty {..}) | Some(QueueState::Normal {..}) => {
-                    let new_resources = x.create(3);
+                    let new_resources = x.create(x.next_id);
+                    x.next_id += 1;
                     x.push_downstream.send((new_resources.clone(), NotificationMetadata {
                         time: time.clone(),
                         element_from: x.element_name.clone(),
@@ -173,7 +171,6 @@ define_sink!(
     },
     check_update_method = |mut sink: Self, time: MonotonicTime| {
         async move {
-            println!("Checking update state for sink");
             let us_state = sink.req_upstream.send(()).await.next();
 
             match us_state {
@@ -303,6 +300,7 @@ fn main() {
     let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
 
     let logger = EventLogger::new(1_000_000);
+    let stock_logger = EventLogger::new(1_000_000);
 
     let mut source = MyQueueSource::new()
         .with_name("Source1".to_string())
@@ -313,8 +311,9 @@ fn main() {
 
     let mut stock = MyQueueStock::new()
         .with_name("Stock1".to_string())
-        .with_log_consumer(&logger);
-    stock.low_capacity = 1;
+        .with_log_consumer(&logger)
+        .with_log_consumer(&stock_logger);
+    stock.low_capacity = 0;
     stock.max_capacity = 20;
 
     let stock_mbox: Mailbox<MyQueueStock> = Mailbox::new();
@@ -322,7 +321,7 @@ fn main() {
 
     let mut sink = MyQueueSink::new()
         .with_name("Sink1".to_string())
-        .with_time_to_destroy_dist(df.create(DistributionConfig::Exponential { mean: 1.0 }).unwrap())
+        .with_time_to_destroy_dist(df.create(DistributionConfig::Exponential { mean: 1.3 }).unwrap())
         .with_log_consumer(&logger);
     let sink_mbox: Mailbox<MyQueueSink> = Mailbox::new();
     let sink_addr = sink_mbox.address();
@@ -349,4 +348,5 @@ fn main() {
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(30)).unwrap();
 
     logger.write_csv("logs.csv").unwrap();
+    stock_logger.write_csv("stock_logs.csv").unwrap();
 }

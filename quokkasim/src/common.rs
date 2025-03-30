@@ -3,8 +3,9 @@ use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}};
 use nexosim::{ports::EventBuffer, time::MonotonicTime};
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
+use serde::Serialize;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EventLog {
     pub time: MonotonicTime,
     pub element_name: String,
@@ -16,7 +17,7 @@ pub struct EventLog {
 #[derive()]
 pub struct EventLogger {
     pub buffer: EventBuffer<EventLog>
-}
+} 
 
 impl EventLogger {
     pub fn new(capacity: usize) -> Self {
@@ -29,9 +30,9 @@ impl EventLogger {
         let file = std::fs::File::create(filename)?;
         let mut writer = csv::Writer::from_writer(file);
         self.buffer.for_each(|log| {
+            // writer.write_record().expect("Failed to write record");
             let record = [
-                log.time.as_secs().to_string(),
-                log.time.subsec_nanos().to_string(),
+                log.time.to_string(),
                 log.element_name.clone(),
                 log.element_type.clone(),
                 log.log_type.clone(),

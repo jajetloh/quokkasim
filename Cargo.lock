@@ -681,6 +681,7 @@ dependencies = [
  "rand_distr",
  "serde",
  "serde_json",
+ "tai-time",
 ]
 
 [[package]]
@@ -934,6 +935,9 @@ name = "tai-time"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15fc9559f4c441310d31f10a6190a43efdfe1aae44e45236065d5827b428b271"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "tempfile"
