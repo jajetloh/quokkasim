@@ -28,7 +28,6 @@ pub trait Stock: Model {
     type RemoveParameterType;
     type StateType: StateEq + std::fmt::Debug;
 
-    fn new() -> Self;
     fn check_update_state<'a>(
         &mut self,
         notif_meta: NotificationMetadata,
@@ -69,22 +68,29 @@ macro_rules! define_stock {
         check_update_method = $check_update_state:expr
     ) => {
         use nexosim::model::Model;
-        use quokkasim::core::Stock;
+        use $crate::core::Stock;
 
         pub struct $struct_name {
-            element_name: String,
-            resource: $resource_type,
+            pub element_name: String,
+            pub resource: $resource_type,
             $(pub $field_name: $field_type),*,
-            log_emitter: Output<EventLog>,
-            state_emitter: Output<NotificationMetadata>,
+            pub log_emitter: Output<EventLog>,
+            pub state_emitter: Output<NotificationMetadata>,
             prev_state: Option<$state_type>,
         }
 
         impl Model for $struct_name {}
 
         impl $struct_name {
-            pub fn build() -> Self {
-                $struct_name::new()
+            pub fn new() -> Self {
+                $struct_name {
+                    element_name: "Stock".to_string(),
+                    resource: $initial_resource,
+                    $($field_name: 0),*,
+                    log_emitter: Output::new(),
+                    state_emitter: Output::new(),
+                    prev_state: None,
+                }
             }
 
             pub fn with_name(mut self, name: String) -> Self {
@@ -116,17 +122,6 @@ macro_rules! define_stock {
             type RemoveType = $remove_type;
             type RemoveParameterType = $remove_parameter_type;
             type StateType = $state_type;
-
-            fn new() -> Self {
-                $struct_name {
-                    element_name: "Stock".to_string(),
-                    resource: $initial_resource,
-                    $($field_name: 0),*,
-                    log_emitter: Output::new(),
-                    state_emitter: Output::new(),
-                    prev_state: None,
-                }
-            }
 
             fn check_update_state<'a>(
                 &mut self,
@@ -224,8 +219,7 @@ macro_rules! define_source {
     ) => {
         use nexosim::ports::Requestor;
         use nexosim::simulation::ActionKey;
-        use quokkasim::core::{Source, Duration};
-        use quokkasim::common::DistributionConfig;
+        use $crate::core::{Source, Duration};
 
         pub struct $struct_name {
             element_name: String,
@@ -379,7 +373,7 @@ macro_rules! define_sink {
             $($field_name:ident : $field_type:ty),*
         },
     ) => {
-        use quokkasim::core::Sink;
+        use $crate::core::Sink;
 
         pub struct $struct_name {
             element_name: String,
@@ -404,7 +398,7 @@ macro_rules! define_sink {
         impl Model for $struct_name {}
 
         impl $struct_name {
-            fn new() -> Self {
+            pub fn new() -> Self {
                 $struct_name {
                     element_name: "Sink".to_string(),
                     element_type: "Sink".to_string(),
@@ -422,12 +416,12 @@ macro_rules! define_sink {
                 }
             }
 
-            fn with_name(mut self, name: String) -> Self {
+            pub fn with_name(mut self, name: String) -> Self {
                 self.element_name = name;
                 return self
             }
 
-            fn with_time_to_destroy_dist(mut self, dist: Distribution) -> Self {
+            pub fn with_time_to_destroy_dist(mut self, dist: Distribution) -> Self {
                 self.time_to_destroy_dist = dist;
                 return self
             }
@@ -542,7 +536,7 @@ macro_rules! define_process {
         },
     ) => {
 
-        use quokkasim::core::Process;
+        use $crate::core::Process;
 
         pub struct $struct_name {
             element_name: String,
@@ -566,6 +560,36 @@ macro_rules! define_process {
         }
 
         impl Model for $struct_name {}
+
+        impl $struct_name {
+            pub fn new() -> Self {
+                $struct_name {
+                    element_name: "Process".to_string(),
+                    element_type: "Process".to_string(),
+                    resource: Default::default(),
+                    $($field_name: Default::default(),)*
+                    previous_check_time: None,
+                    log_emitter: Output::new(),
+                    next_scheduled_event_time: None,
+                    next_scheduled_event_key: None,
+                    time_to_next_event_counter: Duration::ZERO,
+                    req_upstream: Requestor::new(),
+                    withdraw_upstream: Requestor::new(),
+                    req_downstream: Requestor::new(),
+                    push_downstream: Output::new(),
+                }
+            }
+
+            pub fn with_name(mut self, name: String) -> Self {
+                self.element_name = name;
+                return self
+            }
+
+            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+                self.log_emitter.connect_sink(&logger.buffer);
+                return self
+            }
+        }
 
         impl Process for $struct_name {
 
@@ -599,22 +623,7 @@ macro_rules! define_process {
 
         impl Default for $struct_name {
             fn default() -> Self {
-                let mut df = DistributionFactory { base_seed: 0, next_seed: 0 };
-                $struct_name {
-                    element_name: "Process".to_string(),
-                    element_type: "Process".to_string(),
-                    resource: Default::default(),
-                    $($field_name: Default::default(),)*
-                    previous_check_time: None,
-                    log_emitter: Output::new(),
-                    next_scheduled_event_time: None,
-                    next_scheduled_event_key: None,
-                    time_to_next_event_counter: Duration::ZERO,
-                    req_upstream: Requestor::new(),
-                    withdraw_upstream: Requestor::new(),
-                    req_downstream: Requestor::new(),
-                    push_downstream: Output::new(),
-                }
+                $struct_name::new()
             }
         }
     }

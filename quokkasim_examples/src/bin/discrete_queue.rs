@@ -1,5 +1,5 @@
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
-use quokkasim::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
+use quokkasim::{common::{Distribution, DistributionFactory, DistributionConfig, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum QueueState {
