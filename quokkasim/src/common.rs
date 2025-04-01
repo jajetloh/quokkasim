@@ -58,6 +58,7 @@ pub enum Distribution {
     Triangular(Triangular<f64>, SmallRng),
     Constant(f64),
     Normal(Normal<f64>, SmallRng),
+    TruncNormal { normal_dist: Normal<f64>, min: f64, max: f64, rng: SmallRng },
     Exponential(Exp<f64>, SmallRng),
 }
 
@@ -66,6 +67,7 @@ pub enum DistributionConfig {
     Triangular { min: f64, max: f64, mode: f64 },
     Constant(f64),
     Normal { mean: f64, std: f64 },
+    TruncNormal { mean: f64, std: f64, min: Option<f64>, max: Option<f64> },
     Exponential { mean: f64 },
 }
 
@@ -122,6 +124,29 @@ impl DistributionFactory {
                     }
                 }
             },
+            DistributionConfig::TruncNormal { mean, std, min, max } => {
+                match Normal::new(mean, std) {
+                    Ok(dist) => {
+
+                        let min = min.unwrap_or(f64::MIN);
+                        let max = max.unwrap_or(f64::MAX);
+
+                        if min >= max {
+                            return Err(DistributionParametersError {
+                                msg: "Minimum value cannot be greater than or equal maximum value".to_string()
+                            })
+                        }
+
+                        let rng = SmallRng::seed_from_u64(self.next_seed);
+                        return Ok(Distribution::TruncNormal { normal_dist: dist, min, max, rng })
+                    },
+                    Err(e) => {
+                        return Err(DistributionParametersError {
+                            msg: e.to_string()
+                        })
+                    }
+                }
+            },
             DistributionConfig::Exponential { mean } => {
                 match Exp::new(1. / mean) {
                     Ok(dist) => {
@@ -157,6 +182,14 @@ impl Distribution {
             },
             Distribution::Normal(dist, rng) => {
                 dist.sample(rng)
+            },
+            Distribution::TruncNormal { normal_dist, min, max, rng } => {
+                loop {
+                    let x = normal_dist.sample(rng);
+                    if x >= *min && x <= *max {
+                        break x;
+                    }
+                }
             },
             Distribution::Exponential(dist, rng) => {
                 dist.sample(rng)

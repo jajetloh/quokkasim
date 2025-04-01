@@ -534,13 +534,14 @@ macro_rules! define_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
+        
     ) => {
 
         use $crate::core::Process;
 
         pub struct $struct_name {
-            element_name: String,
-            element_type: String,
+            pub element_name: String,
+            pub element_type: String,
             resource: $resource_in_type,
 
             previous_check_time: Option<MonotonicTime>,
@@ -556,7 +557,7 @@ macro_rules! define_process {
             pub req_downstream: Requestor<(), $stock_state_type>,
             pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
 
-            $($field_name: $field_type),*
+            $(pub $field_name: $field_type,)*
         }
 
         impl Model for $struct_name {}
@@ -611,9 +612,6 @@ macro_rules! define_process {
                     };
                     self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
                     if self.time_to_next_event_counter.is_zero() {
-                        // let us_state = self.req_upstream.send(()).await.next();
-                        // let ds_state = self.req_downstream.send(()).await.next();
-
                         let self_moved = std::mem::take(self);
                         *self = $check_update_method(self_moved, current_time.clone()).await; 
                     }

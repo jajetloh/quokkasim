@@ -13,8 +13,9 @@ fn main() {
 
     let mut source = MyQueueSource::new()
         .with_name("Source".into())
-        .with_time_to_new_dist(df.create(DistributionConfig::Exponential { mean: 1.5 }).unwrap())
+        .with_time_to_new_dist(df.create(DistributionConfig::Constant(500.0)).unwrap())
         .with_log_consumer(&logger);
+    source.next_id = 50;
     let source_mbox: Mailbox<MyQueueSource> = Mailbox::new();
     let source_addr = source_mbox.address();
 
@@ -24,11 +25,14 @@ fn main() {
     let stock1_mbox: Mailbox<MyQueueStock> = Mailbox::new();
     let stock1_addr = stock1_mbox.address();
     stock1.low_capacity = 0;
-    stock1.max_capacity = 10;
+    stock1.max_capacity = 100;
+    stock1.resource.queue = (0..50).into_iter().collect::<Vec<i32>>();
 
     let mut process = MyQueueProcess::new()
         .with_name("Process".into())
         .with_log_consumer(&logger);
+    process.process_quantity_dist = Distribution::Constant(1.);
+    // process.process_quantity_dist = df.create(DistributionConfig::TruncNormal { min: Some(f64::MIN_POSITIVE), mean: 5., std: 2., max: Some(8.) }).unwrap();
     let process_mbox: Mailbox<MyQueueProcess> = Mailbox::new();
     let process_addr = process_mbox.address();
 
@@ -42,7 +46,7 @@ fn main() {
 
     let mut sink= MyQueueSink::new()
         .with_name("Sink".into())
-        .with_time_to_destroy_dist(Distribution::Constant( 0.1 ))
+        .with_time_to_destroy_dist(Distribution::Constant( 1. ))
         .with_log_consumer(&logger);
     let sink_mbox: Mailbox<MyQueueSink> = Mailbox::new();
     let sink_addr = sink_mbox.address();
@@ -80,7 +84,12 @@ fn main() {
         },
         &source_addr,
     ).unwrap();
-    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(100)).unwrap();
+    simu.process_event(MyQueueProcess::check_update_state, NotificationMetadata {
+        time: MonotonicTime::EPOCH,
+        element_from: "Process".into(),
+        message: "check_update_state".into(),
+    }, &process_addr).unwrap();
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
     logger.write_csv("logs.csv").unwrap();
 }
