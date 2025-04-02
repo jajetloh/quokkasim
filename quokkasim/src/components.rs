@@ -315,7 +315,8 @@ define_combiner_process!(
                     Some(QueueState::Normal { occupied: occupied1, .. } ) | Some(QueueState::Full { occupied: occupied1, .. } ),
                     Some(QueueState::Empty { empty, .. } ) | Some(QueueState::Normal { empty, .. } ),
                 ) => {
-                    let sink_quantity = (x.process_quantity_dist.sample().round() as i32).min(*occupied0).min(*occupied1).max(*empty);
+                    let sink_quantity = (x.process_quantity_dist.sample().round() as i32).min(*occupied0).min(*occupied1).min(*empty);
+                    println!("sink_quantity: {}", sink_quantity);
                     
                     let items0 = x.withdraw_upstreams.0.send((sink_quantity, NotificationMetadata {
                         time,

@@ -15,7 +15,7 @@ fn main() {
     let mut df = DistributionFactory { base_seed: 1234, next_seed: 0 };
 
     let mut source1 = MyQueueSource::new()
-        .with_name("Source".into())
+        .with_name("Source1".into())
         .with_time_to_new_dist(df.create(DistributionConfig::Constant(500.0)).unwrap())
         .with_log_consumer(&logger);
     source1.next_id = 50;
@@ -23,7 +23,7 @@ fn main() {
     let source1_addr = source1_mbox.address();
 
     let mut stock1 = MyQueueStock::new()
-        .with_name("Stock".into())
+        .with_name("Stock1".into())
         .with_log_consumer(&logger);
     let stock1_mbox: Mailbox<MyQueueStock> = Mailbox::new();
     let stock1_addr = stock1_mbox.address();
@@ -62,10 +62,10 @@ fn main() {
     // let process_addr = process_mbox.address();
 
     let mut stock3 = MyQueueStock::new()
-        .with_name("Stock2".into())
+        .with_name("Stock3".into())
         .with_log_consumer(&logger);
     let stock3_mbox: Mailbox<MyQueueStock> = Mailbox::new();
-    let stock3_addr = stock2_mbox.address();
+    let stock3_addr = stock3_mbox.address();
     stock3.low_capacity = 0;
     stock3.max_capacity = 10;
 
@@ -108,10 +108,12 @@ fn main() {
     stock3.state_emitter.connect(MyQueueSink::check_update_state, &sink_addr);
 
     let sim_builder = SimInit::new()
-        .add_model(source1, source1_mbox, "Source")
-        .add_model(stock1, stock1_mbox, "Stock")
+        .add_model(source1, source1_mbox, "Source1")
+        .add_model(stock1, stock1_mbox, "Stock1")
+        .add_model(source2, source2_mbox, "Source2")
+        .add_model(stock2, stock2_mbox, "Stock2")
         .add_model(combiner, combiner_mbox, "Combiner")
-        .add_model(stock3, stock2_mbox, "Stock2")
+        .add_model(stock3, stock3_mbox, "Stock3")
         .add_model(sink, sink_mbox, "Sink");
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
@@ -119,7 +121,7 @@ fn main() {
         MyQueueSource::check_update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
-            element_from: "Source".into(),
+            element_from: "Source1".into(),
             message: "check_update_state".into(),
         },
         &source1_addr,
@@ -128,7 +130,7 @@ fn main() {
         MyQueueSource::check_update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
-            element_from: "Source".into(),
+            element_from: "Source2".into(),
             message: "check_update_state".into(),
         },
         &source2_addr,
