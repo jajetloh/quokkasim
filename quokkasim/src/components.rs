@@ -1,5 +1,5 @@
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
-use crate::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_process, define_sink, define_source, define_stock};
+use crate::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum QueueState {
@@ -289,6 +289,90 @@ define_process!(
                     }).await;
                 },
             }
+            x
+        }
+    },
+    fields = {
+        process_quantity_dist: Distribution
+    },
+);
+
+define_combiner_process!(
+    name = MyQueueCombinerProcess,
+    stock_state_type = QueueState,
+    resource_in_types = (Vec<i32>, Vec<i32>),
+    resource_in_parameter_types = (i32, i32),
+    resource_out_type = Vec<i32>,
+    resource_out_parameter_type = i32,
+    check_update_method = |mut x: Self, time: MonotonicTime| {
+        async move {
+            let us_states = (x.req_upstreams.0.send(()).await.next(), x.req_upstreams.1.send(()).await.next());
+            let ds_state = x.req_downstream.send(()).await.next();
+
+            match (&us_states.0, &us_states.1, &ds_state) {
+                (
+                    Some(QueueState::Normal { occupied: occupied0, .. } ) | Some(QueueState::Full { occupied: occupied0, .. } ),
+                    Some(QueueState::Normal { occupied: occupied1, .. } ) | Some(QueueState::Full { occupied: occupied1, .. } ),
+                    Some(QueueState::Empty { empty, .. } ) | Some(QueueState::Normal { empty, .. } ),
+                ) => {
+                    let sink_quantity = (x.process_quantity_dist.sample().round() as i32).min(*occupied0).min(*occupied1).max(*empty);
+                    
+                    let items0 = x.withdraw_upstreams.0.send((sink_quantity, NotificationMetadata {
+                        time,
+                        element_from: x.element_name.clone(),
+                        message: "Withdrawing item".into(),
+                    })).await.next().unwrap();
+
+                    let items1 = x.withdraw_upstreams.1.send((sink_quantity, NotificationMetadata {
+                        time,
+                        element_from: x.element_name.clone(),
+                        message: "Withdrawing item".into(),
+                    })).await.next().unwrap();
+
+                    let items = items0.into_iter().chain(items1.into_iter()).collect::<Vec<i32>>();
+
+                    x.push_downstream.send((items.clone(), NotificationMetadata {
+                        time,
+                        element_from: x.element_name.clone(),
+                        message: "Processing complete".into(),
+                    })).await;
+
+                    x.log_emitter.send(EventLog {
+                        time,
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        log_type: "info".into(),
+                        json_data: format!("{{\"message\": \"Processed item\", \"item\": {:?}}}", items),
+                    }).await;
+
+                },
+                (
+                    _, _, Some(QueueState::Full {..} ) | None,
+                ) => {
+                    // Do nothing
+                    x.log_emitter.send(EventLog {
+                        time,
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        log_type: "info".into(),
+                        json_data: format!("{{\"message\": \"Failed to receive item as downstream stock is full or isn't connected\"}}"),
+                    }).await;
+                },
+                (
+                    Some(QueueState::Empty {..} ) | None, _, _
+                ) | (
+                    _, Some(QueueState::Empty {..} ) | None, _
+                ) => {
+                    // Do nothing
+                    x.log_emitter.send(EventLog {
+                        time,
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        log_type: "info".into(),
+                        json_data: format!("{{\"message\": \"Failed to receive item as upstream stocks are empty or aren't connected\"}}"),
+                    }).await;
+                }
+            };
             x
         }
     },
