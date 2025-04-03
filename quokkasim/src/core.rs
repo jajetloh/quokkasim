@@ -644,8 +644,7 @@ macro_rules! define_combiner_process {
         },
         
     ) => {
-
-        pub struct MyQueueCombinerProcess {
+        pub struct $struct_name {
             element_name: String,
             element_type: String,
         
