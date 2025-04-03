@@ -297,7 +297,6 @@ define_process!(
     },
 );
 
-/// Hello there
 define_combiner_process!(
     name = MyQueueCombinerProcess,
     inflow_stock_state_types = (QueueState, QueueState),

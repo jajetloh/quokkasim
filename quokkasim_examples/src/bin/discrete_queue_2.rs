@@ -3,7 +3,7 @@ use std::time::Duration;
 use nexosim::model::{Context, Model};
 use nexosim::ports::{Output, Requestor};
 use nexosim::time::MonotonicTime;
-use quokkasim::components::{MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueState, MyQueueCombinerProcess};
+use quokkasim::components::queue::{MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueState, MyQueueCombinerProcess};
 use quokkasim::common::EventLogger;
 use quokkasim::core::{Distribution, DistributionConfig, DistributionFactory, EventLog, NotificationMetadata, Process, SimInit, Sink, Source, Stock};
 use nexosim::simulation::Mailbox;
@@ -52,7 +52,6 @@ fn main() {
         .with_log_consumer(&logger);
     let combiner_mbox: Mailbox<MyQueueCombinerProcess> = Mailbox::new();
     let combiner_addr = combiner_mbox.address();
-
 
     // let mut process = MyQueueProcess::new()
     //     .with_name("Process".into())
