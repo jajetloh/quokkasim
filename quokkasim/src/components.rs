@@ -299,7 +299,7 @@ define_process!(
 
 define_combiner_process!(
     name = MyQueueCombinerProcess,
-    stock_state_type = QueueState,
+    inflow_stock_state_types = (QueueState, QueueState),
     resource_in_types = (Vec<i32>, Vec<i32>),
     resource_in_parameter_types = (i32, i32),
     resource_out_type = Vec<i32>,

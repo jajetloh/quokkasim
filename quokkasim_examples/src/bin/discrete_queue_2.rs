@@ -103,8 +103,8 @@ fn main() {
     // process.req_downstream.connect(MyQueueStock::get_state, &stock2_addr);
     // stock3.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
 
-    sink.withdraw_upstream.connect(MyQueueStock::remove, &stock2_addr);
-    sink.req_upstream.connect(MyQueueStock::get_state, &stock2_addr);
+    sink.withdraw_upstream.connect(MyQueueStock::remove, &stock3_addr);
+    sink.req_upstream.connect(MyQueueStock::get_state, &stock3_addr);
     stock3.state_emitter.connect(MyQueueSink::check_update_state, &sink_addr);
 
     let sim_builder = SimInit::new()

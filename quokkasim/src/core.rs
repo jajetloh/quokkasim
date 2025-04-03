@@ -627,20 +627,14 @@ macro_rules! define_process {
     }
 }
 
-
-///
-/// Hello there
-/// Wow
 #[macro_export]
 macro_rules! define_combiner_process {
     (
         name = $struct_name:ident,
 
-        stock_state_type = $stock_state_type:ty,
+        inflow_stock_state_types = ( $( $inflow_stock_state_types:ty ),+ ),
         resource_in_types = ( $( $resource_in_types:ty ),+ ),
-        // resource_in_type = $resource_in_type:ty,
         resource_in_parameter_types = ( $( $resource_in_parameter_types:ty ),+ ),
-        // resource_in_parameter_type = $resource_in_parameter_type:ty,
         resource_out_type = $resource_out_type:ty,
         resource_out_parameter_type = $resource_out_parameter_type:ty,
 
@@ -660,8 +654,8 @@ macro_rules! define_combiner_process {
             previous_check_time: Option<MonotonicTime>,
             time_to_next_event_counter: Duration,
         
-            pub req_upstreams: (Requestor<(), QueueState>, Requestor<(), QueueState>),
-            pub withdraw_upstreams: (Requestor<(i32, NotificationMetadata), Vec<i32>>, Requestor<(i32, NotificationMetadata), Vec<i32>>),
+            pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
+            pub withdraw_upstreams: ( $( Requestor<($resource_in_parameter_types, NotificationMetadata), $resource_in_types> ),+ ),
         
             pub req_downstream: Requestor<(), QueueState>,
             pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
@@ -679,7 +673,9 @@ macro_rules! define_combiner_process {
                     log_emitter: Output::new(),
                     previous_check_time: None,
                     time_to_next_event_counter: Duration::from_secs(0),
-                    req_upstreams: (Requestor::new(), Requestor::new()),
+                    // req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
+                    req_upstreams: Default::default(),
+                    // req_upstreams: (Requestor::new(), Requestor::new()),
                     withdraw_upstreams: (Requestor::new(), Requestor::new()),
                     req_downstream: Requestor::new(),
                     push_downstream: Output::new(),
@@ -725,5 +721,100 @@ macro_rules! define_combiner_process {
         }
     }
 }
+
+
+
+// #[macro_export]
+// macro_rules! define_splitter_process {
+//     (
+//         name = $struct_name:ident,
+
+//         stock_state_type = $stock_state_type:ty,
+//         resource_in_type = $resource_in_type:ty,
+//         resource_in_parameter_type = $resource_in_parameter_type:ty,
+//         resource_out_types = ( $( $resource_out_types:ty ),+ ), 
+//         resource_out_parameter_types = ( $( $resource_out_parameter_types:ty ),+ ),
+
+//         check_update_method = $check_update_method:expr,
+//         fields = {
+//             $($field_name:ident : $field_type:ty),*
+//         },
+        
+//     ) => {
+
+//         pub struct MyQueueCombinerProcess {
+//             element_name: String,
+//             element_type: String,
+        
+//             log_emitter: Output<EventLog>,
+        
+//             previous_check_time: Option<MonotonicTime>,
+//             time_to_next_event_counter: Duration,
+        
+//             pub req_upstream: Requestor<(), QueueState>, Requestor<(), QueueState>),
+//             pub withdraw_upstream: (Requestor<(i32, NotificationMetadata), Vec<i32>>, Requestor<(i32, NotificationMetadata), Vec<i32>>),
+        
+//             pub req_downstream: Requestor<(), QueueState>,
+//             pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
+        
+//             $(pub $field_name: $field_type,)*
+//         }
+        
+//         impl Model for MyQueueCombinerProcess {}
+        
+//         impl MyQueueCombinerProcess {
+//             pub fn new() -> Self {
+//                 Self {
+//                     element_name: "MyQueueCombinerProcess".into(),
+//                     element_type: "MyQueueCombinerProcess".into(),
+//                     log_emitter: Output::new(),
+//                     previous_check_time: None,
+//                     time_to_next_event_counter: Duration::from_secs(0),
+//                     req_upstreams: (Requestor::new(), Requestor::new()),
+//                     withdraw_upstreams: (Requestor::new(), Requestor::new()),
+//                     req_downstream: Requestor::new(),
+//                     push_downstream: Output::new(),
+//                     $($field_name: Default::default(),)*
+//                 }
+//             }
+        
+//             pub fn with_name(mut self, name: String) -> Self {
+//                 self.element_name = name;
+//                 self
+//             }
+        
+//             pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+//                 self.log_emitter.connect_sink(&logger.buffer);
+//                 return self
+//             }
+        
+//             pub fn check_update_state<'a>(
+//                 &'a mut self,
+//                 notif_meta: NotificationMetadata,
+//                 cx: &'a mut Context<Self>,
+//             ) -> impl Future<Output = ()> + Send + 'a {
+//                 async move {
+//                     let current_time = cx.time();
+//                     let elapsed_time: Duration = match self.previous_check_time {
+//                         None => Duration::MAX,
+//                         Some(t) => current_time.duration_since(t),
+//                     };
+//                     self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+//                     if self.time_to_next_event_counter.is_zero() {
+//                         let self_moved = std::mem::take(self);
+//                         *self = $check_update_method(self_moved, current_time.clone()).await; 
+//                     }
+//                 }
+//             }
+        
+//         }
+        
+//         impl Default for MyQueueCombinerProcess {
+//             fn default() -> Self {
+//                 Self::new()
+//             }
+//         }
+//     }
+// }
 
 
