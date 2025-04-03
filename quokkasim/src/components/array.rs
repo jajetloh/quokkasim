@@ -1,5 +1,3 @@
-use std::ops::Add;
-
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 use crate::{common::{Distribution, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
 
@@ -310,7 +308,7 @@ define_combiner_process!(
     resource_in_parameter_types = (f64, f64),
     outflow_stock_state_type = ArrayStockState,
     resource_out_type = ArrayResource,
-    resource_out_parameter_type = ArrayResource,
+    resource_out_parameter_type = (),
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             let us_states = (x.req_upstreams.0.send(()).await.next(), x.req_upstreams.1.send(()).await.next());
@@ -339,8 +337,6 @@ define_combiner_process!(
 
                     let mut total = qty1.clone();
                     total.add(qty2);
-                    
-                    // let items = items0.into_iter().chain(items1.into_iter()).collect::<Vec<i32>>();
 
                     x.push_downstream.send((total.clone(), NotificationMetadata {
                         time,

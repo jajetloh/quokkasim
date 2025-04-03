@@ -299,7 +299,7 @@ define_combiner_process!(
     resource_in_parameter_types = (i32, i32),
     outflow_stock_state_type = QueueState,
     resource_out_type = Vec<i32>,
-    resource_out_parameter_type = i32,
+    resource_out_parameter_type = (),
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             let us_states = (x.req_upstreams.0.send(()).await.next(), x.req_upstreams.1.send(()).await.next());
