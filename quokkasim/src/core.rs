@@ -86,7 +86,7 @@ macro_rules! define_stock {
                 $struct_name {
                     element_name: "Stock".to_string(),
                     resource: $initial_resource,
-                    $($field_name: 0),*,
+                    $($field_name: Default::default()),*,
                     log_emitter: Output::new(),
                     state_emitter: Output::new(),
                     prev_state: None,
@@ -350,7 +350,7 @@ pub trait Sink: Model {
     type SubtractType;
     type SubtractParameterType;
 
-    fn destroy(&mut self, args: Self::SubtractParameterType, time: MonotonicTime) -> impl Future<Output = Self::SubtractType>;
+    // fn destroy(&mut self, args: Self::SubtractParameterType, time: MonotonicTime) -> impl Future<Output = Self::SubtractType>;
 
     fn check_update_state<'a>(
         &'a mut self,
@@ -367,7 +367,6 @@ macro_rules! define_sink {
         stock_state_type = $stock_state_type:ty,
         subtract_type = $subtract_type:ty,
         subtract_parameters_type = $subtract_parameters_type:ty,
-        destroy_method = $destroy_method:expr,
         check_update_method = $check_update_method:expr,
         fields = {
             $($field_name:ident : $field_type:ty),*
@@ -453,13 +452,6 @@ macro_rules! define_sink {
         impl Sink for $struct_name {
             type SubtractType = $subtract_type;
             type SubtractParameterType = $subtract_parameters_type;
-
-            fn destroy(&mut self, params: Self::SubtractParameterType, time: MonotonicTime) -> impl Future<Output = Self::SubtractType> {
-                async move {
-                    self.log(time, "Destroy".into(), format!("{:?}", params)).await;
-                    $destroy_method(self, params)
-                }
-            }
 
             fn check_update_state<'a>(
                 &'a mut self,
@@ -635,6 +627,7 @@ macro_rules! define_combiner_process {
         inflow_stock_state_types = ( $( $inflow_stock_state_types:ty ),+ ),
         resource_in_types = ( $( $resource_in_types:ty ),+ ),
         resource_in_parameter_types = ( $( $resource_in_parameter_types:ty ),+ ),
+        outflow_stock_state_type = $outflow_stock_state_type:ty,
         resource_out_type = $resource_out_type:ty,
         resource_out_parameter_type = $resource_out_parameter_type:ty,
 
@@ -656,15 +649,15 @@ macro_rules! define_combiner_process {
             pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
             pub withdraw_upstreams: ( $( Requestor<($resource_in_parameter_types, NotificationMetadata), $resource_in_types> ),+ ),
         
-            pub req_downstream: Requestor<(), QueueState>,
+            pub req_downstream: Requestor<(), $outflow_stock_state_type>,
             pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
         
             $(pub $field_name: $field_type,)*
         }
         
-        impl Model for MyQueueCombinerProcess {}
+        impl Model for $struct_name {}
         
-        impl MyQueueCombinerProcess {
+        impl $struct_name {
             pub fn new() -> Self {
                 Self {
                     element_name: "MyQueueCombinerProcess".into(),
@@ -672,9 +665,7 @@ macro_rules! define_combiner_process {
                     log_emitter: Output::new(),
                     previous_check_time: None,
                     time_to_next_event_counter: Duration::from_secs(0),
-                    // req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
                     req_upstreams: Default::default(),
-                    // req_upstreams: (Requestor::new(), Requestor::new()),
                     withdraw_upstreams: (Requestor::new(), Requestor::new()),
                     req_downstream: Requestor::new(),
                     push_downstream: Output::new(),
@@ -713,7 +704,7 @@ macro_rules! define_combiner_process {
         
         }
         
-        impl Default for MyQueueCombinerProcess {
+        impl Default for $struct_name {
             fn default() -> Self {
                 Self::new()
             }

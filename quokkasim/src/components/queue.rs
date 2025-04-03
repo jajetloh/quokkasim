@@ -164,11 +164,6 @@ define_sink!(
     stock_state_type = QueueState,
     subtract_type = Vec<i32>,
     subtract_parameters_type = i32,
-    destroy_method = |sink: &mut MyQueueSink, x: i32| -> Vec<i32> {
-        let mut resource = sink.resource.clone();
-        resource.retain(|&y| y != x);
-        resource
-    },
     check_update_method = |mut sink: Self, time: MonotonicTime| {
         async move {
             let us_state = sink.req_upstream.send(()).await.next();
@@ -302,6 +297,7 @@ define_combiner_process!(
     inflow_stock_state_types = (QueueState, QueueState),
     resource_in_types = (Vec<i32>, Vec<i32>),
     resource_in_parameter_types = (i32, i32),
+    outflow_stock_state_type = QueueState,
     resource_out_type = Vec<i32>,
     resource_out_parameter_type = i32,
     check_update_method = |mut x: Self, time: MonotonicTime| {
