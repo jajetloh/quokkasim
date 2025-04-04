@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use nexosim::time::MonotonicTime;
-use quokkasim::{common::EventLogger, components::array::{ArrayCombinerProcess, ArrayStock}, core::{Stock, Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, SimInit}};
+use quokkasim::{common::EventLogger, components::array::{ArrayCombinerProcess, ArrayProcess, ArrayStock}, core::{Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, Process, SimInit, Stock}};
 
 fn main() {
 
@@ -76,35 +76,51 @@ fn main() {
     let output_stockpile_2_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let output_stockpile_2_addr = output_stockpile_2_mbox.address();
 
+    let mut reclaimer_3 = ArrayProcess::new()
+        .with_name("Reclaimer 3".into())
+        .with_log_consumer(&logger);
+    let reclaimer_3_mbox: Mailbox<ArrayProcess> = Mailbox::new();
+    let reclaimer_3_addr = reclaimer_3_mbox.address();
+
     // Connections
 
     // - Reclaimer 1:
 
-    reclaimer_1.req_upstreams.0.connect(ArrayStock::get_state, &stockpile_1_addr);
-    reclaimer_1.withdraw_upstreams.0.connect(ArrayStock::remove, &stockpile_1_addr);
-    stockpile_1.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_1_addr);
+    // reclaimer_1.req_upstreams.0.connect(ArrayStock::get_state, &stockpile_1_addr);
+    // reclaimer_1.withdraw_upstreams.0.connect(ArrayStock::remove, &stockpile_1_addr);
+    // stockpile_1.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_1_addr);
 
-    reclaimer_1.req_upstreams.1.connect(ArrayStock::get_state, &stockpile_2_addr);
-    reclaimer_1.withdraw_upstreams.1.connect(ArrayStock::remove, &stockpile_2_addr);
-    stockpile_2.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_1_addr);
+    // reclaimer_1.req_upstreams.1.connect(ArrayStock::get_state, &stockpile_2_addr);
+    // reclaimer_1.withdraw_upstreams.1.connect(ArrayStock::remove, &stockpile_2_addr);
+    // stockpile_2.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_1_addr);
 
-    reclaimer_1.push_downstream.connect(ArrayStock::add, &output_stockpile_1_addr);
-    reclaimer_1.req_downstream.connect(ArrayStock::get_state, &output_stockpile_1_addr);
-    output_stockpile_1.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_1_addr);
+    // reclaimer_1.push_downstream.connect(ArrayStock::add, &output_stockpile_1_addr);
+    // reclaimer_1.req_downstream.connect(ArrayStock::get_state, &output_stockpile_1_addr);
+    // output_stockpile_1.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_1_addr);
     
     // - Reclaimer 2:
 
-    reclaimer_2.req_upstreams.0.connect(ArrayStock::get_state, &stockpile_2_addr);
-    reclaimer_2.withdraw_upstreams.0.connect(ArrayStock::remove, &stockpile_2_addr);
-    stockpile_2.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_2_addr);
+    // reclaimer_2.req_upstreams.0.connect(ArrayStock::get_state, &stockpile_2_addr);
+    // reclaimer_2.withdraw_upstreams.0.connect(ArrayStock::remove, &stockpile_2_addr);
+    // stockpile_2.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_2_addr);
 
-    reclaimer_2.req_upstreams.1.connect(ArrayStock::get_state, &stockpile_3_addr);
-    reclaimer_2.withdraw_upstreams.1.connect(ArrayStock::remove, &stockpile_3_addr);
-    stockpile_3.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_2_addr);
+    // reclaimer_2.req_upstreams.1.connect(ArrayStock::get_state, &stockpile_3_addr);
+    // reclaimer_2.withdraw_upstreams.1.connect(ArrayStock::remove, &stockpile_3_addr);
+    // stockpile_3.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_2_addr);
 
-    reclaimer_2.push_downstream.connect(ArrayStock::add, &output_stockpile_2_addr);
-    reclaimer_2.req_downstream.connect(ArrayStock::get_state, &output_stockpile_2_addr);
-    output_stockpile_2.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_2_addr);
+    // reclaimer_2.push_downstream.connect(ArrayStock::add, &output_stockpile_2_addr);
+    // reclaimer_2.req_downstream.connect(ArrayStock::get_state, &output_stockpile_2_addr);
+    // output_stockpile_2.state_emitter.connect(ArrayCombinerProcess::check_update_state, &reclaimer_2_addr);
+
+    // - Reclaimer 3
+
+    reclaimer_3.req_upstream.connect(ArrayStock::get_state, &stockpile_1_addr);
+    reclaimer_3.withdraw_upstream.connect(ArrayStock::remove, &stockpile_1_addr);
+    stockpile_1.state_emitter.connect(ArrayProcess::check_update_state, &reclaimer_3_addr);
+
+    reclaimer_3.req_downstream.connect(ArrayStock::get_state, &output_stockpile_1_addr);
+    reclaimer_3.push_downstream.connect(ArrayStock::add, &output_stockpile_1_addr);
+    output_stockpile_1.state_emitter.connect(ArrayProcess::check_update_state, &reclaimer_3_addr);
 
     // Model compilation and running
 
@@ -115,20 +131,26 @@ fn main() {
         .add_model(reclaimer_1, reclaimer_1_mbox, "Reclaimer 1")
         .add_model(output_stockpile_1, output_stockpile_1_mbox, "Output Stockpile 1")
         .add_model(reclaimer_2, reclaimer_2_mbox, "Reclaimer 2")
-        .add_model(output_stockpile_2, output_stockpile_2_mbox, "Output Stockpile 2");
+        .add_model(output_stockpile_2, output_stockpile_2_mbox, "Output Stockpile 2")
+        .add_model(reclaimer_3, reclaimer_3_mbox, "Reclaimer 3");
     
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_builder.init(start_time).unwrap().0;
-    simu.process_event(ArrayCombinerProcess::check_update_state, NotificationMetadata {
+    // simu.process_event(ArrayCombinerProcess::check_update_state, NotificationMetadata {
+    //     time: start_time,
+    //     element_from: "Reclaimer 1".into(),
+    //     message: "Start".into(),
+    // }, &reclaimer_1_addr).unwrap();
+    // simu.process_event(ArrayCombinerProcess::check_update_state, NotificationMetadata {
+    //     time: start_time,
+    //     element_from: "Reclaimer 2".into(),
+    //     message: "Start".into(),
+    // }, &reclaimer_2_addr).unwrap();
+    simu.process_event(ArrayProcess::check_update_state, NotificationMetadata {
         time: start_time,
-        element_from: "Reclaimer 1".into(),
+        element_from: "Reclaimer 3".into(),
         message: "Start".into(),
-    }, &reclaimer_1_addr).unwrap();
-    simu.process_event(ArrayCombinerProcess::check_update_state, NotificationMetadata {
-        time: start_time,
-        element_from: "Reclaimer 2".into(),
-        message: "Start".into(),
-    }, &reclaimer_2_addr).unwrap();
+    }, &reclaimer_3_addr).unwrap();
 
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 30)).unwrap();
     logger.write_csv("material_blending.csv").unwrap();

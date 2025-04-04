@@ -240,6 +240,7 @@ define_process!(
     resource_out_parameter_type = ArrayResource,
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
+
             let us_state = x.req_upstream.send(()).await.next();
             let ds_state = x.req_downstream.send(()).await.next();
 
@@ -293,6 +294,7 @@ define_process!(
                     }).await;
                 }
             }
+            x.time_to_next_event_counter = Duration::from_secs(61);
             x
         }
     },

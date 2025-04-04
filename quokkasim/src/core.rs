@@ -602,11 +602,18 @@ macro_rules! define_process {
                         None => Duration::MAX,
                         Some(t) => current_time.duration_since(t),
                     };
-                    self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+                    self.time_to_next_event_counter = self.time_to_next_event_counter.saturating_sub(elapsed_time);
                     if self.time_to_next_event_counter.is_zero() {
                         let self_moved = std::mem::take(self);
                         *self = $check_update_method(self_moved, current_time.clone()).await; 
                     }
+                    self.previous_check_time = Some(current_time);
+                    self.next_scheduled_event_time = Some(current_time + self.time_to_next_event_counter);
+                    self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                        self.next_scheduled_event_time.unwrap(),
+                        Self::check_update_state,
+                        notif_meta
+                    ).unwrap());
                 }
             }
         }
