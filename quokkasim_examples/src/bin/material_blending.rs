@@ -156,6 +156,6 @@ fn main() {
         message: "Start".into(),
     }, &reclaimer_3_addr).unwrap();
 
-    simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 30)).unwrap();
+    simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 2)).unwrap();
     logger.write_csv("material_blending.csv").unwrap();
 }

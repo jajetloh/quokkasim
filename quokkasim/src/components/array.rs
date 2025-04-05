@@ -371,7 +371,7 @@ define_combiner_process!(
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as downstream stock is full or isn't connected\"}}"),
+                        json_data: format!("{{\"message\": \"Failed to process items as downstream stock is full or isn't connected\"}}"),
                     }).await;
                 },
                 (
@@ -385,7 +385,7 @@ define_combiner_process!(
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as upstream stocks are empty or aren't connected\"}}"),
+                        json_data: format!("{{\"message\": \"Failed to process items as upstream stocks are empty or aren't connected\"}}"),
                     }).await;
                 }
             };

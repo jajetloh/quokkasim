@@ -647,10 +647,11 @@ macro_rules! define_combiner_process {
         pub struct $struct_name {
             element_name: String,
             element_type: String,
+            previous_check_time: Option<MonotonicTime>,
         
             log_emitter: Output<EventLog>,
-        
-            previous_check_time: Option<MonotonicTime>,
+            next_scheduled_event_time: Option<MonotonicTime>,
+            next_scheduled_event_key: Option<ActionKey>,
             time_to_next_event_counter: Duration,
         
             pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
@@ -669,8 +670,10 @@ macro_rules! define_combiner_process {
                 Self {
                     element_name: "MyQueueCombinerProcess".into(),
                     element_type: "MyQueueCombinerProcess".into(),
-                    log_emitter: Output::new(),
                     previous_check_time: None,
+                    log_emitter: Output::new(),
+                    next_scheduled_event_time: None,
+                    next_scheduled_event_key: None,
                     time_to_next_event_counter: Duration::from_secs(0),
                     req_upstreams: Default::default(),
                     withdraw_upstreams: (Requestor::new(), Requestor::new()),
@@ -706,6 +709,13 @@ macro_rules! define_combiner_process {
                         let self_moved = std::mem::take(self);
                         *self = $check_update_method(self_moved, current_time.clone()).await; 
                     }
+                    self.previous_check_time = Some(current_time);
+                    self.next_scheduled_event_time = Some(current_time + self.time_to_next_event_counter);
+                    self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                        self.next_scheduled_event_time.unwrap(),
+                        Self::check_update_state,
+                        notif_meta
+                    ).unwrap());
                 }
             }
         
