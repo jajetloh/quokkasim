@@ -78,6 +78,7 @@ macro_rules! define_stock {
         $(#[$attr])*
         pub struct $struct_name {
             pub element_name: String,
+            pub element_type: String,
             pub resource: $resource_type,
             $(pub $field_name: $field_type),*,
             pub log_emitter: Output<EventLog>,
@@ -90,7 +91,8 @@ macro_rules! define_stock {
         impl $struct_name {
             pub fn new() -> Self {
                 $struct_name {
-                    element_name: "Stock".to_string(),
+                    element_name: stringify!($struct_name).to_string(),
+                    element_type: stringify!($struct_name).to_string(),
                     resource: $initial_resource,
                     $($field_name: Default::default()),*,
                     log_emitter: Output::new(),
@@ -114,7 +116,7 @@ macro_rules! define_stock {
                     self.log_emitter.send(EventLog {
                         time,
                         element_name: self.element_name.clone(),
-                        element_type: stringify!($struct_name).to_string(),
+                        element_type: self.element_type.clone(),
                         log_type,
                         json_data,
                     }).await
@@ -255,8 +257,8 @@ macro_rules! define_source {
 
             pub fn new() -> Self {
                 $struct_name {
-                    element_name: "Source".to_string(),
-                    element_type: "Source".to_string(),
+                    element_name: stringify!($struct_name).to_string(),
+                    element_type: stringify!($struct_name).to_string(),
                     resource: Default::default(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
@@ -409,8 +411,8 @@ macro_rules! define_sink {
         impl $struct_name {
             pub fn new() -> Self {
                 $struct_name {
-                    element_name: "Sink".to_string(),
-                    element_type: "Sink".to_string(),
+                    element_name: stringify!($struct_name).to_string(),
+                    element_type: stringify!($struct_name).to_string(),
                     resource: Default::default(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
@@ -569,8 +571,8 @@ macro_rules! define_process {
         impl $struct_name {
             pub fn new() -> Self {
                 $struct_name {
-                    element_name: "Process".to_string(),
-                    element_type: "Process".to_string(),
+                    element_name: stringify!($struct_name).to_string(),
+                    element_type: stringify!($struct_name).to_string(),
                     resource: Default::default(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
@@ -682,8 +684,8 @@ macro_rules! define_combiner_process {
         impl $struct_name {
             pub fn new() -> Self {
                 Self {
-                    element_name: "MyQueueCombinerProcess".into(),
-                    element_type: "MyQueueCombinerProcess".into(),
+                    element_name: stringify!($struct_name).to_string(),
+                    element_type: stringify!($struct_name).to_string(),
                     previous_check_time: None,
                     log_emitter: Output::new(),
                     next_scheduled_event_time: None,
@@ -790,8 +792,8 @@ macro_rules! define_splitter_process {
         impl $struct_name {
             pub fn new() -> Self {
                 Self {
-                    element_name: "Splitter".into(),
-                    element_type: "Splitter".into(),
+                    element_name: stringify!($struct_name).to_string(),
+                    element_type: stringify!($struct_name).to_string(),
                     previous_check_time: None,
                     log_emitter: Output::new(),
                     next_scheduled_event_time: None,
