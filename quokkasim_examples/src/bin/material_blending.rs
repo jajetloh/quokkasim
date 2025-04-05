@@ -3,7 +3,7 @@ use std::time::Duration;
 use nexosim::time::MonotonicTime;
 use quokkasim::{
     common::EventLogger,
-    components::array::{ArrayCombinerProcess, ArrayProcess, ArrayStock},
+    components::array::{ArrayCombinerProcess, ArrayProcess, ArraySplitterProcess, ArrayStock},
     core::{
         Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata,
         Process, SimInit, Stock,
@@ -97,7 +97,6 @@ fn main() {
         .with_log_consumer(&logger);
     output_stockpile_2.low_capacity = 100.;
     output_stockpile_2.max_capacity = 15000.;
-
     let output_stockpile_2_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let output_stockpile_2_addr = output_stockpile_2_mbox.address();
 
@@ -108,6 +107,14 @@ fn main() {
     reclaimer_3.process_duration_secs_dist = Some(Distribution::Constant(60.));
     let reclaimer_3_mbox: Mailbox<ArrayProcess> = Mailbox::new();
     let reclaimer_3_addr = reclaimer_3_mbox.address();
+
+    let mut stacker = ArraySplitterProcess::new()
+        .with_name("Stacker".into())
+        .with_log_consumer(&logger);
+    stacker.process_quantity_dist = Some(Distribution::Constant(600.));
+    stacker.process_duration_secs_dist = Some(Distribution::Constant(360.));
+    let stacker_mbox: Mailbox<ArraySplitterProcess> = Mailbox::new();
+    let stacker_addr = stacker_mbox.address();
 
     // Connections
 
@@ -205,6 +212,26 @@ fn main() {
         .state_emitter
         .connect(ArrayProcess::check_update_state, &reclaimer_3_addr);
 
+    // Stacker
+
+    stacker
+        .req_upstream
+        .connect(ArrayStock::get_state, &output_stockpile_1_addr);
+    stacker
+        .withdraw_upstream
+        .connect(ArrayStock::remove, &output_stockpile_1_addr);
+    output_stockpile_1
+        .state_emitter
+        .connect(ArraySplitterProcess::check_update_state, &stacker_addr);
+
+    stacker.req_downstreams.0.connect(ArrayStock::get_state, &stockpile_2_addr);
+    stacker.push_downstreams.0.connect(ArrayStock::add, &stockpile_2_addr);
+    stockpile_2.state_emitter.connect(ArraySplitterProcess::check_update_state, &stacker_addr);
+
+    stacker.req_downstreams.1.connect(ArrayStock::get_state, &stockpile_3_addr);
+    stacker.push_downstreams.1.connect(ArrayStock::add, &stockpile_3_addr);
+    stockpile_3.state_emitter.connect(ArraySplitterProcess::check_update_state, &stacker_addr);
+
     // Model compilation and running
 
     let sim_builder = SimInit::new()
@@ -223,7 +250,8 @@ fn main() {
             output_stockpile_2_mbox,
             "Output Stockpile 2",
         )
-        .add_model(reclaimer_3, reclaimer_3_mbox, "Reclaimer 3");
+        .add_model(reclaimer_3, reclaimer_3_mbox, "Reclaimer 3")
+        .add_model(stacker, stacker_mbox, "Stacker");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_builder.init(start_time).unwrap().0;
@@ -235,8 +263,7 @@ fn main() {
             message: "Start".into(),
         },
         &reclaimer_1_addr,
-    )
-    .unwrap();
+    ).unwrap();
     simu.process_event(
         ArrayCombinerProcess::check_update_state,
         NotificationMetadata {
@@ -245,8 +272,7 @@ fn main() {
             message: "Start".into(),
         },
         &reclaimer_2_addr,
-    )
-    .unwrap();
+    ).unwrap();
     simu.process_event(
         ArrayProcess::check_update_state,
         NotificationMetadata {
@@ -255,8 +281,16 @@ fn main() {
             message: "Start".into(),
         },
         &reclaimer_3_addr,
-    )
-    .unwrap();
+    ).unwrap();
+    simu.process_event(
+        ArraySplitterProcess::check_update_state,
+        NotificationMetadata {
+            time: start_time,
+            element_from: "Stacker".into(),
+            message: "Start".into(),
+        },
+        &stacker_addr,
+    ).unwrap();
 
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 2))
         .unwrap();

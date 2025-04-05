@@ -1,7 +1,5 @@
 use crate::{
-    common::{Distribution, EventLog, EventLogger, NotificationMetadata},
-    core::{ResourceAdd, ResourceRemove, StateEq},
-    define_combiner_process, define_process, define_sink, define_source, define_stock,
+    common::{Distribution, EventLog, EventLogger, NotificationMetadata}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 
@@ -79,6 +77,14 @@ impl ResourceRemove<ArrayResource, ArrayResource> for ArrayResource {
             .zip(qty.vec.iter())
             .for_each(|(a, b)| *a -= b);
         qty
+    }
+}
+
+impl ResourceMultiply<f64> for ArrayResource {
+    fn mul(&mut self, qty: f64) -> ArrayResource {
+        let mut new_resource = self.clone();
+        new_resource.vec.iter_mut().for_each(|x| *x *= qty);
+        new_resource
     }
 }
 
@@ -340,14 +346,14 @@ define_combiner_process!(
 
             match (&us_states.0, &us_states.1, &ds_state) {
                 (
-                    Some(ArrayStockState::Normal { .. } ) | Some(ArrayStockState::Full { .. } ),
-                    Some(ArrayStockState::Normal { .. } ) | Some(ArrayStockState::Full { .. } ),
-                    Some(ArrayStockState::Empty { .. } ) | Some(ArrayStockState::Normal { .. } ),
+                    Some(ArrayStockState::Normal { occupied: occupied_1, .. } ) | Some(ArrayStockState::Full { occupied: occupied_1, .. } ),
+                    Some(ArrayStockState::Normal { occupied: occupied_2, .. } ) | Some(ArrayStockState::Full { occupied: occupied_2, .. } ),
+                    Some(ArrayStockState::Empty { remaining_capacity, .. } ) | Some(ArrayStockState::Normal { remaining_capacity, .. } ),
                 ) => {
-
+                    
                     let process_quantity = x.process_quantity_dist.as_mut().unwrap_or_else(
                         || panic!("Process quantity dist not defined!")
-                    ).sample();
+                    ).sample().min(*occupied_1 + *occupied_2).min(*remaining_capacity);
 
                     let qty1: ArrayResource = x.withdraw_upstreams.0.send((process_quantity, NotificationMetadata {
                         time,
@@ -403,6 +409,96 @@ define_combiner_process!(
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
                         json_data: format!("{{\"message\": \"Failed to process items as upstream stocks are empty or aren't connected\"}}"),
+                    }).await;
+                }
+            };
+            x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
+                || panic!("Process duration distribution not set!")
+            ).sample());
+            x
+        }
+    },
+    fields = {
+        process_quantity_dist: Option<Distribution>,
+        process_duration_secs_dist: Option<Distribution>
+    },
+);
+
+define_splitter_process!(
+    /// Splitter process for the `ArrayResource` type.
+    name = ArraySplitterProcess,
+    inflow_stock_state_type = ArrayStockState,
+    resource_in_type = ArrayResource,
+    resource_in_parameter_type = f64,
+    outflow_stock_state_types = (ArrayStockState, ArrayStockState),
+    resource_out_types = (ArrayResource, ArrayResource),
+    resource_out_parameter_types = (ArrayResource, ArrayResource),
+    check_update_method = |mut x: Self, time: MonotonicTime| {
+        async move {
+            let us_state = x.req_upstream.send(()).await.next();
+            let ds_states = (x.req_downstreams.0.send(()).await.next(), x.req_downstreams.1.send(()).await.next());
+
+            match (&us_state, &ds_states.0, &ds_states.1) {
+                (
+                    Some(ArrayStockState::Normal { occupied, .. } ) | Some(ArrayStockState::Full { occupied, .. } ),
+                    Some(ArrayStockState::Empty { remaining_capacity: remaining_capacity_1, .. } ) | Some(ArrayStockState::Normal { remaining_capacity: remaining_capacity_1, .. } ),
+                    Some(ArrayStockState::Empty { remaining_capacity: remaining_capacity_2, .. } ) | Some(ArrayStockState::Normal { remaining_capacity: remaining_capacity_2, .. } ),
+                ) => {
+
+                    let process_quantity = x.process_quantity_dist.as_mut().unwrap_or_else(
+                        || panic!("Process quantity dist not defined!")
+                    ).sample().min(*occupied).min(*remaining_capacity_1 + *remaining_capacity_2);
+
+                    let processed_resource: ArrayResource = x.withdraw_upstream.send((process_quantity, NotificationMetadata {
+                        time,
+                        element_from: x.element_name.clone(),
+                        message: "Withdrawing item".into(),
+                    })).await.next().unwrap();
+
+                    let qty1 = processed_resource.clone().mul(0.5);
+                    let qty2 = processed_resource.clone().mul(0.5);
+
+                    x.push_downstreams.0.send((qty1.clone(), NotificationMetadata {
+                        time,
+                        element_from: x.element_name.clone(),
+                        message: "Processing complete".into(),
+                    })).await;
+                    x.push_downstreams.1.send((qty2.clone(), NotificationMetadata {
+                        time,
+                        element_from: x.element_name.clone(),
+                        message: "Processing complete".into(),
+                    })).await;
+
+                    x.log_emitter.send(EventLog {
+                        time,
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        log_type: "info".into(),
+                        json_data: format!("{{\"message\": \"Processed quantity\", \"quantity\": {:?}}}", processed_resource),
+                    }).await;
+
+                },
+                (
+                    Some(ArrayStockState::Empty {..} ) | None, _, _
+                ) => {
+                    // Do nothing
+                    x.log_emitter.send(EventLog {
+                        time,
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        log_type: "info".into(),
+                        json_data: format!("{{\"message\": \"Failed to process items as downstream stocks are full or aren't connected\"}}"),
+                    }).await;
+                },
+                (_, Some(ArrayStockState::Full {..} ) | None, _)
+                    | (_, _, Some(ArrayStockState::Full {..} ) | None) => {
+                    // Do nothing
+                    x.log_emitter.send(EventLog {
+                        time,
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        log_type: "info".into(),
+                        json_data: format!("{{\"message\": \"Failed to process items as upstream stock is empty or isn't connected\"}}"),
                     }).await;
                 }
             };
