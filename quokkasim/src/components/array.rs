@@ -3,6 +3,11 @@ use crate::{
 };
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 
+/**
+ * This module is based around the `ArrayResource` type, which holds an array of 5 f64 values.
+ * Processing is performed instantaneously by Process-type components.
+ */
+
 #[derive(Debug, Clone)]
 pub enum ArrayStockState {
     Empty {
