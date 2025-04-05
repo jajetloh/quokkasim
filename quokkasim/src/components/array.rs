@@ -328,15 +328,17 @@ define_combiner_process!(
                     Some(ArrayStockState::Empty { .. } ) | Some(ArrayStockState::Normal { .. } ),
                 ) => {
 
-                    let process_qty = x.process_quantity_dist.sample();
+                    let process_quantity = x.process_quantity_dist.as_mut().unwrap_or_else(
+                        || panic!("Process quantity dist not defined!")
+                    ).sample();
                     
-                    let qty1: ArrayResource = x.withdraw_upstreams.0.send((process_qty, NotificationMetadata {
+                    let qty1: ArrayResource = x.withdraw_upstreams.0.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Withdrawing item".into(),
                     })).await.next().unwrap();
 
-                    let qty2: ArrayResource = x.withdraw_upstreams.1.send((process_qty, NotificationMetadata {
+                    let qty2: ArrayResource = x.withdraw_upstreams.1.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Withdrawing item".into(),
@@ -387,10 +389,14 @@ define_combiner_process!(
                     }).await;
                 }
             };
+            x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
+                || panic!("Process duration distribution not set!")
+            ).sample());
             x
         }
     },
     fields = {
-        process_quantity_dist: Distribution
+        process_quantity_dist: Option<Distribution>,
+        process_duration_secs_dist: Option<Distribution>
     },
 );
