@@ -1,5 +1,9 @@
+use crate::{
+    common::{Distribution, EventLog, EventLogger, NotificationMetadata},
+    core::{ResourceAdd, ResourceRemove, StateEq},
+    define_combiner_process, define_process, define_sink, define_source, define_stock,
+};
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
-use crate::{common::{Distribution, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum ArrayStockState {
@@ -28,6 +32,7 @@ impl StateEq for ArrayStockState {
     }
 }
 
+/// A resource type that contains an array of 5 f64 values.
 #[derive(Debug, Clone)]
 pub struct ArrayResource {
     pub vec: [f64; 5],
@@ -47,7 +52,10 @@ impl Default for ArrayResource {
 
 impl ResourceAdd<Self> for ArrayResource {
     fn add(&mut self, item: Self) {
-        self.vec.iter_mut().zip(item.vec.iter()).for_each(|(a, b)| *a += b);
+        self.vec
+            .iter_mut()
+            .zip(item.vec.iter())
+            .for_each(|(a, b)| *a += b);
     }
 }
 
@@ -56,19 +64,26 @@ impl ResourceRemove<f64, ArrayResource> for ArrayResource {
         // Removes proportionally from each element of the array
         let proportion = qty / self.total();
         let removed = self.vec.map(|x| x * proportion);
-        self.vec.iter_mut().zip(removed.iter()).for_each(|(a, b)| *a -= b);
+        self.vec
+            .iter_mut()
+            .zip(removed.iter())
+            .for_each(|(a, b)| *a -= b);
         ArrayResource { vec: removed }
     }
 }
 
 impl ResourceRemove<ArrayResource, ArrayResource> for ArrayResource {
     fn sub(&mut self, qty: ArrayResource) -> ArrayResource {
-        self.vec.iter_mut().zip(qty.vec.iter()).for_each(|(a, b)| *a -= b);
+        self.vec
+            .iter_mut()
+            .zip(qty.vec.iter())
+            .for_each(|(a, b)| *a -= b);
         qty
     }
 }
 
 define_stock!(
+    /// Stock for the `ArrayResource` type.
     name = ArrayStock,
     resource_type = ArrayResource,
     initial_resource = ArrayResource { vec: [0.0; 5] },
@@ -104,6 +119,7 @@ define_stock!(
 );
 
 define_source!(
+    /// Source for the `ArrayResource` type.
     name = ArraySource,
     resource_type = ArrayResource,
     stock_state_type = ArrayStockState,
@@ -114,7 +130,7 @@ define_source!(
         let mut new_resource = ArrayResource { vec: [0.0; 5] };
         new_resource.vec.iter_mut().zip(source.component_split.vec.iter()).for_each(|(a, b)| *a = b * proportion);
         new_resource
-    },  
+    },
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             let ds_state = x.req_downstream.send(()).await.next();
@@ -171,6 +187,7 @@ define_source!(
 );
 
 define_sink!(
+    /// Sink for the `ArrayResource` type.
     name = ArraySink,
     resource_type = ArrayResource,
     stock_state_type = ArrayStockState,
@@ -181,8 +198,6 @@ define_sink!(
             let us_state = sink.req_upstream.send(()).await.next();
             match us_state {
                 Some(ArrayStockState::Full { .. } | ArrayStockState::Normal { .. }) => {
-                    // let ved = sink.destroy(sink.destroy_quantity_dist.sample());
-                    // let removed = sink.resource.sub(sink.destroy_quantity_dist.sample());
                     let sink_qty = sink.destroy_quantity_dist.sample();
                     let removed = sink.withdraw_upstream.send((sink_qty, NotificationMetadata {
                         time,
@@ -232,6 +247,7 @@ define_sink!(
 );
 
 define_process!(
+    /// Process for the `ArrayResource` type.
     name = ArrayProcess,
     stock_state_type = ArrayStockState,
     resource_in_type = ArrayResource,
@@ -309,6 +325,7 @@ define_process!(
 );
 
 define_combiner_process!(
+    /// Combiner process for the `ArrayResource` type.
     name = ArrayCombinerProcess,
     inflow_stock_state_types = (ArrayStockState, ArrayStockState),
     resource_in_types = (ArrayResource, ArrayResource),
@@ -331,7 +348,7 @@ define_combiner_process!(
                     let process_quantity = x.process_quantity_dist.as_mut().unwrap_or_else(
                         || panic!("Process quantity dist not defined!")
                     ).sample();
-                    
+
                     let qty1: ArrayResource = x.withdraw_upstreams.0.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),

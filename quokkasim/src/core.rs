@@ -54,6 +54,7 @@ pub trait Stock: Model {
 #[macro_export]
 macro_rules! define_stock {
     (
+        $(#[$attr:meta])*
         name = $struct_name:ident,
         resource_type = $resource_type:ty,
         initial_resource = $initial_resource:expr,
@@ -70,6 +71,7 @@ macro_rules! define_stock {
         use nexosim::model::Model;
         use $crate::core::Stock;
 
+        $(#[$attr])*
         pub struct $struct_name {
             pub element_name: String,
             pub resource: $resource_type,
@@ -206,6 +208,7 @@ pub trait Source: Model {
 #[macro_export]
 macro_rules! define_source {
     (
+        $(#[$attr:meta])*
         name = $struct_name:ident,
         resource_type = $resource_type:ty,
         stock_state_type = $stock_state_type:ty,
@@ -221,6 +224,7 @@ macro_rules! define_source {
         use nexosim::simulation::ActionKey;
         use $crate::core::{Source, Duration};
 
+        $(#[$attr])*
         pub struct $struct_name {
             element_name: String,
             element_type: String,
@@ -362,6 +366,7 @@ pub trait Sink: Model {
 #[macro_export]
 macro_rules! define_sink {
     (
+        $(#[$attr:meta])*
         name = $struct_name:ident,
         resource_type = $resource_type:ty,
         stock_state_type = $stock_state_type:ty,
@@ -374,6 +379,7 @@ macro_rules! define_sink {
     ) => {
         use $crate::core::Sink;
 
+        $(#[$attr])*
         pub struct $struct_name {
             element_name: String,
             element_type: String,
@@ -514,6 +520,7 @@ pub trait Process: Model {
 #[macro_export]
 macro_rules! define_process {
     (
+        $(#[$attr:meta])*
         name = $struct_name:ident,
 
         stock_state_type = $stock_state_type:ty,
@@ -531,6 +538,7 @@ macro_rules! define_process {
 
         use $crate::core::Process;
 
+        $(#[$attr])*
         pub struct $struct_name {
             pub element_name: String,
             pub element_type: String,
@@ -629,6 +637,7 @@ macro_rules! define_process {
 #[macro_export]
 macro_rules! define_combiner_process {
     (
+        $(#[$attr:meta])*
         name = $struct_name:ident,
 
         inflow_stock_state_types = ( $( $inflow_stock_state_types:ty ),+ ),
@@ -644,6 +653,7 @@ macro_rules! define_combiner_process {
         },
         
     ) => {
+        $(#[$attr])*
         pub struct $struct_name {
             element_name: String,
             element_type: String,
