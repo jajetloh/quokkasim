@@ -249,7 +249,9 @@ define_process!(
                     Some(ArrayStockState::Normal {..}) | Some(ArrayStockState::Full {..}),
                     Some(ArrayStockState::Empty {..}) | Some(ArrayStockState::Normal {..}),
                 ) => {
-                    let process_quantity = x.process_quantity_dist.sample();
+                    let process_quantity = x.process_quantity_dist.as_mut().unwrap_or_else(
+                        || panic!("Process quantity dist not defined!")
+                    ).sample();
                     let moved = x.withdraw_upstream.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
@@ -294,12 +296,15 @@ define_process!(
                     }).await;
                 }
             }
-            x.time_to_next_event_counter = Duration::from_secs(61);
+            x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
+                || panic!("Process duration distribution not set!")
+            ).sample());
             x
         }
     },
     fields = {
-        process_quantity_dist: Distribution
+        process_quantity_dist: Option<Distribution>,
+        process_duration_secs_dist: Option<Distribution>
     },
 );
 

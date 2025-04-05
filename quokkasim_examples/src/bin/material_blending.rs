@@ -79,6 +79,8 @@ fn main() {
     let mut reclaimer_3 = ArrayProcess::new()
         .with_name("Reclaimer 3".into())
         .with_log_consumer(&logger);
+    // reclaimer_3.process_quantity_dist = Some(Distribution::Constant(100.));
+    reclaimer_3.process_duration_secs_dist = Some(Distribution::Constant(60.));
     let reclaimer_3_mbox: Mailbox<ArrayProcess> = Mailbox::new();
     let reclaimer_3_addr = reclaimer_3_mbox.address();
 
