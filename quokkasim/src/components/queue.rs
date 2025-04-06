@@ -232,12 +232,14 @@ define_process!(
 
             match (&us_state, &ds_state) {
                 (
-                    Some(QueueState::Normal {..} ) | Some(QueueState::Full {..} ),
-                    Some(QueueState::Empty {..} ) | Some(QueueState::Normal {..} ),
+                    Some(QueueState::Normal { occupied, .. } ) | Some(QueueState::Full { occupied, .. } ),
+                    Some(QueueState::Empty { empty, .. } ) | Some(QueueState::Normal { empty, .. } ),
                 ) => {
-                    let sink_quantity = x.process_quantity_dist.sample().round() as i32;
-                    
-                    let items = x.withdraw_upstream.send((sink_quantity, NotificationMetadata {
+                    let process_quantity = (x.process_quantity_dist.as_mut().unwrap_or_else(
+                        || panic!("Process quantity dist not defined!")
+                    ).sample().round() as i32).min(*occupied).min(*empty);
+
+                    let items = x.withdraw_upstream.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Withdrawing item".into(),
@@ -284,11 +286,15 @@ define_process!(
                     }).await;
                 },
             }
+            x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
+                || panic!("Process duration distribution not set!")
+            ).sample());
             x
         }
     },
     fields = {
-        process_quantity_dist: Distribution
+        process_quantity_dist: Option<Distribution>,
+        process_duration_secs_dist: Option<Distribution>
     },
 );
 

@@ -50,15 +50,18 @@ fn main() {
     let mut combiner = MyQueueCombinerProcess::new()
         .with_name("Combiner".into())
         .with_log_consumer(&logger);
+    combiner.process_duration_secs_dist = Some(Distribution::Constant(30.));
+    combiner.process_quantity_dist = Some(Distribution::Constant(2.));
     let combiner_mbox: Mailbox<MyQueueCombinerProcess> = Mailbox::new();
     let combiner_addr = combiner_mbox.address();
 
-    // let mut process = MyQueueProcess::new()
-    //     .with_name("Process".into())
-    //     .with_log_consumer(&logger);
-    // process.process_quantity_dist = Distribution::Constant(1.);
-    // let process_mbox: Mailbox<MyQueueProcess> = Mailbox::new();
-    // let process_addr = process_mbox.address();
+    let mut process = MyQueueProcess::new()
+        .with_name("Process".into())
+        .with_log_consumer(&logger);
+    process.process_quantity_dist = Some(Distribution::Constant(1.));
+    process.process_duration_secs_dist = Some(Distribution::Constant(15.));
+    let process_mbox: Mailbox<MyQueueProcess> = Mailbox::new();
+    let process_addr = process_mbox.address();
 
     let mut stock3 = MyQueueStock::new()
         .with_name("Stock3".into())
@@ -89,18 +92,16 @@ fn main() {
     combiner.req_upstreams.1.connect(MyQueueStock::get_state, &stock2_addr);
     stock1.state_emitter.connect(MyQueueCombinerProcess::check_update_state, &combiner_addr);
     stock2.state_emitter.connect(MyQueueCombinerProcess::check_update_state, &combiner_addr);
-
     combiner.push_downstream.connect(MyQueueStock::add, &stock3_addr);
     combiner.req_downstream.connect(MyQueueStock::get_state, &stock3_addr);
     stock3.state_emitter.connect(MyQueueCombinerProcess::check_update_state, &combiner_addr);
 
-    // process.withdraw_upstream.connect(MyQueueStock::remove, &stock1_addr);
-    // process.req_upstream.connect(MyQueueStock::get_state, &stock1_addr);
-    // stock1.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
-
-    // process.push_downstream.connect(MyQueueStock::add, &stock2_addr);
-    // process.req_downstream.connect(MyQueueStock::get_state, &stock2_addr);
-    // stock3.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
+    process.withdraw_upstream.connect(MyQueueStock::remove, &stock1_addr);
+    process.req_upstream.connect(MyQueueStock::get_state, &stock1_addr);
+    stock1.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
+    process.push_downstream.connect(MyQueueStock::add, &stock2_addr);
+    process.req_downstream.connect(MyQueueStock::get_state, &stock2_addr);
+    stock3.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
 
     sink.withdraw_upstream.connect(MyQueueStock::remove, &stock3_addr);
     sink.req_upstream.connect(MyQueueStock::get_state, &stock3_addr);
@@ -112,6 +113,7 @@ fn main() {
         .add_model(source2, source2_mbox, "Source2")
         .add_model(stock2, stock2_mbox, "Stock2")
         .add_model(combiner, combiner_mbox, "Combiner")
+        .add_model(process, process_mbox, "Process")
         .add_model(stock3, stock3_mbox, "Stock3")
         .add_model(sink, sink_mbox, "Sink");
 
@@ -120,7 +122,7 @@ fn main() {
         MyQueueSource::check_update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
-            element_from: "Source1".into(),
+            element_from: "Init".into(),
             message: "check_update_state".into(),
         },
         &source1_addr,
@@ -129,17 +131,22 @@ fn main() {
         MyQueueSource::check_update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
-            element_from: "Source2".into(),
+            element_from: "Init".into(),
             message: "check_update_state".into(),
         },
         &source2_addr,
     ).unwrap();
     simu.process_event(MyQueueCombinerProcess::check_update_state, NotificationMetadata {
         time: MonotonicTime::EPOCH,
-        element_from: "Process".into(),
+        element_from: "Init".into(),
         message: "check_update_state".into(),
     }, &combiner_addr).unwrap();
+    simu.process_event(MyQueueProcess::check_update_state, NotificationMetadata {
+        time: MonotonicTime::EPOCH,
+        element_from: "Init".into(),
+        message: "check_update_state".into(),
+    }, &process_addr).unwrap();
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
-    logger.write_csv("logs.csv").unwrap();
+    logger.write_csv("outputs/discrete_queue_2.csv").unwrap();
 }

@@ -294,5 +294,5 @@ fn main() {
 
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 2))
         .unwrap();
-    logger.write_csv("material_blending.csv").unwrap();
+    logger.write_csv("outputs/material_blending_logs.csv").unwrap();
 }

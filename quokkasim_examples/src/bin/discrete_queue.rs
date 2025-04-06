@@ -343,6 +343,6 @@ fn main() {
     ).unwrap();
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(30)).unwrap();
 
-    logger.write_csv("logs.csv").unwrap();
-    stock_logger.write_csv("stock_logs.csv").unwrap();
+    logger.write_csv("outputs/discrete_queue_logs.csv").unwrap();
+    stock_logger.write_csv("outputs/discrete_queue_stock_logs.csv").unwrap();
 }
