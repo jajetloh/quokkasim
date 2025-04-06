@@ -88,7 +88,7 @@ macro_rules! define_stock {
             prev_state: Option<$state_type>,
         }
 
-        impl Model for $struct_name {}
+        impl nexosim::model::Model for $struct_name {}
 
         impl<'a> $struct_name {
             pub fn new() -> Self {
@@ -108,7 +108,7 @@ macro_rules! define_stock {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
@@ -148,7 +148,7 @@ macro_rules! define_stock {
                             if !ps.is_same_state(&current_state) {
                                 self.log(cx.time(), "StateChange".to_string()).await;
                                 cx.schedule_event(
-                                    cx.time() + Duration::from_nanos(1), $struct_name::notify_change, notif_meta
+                                    cx.time() + ::std::time::Duration::from_nanos(1), $struct_name::notify_change, notif_meta
                                 ).unwrap();
                             } else {
                             }
@@ -225,7 +225,8 @@ macro_rules! define_source {
         check_update_method = $check_update_method:expr,
         fields = {
             $($field_name:ident : $field_type:ty),*
-        }
+        },
+        log_record_type = $log_record_type:ty
     ) => {
         use nexosim::ports::Requestor;
         use nexosim::simulation::ActionKey;
@@ -252,7 +253,7 @@ macro_rules! define_source {
             pub push_downstream: Output<($add_type, NotificationMetadata)>,
         }
 
-        impl Model for $struct_name {}
+        impl nexosim::model::Model for $struct_name {}
 
         impl $struct_name {
 
@@ -283,7 +284,7 @@ macro_rules! define_source {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
@@ -291,7 +292,7 @@ macro_rules! define_source {
             pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
                 async move {
                     self.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: self.element_name.clone(),
                         element_type: self.element_type.clone(),
                         log_type,
@@ -383,6 +384,7 @@ macro_rules! define_sink {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
+        log_record_type = $log_record_type:ty
     ) => {
         use $crate::core::Sink;
 
@@ -407,7 +409,7 @@ macro_rules! define_sink {
             pub withdraw_upstream: Requestor<($subtract_parameters_type, NotificationMetadata), $subtract_type>,
         }
 
-        impl Model for $struct_name {}
+        impl nexosim::model::Model for $struct_name {}
 
         impl $struct_name {
             pub fn new() -> Self {
@@ -438,7 +440,7 @@ macro_rules! define_sink {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
@@ -446,7 +448,7 @@ macro_rules! define_sink {
             pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
                 async move {
                     self.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: self.element_name.clone(),
                         element_type: self.element_type.clone(),
                         log_type,
@@ -540,7 +542,7 @@ macro_rules! define_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        
+        log_record_type = $log_record_type:ty
     ) => {
 
         use $crate::core::Process;
@@ -566,7 +568,7 @@ macro_rules! define_process {
             $(pub $field_name: $field_type,)*
         }
 
-        impl Model for $struct_name {}
+        impl nexosim::model::Model for $struct_name {}
 
         impl $struct_name {
             pub fn new() -> Self {
@@ -591,7 +593,7 @@ macro_rules! define_process {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
@@ -656,7 +658,7 @@ macro_rules! define_combiner_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        
+        log_record_type = $log_record_type:ty
     ) => {
         $(#[$attr])*
         pub struct $struct_name {
@@ -678,7 +680,7 @@ macro_rules! define_combiner_process {
             $(pub $field_name: $field_type,)*
         }
         
-        impl Model for $struct_name {}
+        impl nexosim::model::Model for $struct_name {}
         
         impl $struct_name {
             pub fn new() -> Self {
@@ -703,7 +705,7 @@ macro_rules! define_combiner_process {
                 self
             }
         
-            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
@@ -763,7 +765,7 @@ macro_rules! define_splitter_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        
+        log_record_type = $log_record_type:ty
     ) => {
 
         $(#[$attr])*
@@ -811,7 +813,7 @@ macro_rules! define_splitter_process {
                 self
             }
         
-            pub fn with_log_consumer(mut self, logger: &EventLogger) -> Self {
+            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
@@ -841,7 +843,6 @@ macro_rules! define_splitter_process {
                     ).unwrap());
                 }
             }
-        
         }
         
         impl Default for $struct_name {

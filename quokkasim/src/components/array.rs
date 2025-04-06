@@ -94,20 +94,20 @@ impl ResourceMultiply<f64> for ArrayResource {
     }
 }
 
-#[derive(Serialize, Clone)]
-struct ArrayStockLog {
-    time: MonotonicTime,
-    element_name: String,
-    element_type: String,
-    log_type: String,
-    occupied: f64,
-    remaining_capacity: f64,
-    state: String,
-    x0: f64,
-    x1: f64,
-    x2: f64,
-    x3: f64,
-    x4: f64,
+#[derive(Serialize, Clone, Debug)]
+pub struct ArrayStockLog {
+    pub time: String,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub occupied: f64,
+    pub remaining_capacity: f64,
+    pub state: String,
+    pub x0: f64,
+    pub x1: f64,
+    pub x2: f64,
+    pub x3: f64,
+    pub x4: f64,
 }
 
 define_stock!(
@@ -144,12 +144,12 @@ define_stock!(
     },
     check_update_method = |x: &mut Self, cx: &mut Context<Self>| {
     },
-    log_record_type =  ArrayStockLog,
+    log_record_type = ArrayStockLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, log_type: String| {
         async move {
             let state = x.get_state().await;
             let log = ArrayStockLog {
-                time,
+                time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
                 log_type,
@@ -205,7 +205,7 @@ define_source!(
                         message: "New resource created".to_string(),
                     })).await;
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: "ArraySource".to_string(),
                         log_type: "New resource created".to_string(),
@@ -217,7 +217,7 @@ define_source!(
                 },
                 Some(ArrayStockState::Full { .. }) => {
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: "ArraySource".to_string(),
                         log_type: "Stock is full".to_string(),
@@ -228,7 +228,7 @@ define_source!(
                 },
                 None => {
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: "ArraySource".to_string(),
                         log_type: "No downstream state".to_string(),
@@ -244,7 +244,8 @@ define_source!(
     fields = {
         component_split: ArrayResource,
         create_quantity_dist: Distribution
-    }
+    },
+    log_record_type = EventLog
 );
 
 define_sink!(
@@ -266,7 +267,7 @@ define_sink!(
                         message: "Resource removed".to_string(),
                     })).await.collect::<Vec<_>>();
                     sink.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: sink.element_name.clone(),
                         element_type: "ArraySink".to_string(),
                         log_type: "Resource destroyed".to_string(),
@@ -278,7 +279,7 @@ define_sink!(
                 },
                 Some(ArrayStockState::Empty { .. }) => {
                     sink.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: sink.element_name.clone(),
                         element_type: "ArraySink".to_string(),
                         log_type: "Stock is full".to_string(),
@@ -289,7 +290,7 @@ define_sink!(
                 },
                 None => {
                     sink.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: sink.element_name.clone(),
                         element_type: "ArraySink".to_string(),
                         log_type: "No upstream state".to_string(),
@@ -305,6 +306,7 @@ define_sink!(
     fields = {
         destroy_quantity_dist: Distribution
     },
+    log_record_type = EventLog
 );
 
 define_process!(
@@ -342,7 +344,7 @@ define_process!(
                     })).await;
 
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -355,7 +357,7 @@ define_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -365,7 +367,7 @@ define_process!(
                 _ => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -383,6 +385,7 @@ define_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
+    log_record_type = EventLog
 );
 
 define_combiner_process!(
@@ -432,7 +435,7 @@ define_combiner_process!(
                     })).await;
 
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -445,7 +448,7 @@ define_combiner_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -459,7 +462,7 @@ define_combiner_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -477,6 +480,7 @@ define_combiner_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
+    log_record_type = EventLog
 );
 
 define_splitter_process!(
@@ -525,7 +529,7 @@ define_splitter_process!(
                     })).await;
 
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -538,7 +542,7 @@ define_splitter_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -549,7 +553,7 @@ define_splitter_process!(
                     | (_, _, Some(ArrayStockState::Full {..} ) | None) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -567,4 +571,5 @@ define_splitter_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
+    log_record_type = EventLog
 );

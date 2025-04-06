@@ -1,5 +1,6 @@
 use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}};
 
+use csv::WriterBuilder;
 use nexosim::{ports::EventBuffer, time::MonotonicTime};
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
@@ -7,7 +8,7 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EventLog {
-    pub time: MonotonicTime,
+    pub time: String,
     pub element_name: String,
     pub element_type: String,
     pub log_type: String,
@@ -15,11 +16,11 @@ pub struct EventLog {
 }
 
 #[derive()]
-pub struct EventLogger {
-    pub buffer: EventBuffer<EventLog>
+pub struct EventLogger<T: Serialize> {
+    pub buffer: EventBuffer<T>
 } 
 
-impl EventLogger {
+impl<T> EventLogger<T> where T: Serialize + std::fmt::Debug {
     pub fn new(capacity: usize) -> Self {
         EventLogger {
             buffer: EventBuffer::with_capacity(capacity)
@@ -29,16 +30,8 @@ impl EventLogger {
     pub fn write_csv(self, filename: &str) -> Result<(), std::io::Error> {
         let file = std::fs::File::create(filename)?;
         let mut writer = csv::Writer::from_writer(file);
-        self.buffer.for_each(|log| {
-            // writer.write_record().expect("Failed to write record");
-            let record = [
-                log.time.to_string(),
-                log.element_name.clone(),
-                log.element_type.clone(),
-                log.log_type.clone(),
-                log.json_data.clone()
-            ];
-            writer.write_record(&record).expect("Failed to write record");
+        self.buffer.for_each(|log: T| {
+            writer.serialize(log).expect("Failed to write record");
         });
         writer.flush().expect("Failed to flush writer");
         Ok(())

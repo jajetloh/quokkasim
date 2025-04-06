@@ -93,6 +93,20 @@ define_stock!(
         }
     },
     check_update_method = |x: &mut MyQueueStock, cx: &mut Context<MyQueueStock>| {
+    },
+    log_record_type = EventLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, log_type: String| {
+        async move {
+            let state = x.get_state().await;
+            let log = EventLog {
+                time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                log_type,
+                json_data: format!("{{\"message\": \"Queue state\", \"state\": {:?}}}", state),
+            };
+            x.log_emitter.send(log).await;
+        }
     }
 );
 
@@ -121,7 +135,7 @@ define_source!(
                         message: "New item".to_string(),
                     })).await;
                     x.log_emitter.send(EventLog {
-                        time: time.clone(),
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -131,7 +145,7 @@ define_source!(
                 Some(QueueState::Full {..}) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time: time.clone(),
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -141,7 +155,7 @@ define_source!(
                 None => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time: time.clone(),
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -154,7 +168,8 @@ define_source!(
     },
     fields = {
         next_id: i32
-    }
+    },
+    log_record_type = EventLog
 );
 
 
@@ -177,7 +192,7 @@ define_sink!(
                         message: "Withdrawing item".into(),
                     })).await.next().unwrap();
                     sink.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: sink.element_name.clone(),
                         element_type: sink.element_type.clone(),
                         log_type: "info".into(),
@@ -188,7 +203,7 @@ define_sink!(
                 Some(QueueState::Empty {..}) => {
                     // Do nothing
                     sink.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: sink.element_name.clone(),
                         element_type: sink.element_type.clone(),
                         log_type: "info".into(),
@@ -198,7 +213,7 @@ define_sink!(
                 None => {
                     // Do nothing
                     sink.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: sink.element_name.clone(),
                         element_type: sink.element_type.clone(),
                         log_type: "info".into(),
@@ -213,6 +228,7 @@ define_sink!(
         next_id: i32,
         sink_quantity_dist: Distribution
     },
+    log_record_type = EventLog
 );
 
 
@@ -252,7 +268,7 @@ define_process!(
                     })).await;
 
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -265,7 +281,7 @@ define_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -278,7 +294,7 @@ define_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -296,6 +312,7 @@ define_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
+    log_record_type = EventLog
 );
 
 define_combiner_process!(
@@ -342,7 +359,7 @@ define_combiner_process!(
                     })).await;
 
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -355,7 +372,7 @@ define_combiner_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -369,7 +386,7 @@ define_combiner_process!(
                 ) => {
                     // Do nothing
                     x.log_emitter.send(EventLog {
-                        time,
+                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
                         log_type: "info".into(),
@@ -387,4 +404,5 @@ define_combiner_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
+    log_record_type = EventLog
 );

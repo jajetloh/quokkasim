@@ -3,17 +3,17 @@ use std::time::Duration;
 use nexosim::time::MonotonicTime;
 use quokkasim::{
     common::EventLogger,
-    components::array::{ArrayCombinerProcess, ArrayProcess, ArraySplitterProcess, ArrayStock},
+    components::array::{ArrayCombinerProcess, ArrayProcess, ArraySplitterProcess, ArrayStock, ArrayStockLog},
     core::{
-        Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata,
-        Process, SimInit, Stock,
+        Distribution, DistributionConfig, DistributionFactory, EventLog, Mailbox, NotificationMetadata, Process, SimInit, Stock
     },
 };
 
 fn main() {
     // Declarations
 
-    let logger = EventLogger::new(100_000);
+    let logger: EventLogger<EventLog> = EventLogger::new(100_000);
+    let stock_logger: EventLogger<ArrayStockLog> = EventLogger::new(100_000);
     let mut df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
@@ -21,7 +21,7 @@ fn main() {
 
     let mut stockpile_1 = ArrayStock::new()
         .with_name("Stockpile 1".into())
-        .with_log_consumer(&logger);
+        .with_log_consumer(&stock_logger);
     stockpile_1.low_capacity = 100.;
     stockpile_1.max_capacity = 10000.;
     stockpile_1.resource.vec = [8000., 2000., 0., 0., 0.];
@@ -31,7 +31,7 @@ fn main() {
 
     let mut stockpile_2 = ArrayStock::new()
         .with_name("Stockpile 2".into())
-        .with_log_consumer(&logger);
+        .with_log_consumer(&stock_logger);
     stockpile_2.low_capacity = 100.;
     stockpile_2.max_capacity = 10000.;
     stockpile_2.resource.vec = [0., 6000., 1000., 1000., 0.];
@@ -41,7 +41,7 @@ fn main() {
 
     let mut stockpile_3 = ArrayStock::new()
         .with_name("Stockpile 3".into())
-        .with_log_consumer(&logger);
+        .with_log_consumer(&stock_logger);
     stockpile_3.low_capacity = 100.;
     stockpile_3.max_capacity = 20000.;
     stockpile_3.resource.vec = [5000., 5000., 5000., 5000., 0.];
@@ -68,7 +68,7 @@ fn main() {
 
     let mut output_stockpile_1 = ArrayStock::new()
         .with_name("Output Stockpile 1".into())
-        .with_log_consumer(&logger);
+        .with_log_consumer(&stock_logger);
     output_stockpile_1.low_capacity = 100.;
     output_stockpile_1.max_capacity = 15000.;
 
@@ -94,7 +94,7 @@ fn main() {
 
     let mut output_stockpile_2 = ArrayStock::new()
         .with_name("Output Stockpile 2".into())
-        .with_log_consumer(&logger);
+        .with_log_consumer(&stock_logger);
     output_stockpile_2.low_capacity = 100.;
     output_stockpile_2.max_capacity = 15000.;
     let output_stockpile_2_mbox: Mailbox<ArrayStock> = Mailbox::new();
@@ -295,4 +295,5 @@ fn main() {
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 2))
         .unwrap();
     logger.write_csv("outputs/material_blending_logs.csv").unwrap();
+    stock_logger.write_csv("outputs/material_blending_stock_logs.csv").unwrap();
 }
