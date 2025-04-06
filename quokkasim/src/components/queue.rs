@@ -311,15 +311,17 @@ define_combiner_process!(
                     Some(QueueState::Normal { occupied: occupied1, .. } ) | Some(QueueState::Full { occupied: occupied1, .. } ),
                     Some(QueueState::Empty { empty, .. } ) | Some(QueueState::Normal { empty, .. } ),
                 ) => {
-                    let sink_quantity = (x.process_quantity_dist.sample().round() as i32).min(*occupied0).min(*occupied1).min(*empty);
-                    
-                    let items0 = x.withdraw_upstreams.0.send((sink_quantity, NotificationMetadata {
+                    let process_quantity = (x.process_quantity_dist.as_mut().unwrap_or_else(
+                        || panic!("Process quantity dist not defined!")
+                    ).sample().round() as i32).min(*occupied0 + *occupied1).min(*empty);
+
+                    let items0 = x.withdraw_upstreams.0.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Withdrawing item".into(),
                     })).await.next().unwrap();
 
-                    let items1 = x.withdraw_upstreams.1.send((sink_quantity, NotificationMetadata {
+                    let items1 = x.withdraw_upstreams.1.send((process_quantity, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Withdrawing item".into(),
@@ -369,10 +371,14 @@ define_combiner_process!(
                     }).await;
                 }
             };
+            x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
+                || panic!("Process duration distribution not set!")
+            ).sample());
             x
         }
     },
     fields = {
-        process_quantity_dist: Distribution
+        process_quantity_dist: Option<Distribution>,
+        process_duration_secs_dist: Option<Distribution>
     },
 );

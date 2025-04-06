@@ -548,7 +548,6 @@ macro_rules! define_process {
         pub struct $struct_name {
             pub element_name: String,
             pub element_type: String,
-            resource: $resource_in_type,
 
             previous_check_time: Option<MonotonicTime>,
 
@@ -573,7 +572,6 @@ macro_rules! define_process {
                 $struct_name {
                     element_name: stringify!($struct_name).to_string(),
                     element_type: stringify!($struct_name).to_string(),
-                    resource: Default::default(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
                     log_emitter: Output::new(),
@@ -854,3 +852,9 @@ macro_rules! define_splitter_process {
 }
 
 
+#[macro_export]
+macro_rules! connect_components {
+    () => {
+        
+    };
+}
