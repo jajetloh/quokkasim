@@ -70,7 +70,9 @@ macro_rules! define_stock {
             $($field_name:ident : $field_type:ty),*
         },
         get_state_method = $get_state_method:expr,
-        check_update_method = $check_update_state:expr
+        check_update_method = $check_update_state:expr,
+        log_record_type = $log_record_type:ty,
+        log_method = $log_method:expr
     ) => {
         use nexosim::model::Model;
         use $crate::core::Stock;
@@ -81,14 +83,14 @@ macro_rules! define_stock {
             pub element_type: String,
             pub resource: $resource_type,
             $(pub $field_name: $field_type),*,
-            pub log_emitter: Output<EventLog>,
+            pub log_emitter: Output<$log_record_type>,
             pub state_emitter: Output<NotificationMetadata>,
             prev_state: Option<$state_type>,
         }
 
         impl Model for $struct_name {}
 
-        impl $struct_name {
+        impl<'a> $struct_name {
             pub fn new() -> Self {
                 $struct_name {
                     element_name: stringify!($struct_name).to_string(),
@@ -111,15 +113,14 @@ macro_rules! define_stock {
                 return self
             }
 
-            pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
+            pub fn log(&'a mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
+                // async move {
+                //     // let record: $log_record_type = $log_method(self, time, log_type).await;
+                //     // self.log_emitter.send(record).await
+                //     $log_method(self, time, log_type).await;
+                // }
                 async move {
-                    self.log_emitter.send(EventLog {
-                        time,
-                        element_name: self.element_name.clone(),
-                        element_type: self.element_type.clone(),
-                        log_type,
-                        json_data,
-                    }).await
+                    $log_method(self, time, log_type).await;
                 }
             }
         }
@@ -145,7 +146,7 @@ macro_rules! define_stock {
                         },
                         Some(ps) => {
                             if !ps.is_same_state(&current_state) {
-                                self.log(cx.time(), "StateChange".to_string(), format!("State changed from {:?} to {:?}", ps, current_state)).await;
+                                self.log(cx.time(), "StateChange".to_string()).await;
                                 cx.schedule_event(
                                     cx.time() + Duration::from_nanos(1), $struct_name::notify_change, notif_meta
                                 ).unwrap();
@@ -164,7 +165,7 @@ macro_rules! define_stock {
             ) {
                 self.prev_state = Some(self.get_state().await);
                 self.resource.add(data.0.clone());
-                self.log(cx.time(), "Add".to_string(), format!("Added {:?}. Resources: {:?}", data.0, self.resource)).await;
+                self.log(cx.time(), "Add".to_string()).await;
                 self.check_update_state(data.1, cx).await;
             }
 
@@ -174,7 +175,7 @@ macro_rules! define_stock {
                 cx: &mut Context<Self>
             ) -> Self::RemoveType {
                 let result: Self::RemoveType = self.resource.sub(data.0.clone());
-                self.log(cx.time(), "Add".to_string(), format!("Added {:?}. Resources: {:?}", data.0, self.resource)).await;
+                self.log(cx.time(), "Remove".to_string()).await;
                 self.check_update_state(data.1, cx).await;
                 result
             }

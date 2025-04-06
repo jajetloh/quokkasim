@@ -2,6 +2,7 @@ use crate::{
     common::{Distribution, EventLog, EventLogger, NotificationMetadata}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
+use serde::Serialize;
 
 /**
  * This module is based around the `ArrayResource` type, which holds an array of 5 f64 values.
@@ -93,6 +94,22 @@ impl ResourceMultiply<f64> for ArrayResource {
     }
 }
 
+#[derive(Serialize, Clone)]
+struct ArrayStockLog {
+    time: MonotonicTime,
+    element_name: String,
+    element_type: String,
+    log_type: String,
+    occupied: f64,
+    remaining_capacity: f64,
+    state: String,
+    x0: f64,
+    x1: f64,
+    x2: f64,
+    x3: f64,
+    x4: f64,
+}
+
 define_stock!(
     /// Stock for the `ArrayResource` type.
     name = ArrayStock,
@@ -126,6 +143,39 @@ define_stock!(
         }
     },
     check_update_method = |x: &mut Self, cx: &mut Context<Self>| {
+    },
+    log_record_type =  ArrayStockLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, log_type: String| {
+        async move {
+            let state = x.get_state().await;
+            let log = ArrayStockLog {
+                time,
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                log_type,
+                occupied: match state { 
+                    ArrayStockState::Empty { occupied, .. } => occupied,
+                    ArrayStockState::Normal { occupied, .. } => occupied,
+                    ArrayStockState::Full { occupied, .. } => occupied,
+                },
+                remaining_capacity: match state {
+                    ArrayStockState::Empty { remaining_capacity, .. } => remaining_capacity,
+                    ArrayStockState::Normal { remaining_capacity, .. } => remaining_capacity,
+                    ArrayStockState::Full { remaining_capacity, .. } => remaining_capacity,
+                },
+                state: match state {
+                    ArrayStockState::Empty { .. } => "Empty".to_string(),
+                    ArrayStockState::Normal { .. } => "Normal".to_string(),
+                    ArrayStockState::Full { .. } => "Full".to_string(),
+                },
+                x0: x.resource.vec[0],
+                x1: x.resource.vec[1],
+                x2: x.resource.vec[2],
+                x3: x.resource.vec[3],
+                x4: x.resource.vec[4],
+            };
+            x.log_emitter.send(log).await;
+        }
     }
 );
 
