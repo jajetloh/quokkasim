@@ -87,7 +87,7 @@ fn main() {
         })
         .unwrap(),
     );
-    reclaimer_2.process_duration_secs_dist = Some(Distribution::Constant(35.));
+    reclaimer_2.process_duration_secs_dist = Some(df.create(DistributionConfig::Triangular { min: 10., max: 30., mode: 25. }).unwrap());
 
     let reclaimer_2_mbox: Mailbox<ArrayCombinerProcess> = Mailbox::new();
     let reclaimer_2_addr = reclaimer_2_mbox.address();
