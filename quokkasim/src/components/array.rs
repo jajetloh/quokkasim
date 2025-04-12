@@ -180,6 +180,25 @@ define_stock!(
     }
 );
 
+#[derive(Serialize, Clone, Debug)]
+pub struct ArrayProcessLog {
+    pub time: String,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub process_data: ArrayProcessLogType,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum ArrayProcessLogType  {
+    SourceSuccess { quantity: f64 },
+    SourceFailure { reason: &'static str },
+    ProcessSuccess { quantity: f64 },
+    ProcessFailure { reason: &'static str },
+    SinkSuccess { quantity: f64 },
+    SinkFailure { reason: &'static str },
+}
+
 define_source!(
     /// Source for the `ArrayResource` type.
     name = ArraySource,
@@ -199,44 +218,19 @@ define_source!(
             match ds_state {
                 Some(ArrayStockState::Empty { .. } | ArrayStockState::Normal { .. }) => {
                     let qty = x.create_quantity_dist.sample();
-                    let new_resource = x.create(qty);
+                    let new_resource = x.create(qty.clone());
                     x.push_downstream.send((new_resource.clone(), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "New resource created".to_string(),
                     })).await;
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: "ArraySource".to_string(),
-                        log_type: "New resource created".to_string(),
-                        json_data: format!(
-                            "{{\"new_resource\": {:?}}}",
-                            new_resource
-                        ),
-                    }).await;
+                    x.log(time, ArrayProcessLogType::SourceSuccess { quantity: qty }).await;
                 },
                 Some(ArrayStockState::Full { .. }) => {
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: "ArraySource".to_string(),
-                        log_type: "Stock is full".to_string(),
-                        json_data: format!(
-                            "{{\"message\": \"Stock is full\"}}"
-                        ),
-                    }).await;
+                    x.log(time, ArrayProcessLogType::SourceFailure { reason: "Downstream is full" }).await;
                 },
                 None => {
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: "ArraySource".to_string(),
-                        log_type: "No downstream state".to_string(),
-                        json_data: format!(
-                            "{{\"message\": \"No downstream state\"}}"
-                        ),
-                    }).await;
+                    x.log(time, ArrayProcessLogType::SourceFailure { reason: "No downstream found" }).await;
                 }
             };
             x
@@ -246,7 +240,22 @@ define_source!(
         component_split: ArrayResource,
         create_quantity_dist: Distribution
     },
-    log_record_type = EventLog
+    log_record_type = ArrayProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: ArrayProcessLogType| {
+        async move {
+            // let state = x.get_state().await;
+            let log = ArrayProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                log_type: "something".to_string(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_pameter_type = ArrayProcessLogType
 );
 
 define_sink!(

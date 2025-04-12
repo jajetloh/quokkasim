@@ -93,6 +93,7 @@ define_stock!(
         }
     },
     check_update_method = |x: &mut MyQueueStock, cx: &mut Context<MyQueueStock>| {
+        
     },
     log_record_type = EventLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, log_type: String| {

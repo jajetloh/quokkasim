@@ -226,7 +226,9 @@ macro_rules! define_source {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        log_record_type = $log_record_type:ty
+        log_record_type = $log_record_type:ty,
+        log_method = $log_method:expr,
+        log_method_pameter_type = $log_method_pameter_type:ty
     ) => {
         use nexosim::ports::Requestor;
         use nexosim::simulation::ActionKey;
@@ -242,7 +244,7 @@ macro_rules! define_source {
 
             previous_check_time: Option<MonotonicTime>,
 
-            pub log_emitter: Output<EventLog>,
+            pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<ActionKey>,
 
@@ -289,15 +291,16 @@ macro_rules! define_source {
                 return self
             }
 
-            pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
                 async move {
-                    self.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: self.element_name.clone(),
-                        element_type: self.element_type.clone(),
-                        log_type,
-                        json_data,
-                    }).await
+                    $log_method(self, time, details).await;
+                    // self.log_emitter.send(EventLog {
+                    //     time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
+                    //     element_name: self.element_name.clone(),
+                    //     element_type: self.element_type.clone(),
+                    //     log_type,
+                    //     json_data,
+                    // }).await
                 }
             }
         }
