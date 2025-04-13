@@ -2,7 +2,8 @@ use crate::{
     common::{Distribution, EventLog, EventLogger, NotificationMetadata}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
+use serde_json::to_string;
 
 /**
  * This module is based around the `ArrayResource` type, which holds an array of 5 f64 values.
@@ -180,16 +181,67 @@ define_stock!(
     }
 );
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ArrayProcessLog {
     pub time: String,
     pub element_name: String,
     pub element_type: String,
-    pub log_type: String,
     pub process_data: ArrayProcessLogType,
 }
 
+impl Serialize for ArrayProcessLog {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("ArrayProcessLog", 5)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let mut event_type: Option<&'static str> = None;
+        let mut quantity: Option<f64> = None;
+        let mut reason: Option<&'static str> = None;
+        match &self.process_data {
+            ArrayProcessLogType::SourceSuccess { quantity: q } => {
+                event_type = Some("SourceSuccess");
+                quantity = Some(*q);
+                reason = None;
+            }
+            ArrayProcessLogType::SourceFailure { reason: r } => {
+                event_type = Some("SourceFailure");
+                quantity = None;
+                reason = Some(r);
+            }
+            ArrayProcessLogType::ProcessSuccess { quantity: q } => {
+                event_type = Some("ProcessSuccess");
+                quantity = Some(*q);
+                reason = None;
+            }
+            ArrayProcessLogType::ProcessFailure { reason: r } => {
+                event_type = Some("ProcessFailure");
+                quantity = None;
+                reason = Some(r);
+            }
+            ArrayProcessLogType::SinkSuccess { quantity: q } => {
+                event_type = Some("SinkSuccess");
+                quantity = Some(*q);
+                reason = None;
+            }
+            ArrayProcessLogType::SinkFailure { reason: r } => {
+                event_type = Some("SinkFailure");
+                quantity = None;
+                reason = Some(r);
+            }
+        }
+        state.serialize_field("event_type", &event_type).unwrap();
+        state.serialize_field("quantity", &quantity).unwrap();
+        state.serialize_field("reason", &reason).unwrap();
+        state.end()
+    }
+}
+
 #[derive(Serialize, Clone, Debug)]
+#[serde(tag = "type")]
 pub enum ArrayProcessLogType  {
     SourceSuccess { quantity: f64 },
     SourceFailure { reason: &'static str },
@@ -248,7 +300,6 @@ define_source!(
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
-                log_type: "something".to_string(),
                 process_data: details,
                 
             };
@@ -276,38 +327,13 @@ define_sink!(
                         element_from: sink.element_name.clone(),
                         message: "Resource removed".to_string(),
                     })).await.collect::<Vec<_>>();
-                    sink.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: sink.element_name.clone(),
-                        element_type: "ArraySink".to_string(),
-                        log_type: "Resource destroyed".to_string(),
-                        json_data: format!(
-                            "{{\"removed\": {:?}}}",
-                            removed
-                        ),
-                    }).await;
+                    sink.log(time, ArrayProcessLogType::SinkSuccess { quantity: sink_qty }).await;
                 },
                 Some(ArrayStockState::Empty { .. }) => {
-                    sink.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: sink.element_name.clone(),
-                        element_type: "ArraySink".to_string(),
-                        log_type: "Stock is full".to_string(),
-                        json_data: format!(
-                            "{{\"message\": \"Stock is empty\"}}"
-                        ),
-                    }).await;
+                    sink.log(time, ArrayProcessLogType::SinkFailure { reason: "Upstream is empty" }).await;
                 },
                 None => {
-                    sink.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: sink.element_name.clone(),
-                        element_type: "ArraySink".to_string(),
-                        log_type: "No upstream state".to_string(),
-                        json_data: format!(
-                            "{{\"message\": \"No upstream state\"}}"
-                        ),
-                    }).await;
+                    sink.log(time, ArrayProcessLogType::SinkFailure { reason: "Upstream is not connected" }).await;
                 }
             };
             sink
@@ -316,7 +342,21 @@ define_sink!(
     fields = {
         destroy_quantity_dist: Distribution
     },
-    log_record_type = EventLog
+    log_record_type = ArrayProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: ArrayProcessLogType| {
+        async move {
+            // let state = x.get_state().await;
+            let log = ArrayProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_pameter_type = ArrayProcessLogType
 );
 
 define_process!(
@@ -353,37 +393,20 @@ define_process!(
                         message: format!("Depositing quantity {:?} ({:?})", process_quantity, moved),
                     })).await;
 
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("Processed quantity {:?} ({:?})", process_quantity, moved),
-                    }).await;
+                    x.log(time, ArrayProcessLogType::ProcessSuccess { quantity: process_quantity }).await;
                 },
-                (
-                    Some(ArrayStockState::Empty {..} ) | None,
-                    _
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as downstream stock is full or isn't connected\"}}"),
-                    }).await;
+                (Some(ArrayStockState::Empty {..} ), _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                 },
-                _ => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as downstream stock is full or isn't connected\"}}"),
-                    }).await;
-                }
+                (None, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                },
+                (_, None) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                },
+                (_, Some(ArrayStockState::Full {..} )) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                },
             }
             x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
                 || panic!("Process duration distribution not set!")
@@ -395,7 +418,20 @@ define_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
-    log_record_type = EventLog
+    log_record_type = ArrayProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: ArrayProcessLogType| {
+        async move {
+            // let state = x.get_state().await;
+            let log = ArrayProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_pameter_type = ArrayProcessLogType
 );
 
 define_combiner_process!(
@@ -443,41 +479,25 @@ define_combiner_process!(
                         element_from: x.element_name.clone(),
                         message: "Processing complete".into(),
                     })).await;
-
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Processed quantity\", \"quantity\": {:?}}}", total),
-                    }).await;
-
+                    x.log(time, ArrayProcessLogType::ProcessSuccess { quantity: process_quantity }).await;
                 },
-                (
-                    _, _, Some(ArrayStockState::Full {..} ) | None,
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to process items as downstream stock is full or isn't connected\"}}"),
-                    }).await;
+                (_, _, Some(ArrayStockState::Full {..} )) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                 },
-                (
-                    Some(ArrayStockState::Empty {..} ) | None, _, _
-                ) | (
-                    _, Some(ArrayStockState::Empty {..} ) | None, _
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to process items as upstream stocks are empty or aren't connected\"}}"),
-                    }).await;
+                (_, _, None) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                },
+                (None, _, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream 0 is not connected" }).await;
+                }
+                (_, None, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream 1 is not connected" }).await;
+                },
+                (Some(ArrayStockState::Empty {..} ), _, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream 0 is empty" }).await;
+                }
+                (_, Some(ArrayStockState::Empty {..} ), _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream 1 is empty" }).await;
                 }
             };
             x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
@@ -490,7 +510,21 @@ define_combiner_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
-    log_record_type = EventLog
+    log_record_type = ArrayProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: ArrayProcessLogType| {
+        async move {
+            // let state = x.get_state().await;
+            let log = ArrayProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_pameter_type = ArrayProcessLogType
 );
 
 define_splitter_process!(
@@ -538,38 +572,26 @@ define_splitter_process!(
                         message: "Processing complete".into(),
                     })).await;
 
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Processed quantity\", \"quantity\": {:?}}}", processed_resource),
-                    }).await;
-
+                    x.log(time, ArrayProcessLogType::ProcessSuccess { quantity: process_quantity }).await;
                 },
-                (
-                    Some(ArrayStockState::Empty {..} ) | None, _, _
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to process items as downstream stocks are full or aren't connected\"}}"),
-                    }).await;
+                (Some(ArrayStockState::Empty {..} ), _, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                 },
-                (_, Some(ArrayStockState::Full {..} ) | None, _)
-                    | (_, _, Some(ArrayStockState::Full {..} ) | None) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to process items as upstream stock is empty or isn't connected\"}}"),
-                    }).await;
-                }
+                (None, _, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                },
+                (_, None, _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream 0 is not connected" }).await;
+                },
+                (_, _, None) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream 1 is not connected" }).await;
+                },
+                (_, Some(ArrayStockState::Full {..} ), _) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream 0 is full" }).await;
+                },
+                (_, _, Some(ArrayStockState::Full {..} )) => {
+                    x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream 1 is full" }).await;
+                },
             };
             x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
                 || panic!("Process duration distribution not set!")
@@ -581,5 +603,19 @@ define_splitter_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
-    log_record_type = EventLog
+    log_record_type = ArrayProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: ArrayProcessLogType| {
+        async move {
+            // let state = x.get_state().await;
+            let log = ArrayProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_pameter_type = ArrayProcessLogType
 );

@@ -1,6 +1,4 @@
 use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}};
-
-use csv::WriterBuilder;
 use nexosim::{ports::EventBuffer, time::MonotonicTime};
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};

@@ -294,13 +294,6 @@ macro_rules! define_source {
             pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
-                    // self.log_emitter.send(EventLog {
-                    //     time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                    //     element_name: self.element_name.clone(),
-                    //     element_type: self.element_type.clone(),
-                    //     log_type,
-                    //     json_data,
-                    // }).await
                 }
             }
         }
@@ -365,8 +358,6 @@ pub trait Sink: Model {
     type SubtractType;
     type SubtractParameterType;
 
-    // fn destroy(&mut self, args: Self::SubtractParameterType, time: MonotonicTime) -> impl Future<Output = Self::SubtractType>;
-
     fn check_update_state<'a>(
         &'a mut self,
         notif_meta: NotificationMetadata,
@@ -387,7 +378,9 @@ macro_rules! define_sink {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        log_record_type = $log_record_type:ty
+        log_record_type = $log_record_type:ty,
+        log_method = $log_method:expr,
+        log_method_pameter_type = $log_method_pameter_type:ty
     ) => {
         use $crate::core::Sink;
 
@@ -401,7 +394,7 @@ macro_rules! define_sink {
 
             previous_check_time: Option<MonotonicTime>,
 
-            pub log_emitter: Output<EventLog>,
+            pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<ActionKey>,
 
@@ -448,15 +441,9 @@ macro_rules! define_sink {
                 return self
             }
 
-            pub fn log(&mut self, time: MonotonicTime, log_type: String, json_data: String) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
                 async move {
-                    self.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: self.element_name.clone(),
-                        element_type: self.element_type.clone(),
-                        log_type,
-                        json_data,
-                    }).await
+                    $log_method(self, time, details).await;
                 }
             }
         }
@@ -545,7 +532,9 @@ macro_rules! define_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        log_record_type = $log_record_type:ty
+        log_record_type = $log_record_type:ty,
+        log_method = $log_method:expr,
+        log_method_pameter_type = $log_method_pameter_type:ty
     ) => {
 
         use $crate::core::Process;
@@ -557,7 +546,7 @@ macro_rules! define_process {
 
             previous_check_time: Option<MonotonicTime>,
 
-            pub log_emitter: Output<EventLog>,
+            pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<ActionKey>,
             time_to_next_event_counter: Duration,
@@ -599,6 +588,12 @@ macro_rules! define_process {
             pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
+            }
+
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+                async move {
+                    $log_method(self, time, details).await;
+                }
             }
         }
 
@@ -661,7 +656,9 @@ macro_rules! define_combiner_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        log_record_type = $log_record_type:ty
+        log_record_type = $log_record_type:ty,
+        log_method = $log_method:expr,
+        log_method_pameter_type = $log_method_pameter_type:ty
     ) => {
         $(#[$attr])*
         pub struct $struct_name {
@@ -669,7 +666,7 @@ macro_rules! define_combiner_process {
             element_type: String,
             previous_check_time: Option<MonotonicTime>,
         
-            log_emitter: Output<EventLog>,
+            log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<ActionKey>,
             time_to_next_event_counter: Duration,
@@ -738,6 +735,12 @@ macro_rules! define_combiner_process {
                     ).unwrap());
                 }
             }
+
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+                async move {
+                    $log_method(self, time, details).await;
+                }
+            }
         
         }
         
@@ -768,7 +771,9 @@ macro_rules! define_splitter_process {
         fields = {
             $($field_name:ident : $field_type:ty),*
         },
-        log_record_type = $log_record_type:ty
+        log_record_type = $log_record_type:ty,
+        log_method = $log_method:expr,
+        log_method_pameter_type = $log_method_pameter_type:ty
     ) => {
 
         $(#[$attr])*
@@ -777,7 +782,7 @@ macro_rules! define_splitter_process {
             element_type: String,
             previous_check_time: Option<MonotonicTime>,
         
-            log_emitter: Output<EventLog>,
+            log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<ActionKey>,
             time_to_next_event_counter: Duration,
@@ -844,6 +849,12 @@ macro_rules! define_splitter_process {
                         Self::check_update_state,
                         notif_meta
                     ).unwrap());
+                }
+            }
+
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+                async move {
+                    $log_method(self, time, details).await;
                 }
             }
         }
