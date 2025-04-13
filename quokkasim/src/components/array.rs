@@ -257,9 +257,12 @@ define_source!(
     add_type = ArrayResource,
     add_parameter_type = f64,
     create_method = |mut source: &mut Self, x: f64| -> ArrayResource {
-        let proportion = x / source.component_split.total();
+        let component_split = source.component_split.as_mut().unwrap_or_else(
+            || panic!("Source component split not defined!")
+        );
+        let proportion = x / component_split.total();
         let mut new_resource = ArrayResource { vec: [0.0; 5] };
-        new_resource.vec.iter_mut().zip(source.component_split.vec.iter()).for_each(|(a, b)| *a = b * proportion);
+        new_resource.vec.iter_mut().zip(component_split.vec.iter()).for_each(|(a, b)| *a = b * proportion);
         new_resource
     },
     check_update_method = |mut x: Self, time: MonotonicTime| {
@@ -267,7 +270,9 @@ define_source!(
             let ds_state = x.req_downstream.send(()).await.next();
             match ds_state {
                 Some(ArrayStockState::Empty { .. } | ArrayStockState::Normal { .. }) => {
-                    let qty = x.create_quantity_dist.sample();
+                    let qty = x.create_quantity_dist.as_mut().unwrap_or_else(
+                        || panic!("Source component split not defined!")
+                    ).sample();
                     let new_resource = x.create(qty.clone());
                     x.push_downstream.send((new_resource.clone(), NotificationMetadata {
                         time,
@@ -287,13 +292,12 @@ define_source!(
         }
     },
     fields = {
-        component_split: ArrayResource,
-        create_quantity_dist: Distribution
+        component_split: Option<ArrayResource>,
+        create_quantity_dist: Option<Distribution>
     },
     log_record_type = ArrayProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: ArrayProcessLogType| {
         async move {
-            // let state = x.get_state().await;
             let log = ArrayProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),

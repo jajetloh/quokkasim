@@ -236,8 +236,8 @@ macro_rules! define_source {
 
         $(#[$attr])*
         pub struct $struct_name {
-            element_name: String,
-            element_type: String,
+            pub element_name: String,
+            pub element_type: String,
             resource: $resource_type,
             
             $(pub $field_name: $field_type,)*
