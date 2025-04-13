@@ -1,4 +1,5 @@
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
+use serde::{ser::SerializeStruct, Serialize};
 use crate::{common::{Distribution, DistributionFactory, EventLog, EventLogger, NotificationMetadata}, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
@@ -111,8 +112,79 @@ define_stock!(
     }
 );
 
+#[derive(Clone, Debug)]
+pub struct QueueProcessLog {
+    pub time: String,
+    pub element_name: String,
+    pub element_type: String,
+    pub process_data: QueueProcessLogType,
+}
+
+impl Serialize for QueueProcessLog {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("QueueProcessLog", 6)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let mut event_type: Option<&'static str> = None;
+        let mut quantity: Option<i32> = None;
+        let mut reason: Option<&'static str> = None;
+        match &self.process_data {
+            QueueProcessLogType::SourceSuccess { quantity: q } => {
+                event_type = Some("SourceSuccess");
+                quantity = Some(*q);
+                reason = None;
+            }
+            QueueProcessLogType::SourceFailure { reason: r } => {
+                event_type = Some("SourceFailure");
+                quantity = None;
+                reason = Some(r);
+            }
+            QueueProcessLogType::ProcessSuccess { quantity: q } => {
+                event_type = Some("ProcessSuccess");
+                quantity = Some(*q);
+                reason = None;
+            }
+            QueueProcessLogType::ProcessFailure { reason: r } => {
+                event_type = Some("ProcessFailure");
+                quantity = None;
+                reason = Some(r);
+            }
+            QueueProcessLogType::SinkSuccess { quantity: q } => {
+                event_type = Some("SinkSuccess");
+                quantity = Some(*q);
+                reason = None;
+            }
+            QueueProcessLogType::SinkFailure { reason: r } => {
+                event_type = Some("SinkFailure");
+                quantity = None;
+                reason = Some(r);
+            }
+        }
+        state.serialize_field("event_type", &event_type).unwrap();
+        state.serialize_field("quantity", &quantity).unwrap();
+        state.serialize_field("reason", &reason).unwrap();
+        state.end()
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub enum QueueProcessLogType  {
+    SourceSuccess { quantity: i32 },
+    SourceFailure { reason: &'static str },
+    ProcessSuccess { quantity: i32 },
+    ProcessFailure { reason: &'static str },
+    SinkSuccess { quantity: i32 },
+    SinkFailure { reason: &'static str },
+}
+
 
 define_source!(
+    /// Source for the `Vec<i32>` type.
     name = MyQueueSource,
     resource_type = Vec<i32>,
     stock_state_type = QueueState,
@@ -135,33 +207,14 @@ define_source!(
                         element_from: x.element_name.clone(),
                         message: "New item".to_string(),
                     })).await;
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Created new to queue\", \"item\": {:?}}}", new_resources),
-                    }).await;
+                    x.log(time, QueueProcessLogType::SourceSuccess { quantity: 1 }).await;
                 },
                 Some(QueueState::Full {..}) => {
                     // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to create new item as downstream stock is full\"}}"),
-                    }).await;
+                    x.log(time, QueueProcessLogType::SourceFailure { reason: "Downstream is full" }).await;
                 },
                 None => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to create new item as no downstream stock is connected\"}}"),
-                    }).await;
+                    x.log(time, QueueProcessLogType::SourceFailure { reason: "Downstream is not connected" }).await;
                 },
             }
             x
@@ -170,11 +223,25 @@ define_source!(
     fields = {
         next_id: i32
     },
-    log_record_type = EventLog
+    log_record_type = QueueProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: QueueProcessLogType| {
+        async move {
+            let log = QueueProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_parameter_type = QueueProcessLogType
 );
 
 
 define_sink!(
+    /// Sink for the `Vec<i32>` type.
     name = MyQueueSink,
     resource_type = Vec<i32>,
     stock_state_type = QueueState,
@@ -192,34 +259,13 @@ define_sink!(
                         element_from: sink.element_name.clone(),
                         message: "Withdrawing item".into(),
                     })).await.next().unwrap();
-                    sink.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: sink.element_name.clone(),
-                        element_type: sink.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Received item\", \"item\": {:?}}}", item),
-                    }).await;
-                    sink.log(time, "Destroy".into(), format!("{:?}", item)).await;
+                    sink.log(time, QueueProcessLogType::SinkSuccess { quantity: sink_quantity }).await;
                 },
                 Some(QueueState::Empty {..}) => {
-                    // Do nothing
-                    sink.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: sink.element_name.clone(),
-                        element_type: sink.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as upstream stock is empty\"}}"),
-                    }).await;
+                    sink.log(time, QueueProcessLogType::SinkFailure { reason: "Upstream is empty" }).await;
                 },
                 None => {
-                    // Do nothing
-                    sink.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: sink.element_name.clone(),
-                        element_type: sink.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as no upstream stock is connected\"}}"),
-                    }).await;
+                    sink.log(time, QueueProcessLogType::SinkFailure { reason: "Upstream is not connected" }).await;
                 },
             };
             sink
@@ -229,11 +275,26 @@ define_sink!(
         next_id: i32,
         sink_quantity_dist: Distribution
     },
-    log_record_type = EventLog
+    log_record_type = QueueProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: QueueProcessLogType| {
+        async move {
+            // let state = x.get_state().await;
+            let log = QueueProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_parameter_type = QueueProcessLogType
 );
 
 
 define_process!(
+    /// Process for the `Vec<i32>` type.
     name = MyQueueProcess,
 
     stock_state_type = QueueState,
@@ -268,39 +329,19 @@ define_process!(
                         message: "Processing complete".into(),
                     })).await;
 
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Processed item\", \"item\": {:?}}}", items),
-                    }).await;
+                    x.log(time, QueueProcessLogType::ProcessSuccess { quantity: process_quantity }).await;
                 },
-                (
-                    Some(QueueState::Empty {..} ) | None,
-                    _
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as upstream stock is empty or isn't connected\"}}"),
-                    }).await;
+                (Some(QueueState::Empty {..} ), _) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                 },
-                (
-                    _,
-                    Some(QueueState::Full {..} ) | None,
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as downstream stock is full or isn't connected\"}}"),
-                    }).await;
+                (None, _) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                },
+                (_, Some(QueueState::Full {..} )) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                },
+                (_, None) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                 },
             }
             x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
@@ -313,10 +354,24 @@ define_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
-    log_record_type = EventLog
+    log_record_type = QueueProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: QueueProcessLogType| {
+        async move {
+            let log = QueueProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_parameter_type = QueueProcessLogType
 );
 
 define_combiner_process!(
+    /// Combiner for the `Vec<i32>` type.
     name = MyQueueCombinerProcess,
     inflow_stock_state_types = (QueueState, QueueState),
     resource_in_types = (Vec<i32>, Vec<i32>),
@@ -359,41 +414,26 @@ define_combiner_process!(
                         message: "Processing complete".into(),
                     })).await;
 
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Processed item\", \"item\": {:?}}}", items),
-                    }).await;
-
+                    x.log(time, QueueProcessLogType::ProcessSuccess { quantity: process_quantity }).await;
                 },
-                (
-                    _, _, Some(QueueState::Full {..} ) | None,
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as downstream stock is full or isn't connected\"}}"),
-                    }).await;
+                (_, _, Some(QueueState::Full {..} )) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                 },
-                (
-                    Some(QueueState::Empty {..} ) | None, _, _
-                ) | (
-                    _, Some(QueueState::Empty {..} ) | None, _
-                ) => {
-                    // Do nothing
-                    x.log_emitter.send(EventLog {
-                        time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
-                        element_name: x.element_name.clone(),
-                        element_type: x.element_type.clone(),
-                        log_type: "info".into(),
-                        json_data: format!("{{\"message\": \"Failed to receive item as upstream stocks are empty or aren't connected\"}}"),
-                    }).await;
-                }
+                (_, _, None) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                },
+                (Some(QueueState::Empty {..} ), _, _) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Upstream 0 is empty" }).await;
+                },
+                (None, _, _) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Upstream 0 is not connected" }).await;
+                },
+                (_, Some(QueueState::Empty {..} ), _) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Upstream 1 is empty" }).await;
+                },
+                (_, None, _) => {
+                    x.log(time, QueueProcessLogType::ProcessFailure { reason: "Upstream 1 is not connected" }).await;
+                },
             };
             x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
                 || panic!("Process duration distribution not set!")
@@ -405,5 +445,18 @@ define_combiner_process!(
         process_quantity_dist: Option<Distribution>,
         process_duration_secs_dist: Option<Distribution>
     },
-    log_record_type = EventLog
+    log_record_type = QueueProcessLog,
+    log_method = |x: &'a mut Self, time: MonotonicTime, details: QueueProcessLogType| {
+        async move {
+            let log = QueueProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                element_name: x.element_name.clone(),
+                element_type: x.element_type.clone(),
+                process_data: details,
+                
+            };
+            x.log_emitter.send(log).await;
+        }
+    },
+    log_method_parameter_type = QueueProcessLogType
 );

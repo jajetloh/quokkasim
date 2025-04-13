@@ -194,7 +194,7 @@ impl Serialize for ArrayProcessLog {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("ArrayProcessLog", 5)?;
+        let mut state = serializer.serialize_struct("ArrayProcessLog", 6)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
@@ -240,8 +240,7 @@ impl Serialize for ArrayProcessLog {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
-#[serde(tag = "type")]
+#[derive(Clone, Debug)]
 pub enum ArrayProcessLogType  {
     SourceSuccess { quantity: f64 },
     SourceFailure { reason: &'static str },
@@ -306,7 +305,7 @@ define_source!(
             x.log_emitter.send(log).await;
         }
     },
-    log_method_pameter_type = ArrayProcessLogType
+    log_method_parameter_type = ArrayProcessLogType
 );
 
 define_sink!(
@@ -356,7 +355,7 @@ define_sink!(
             x.log_emitter.send(log).await;
         }
     },
-    log_method_pameter_type = ArrayProcessLogType
+    log_method_parameter_type = ArrayProcessLogType
 );
 
 define_process!(
@@ -431,7 +430,7 @@ define_process!(
             x.log_emitter.send(log).await;
         }
     },
-    log_method_pameter_type = ArrayProcessLogType
+    log_method_parameter_type = ArrayProcessLogType
 );
 
 define_combiner_process!(
@@ -524,7 +523,7 @@ define_combiner_process!(
             x.log_emitter.send(log).await;
         }
     },
-    log_method_pameter_type = ArrayProcessLogType
+    log_method_parameter_type = ArrayProcessLogType
 );
 
 define_splitter_process!(
@@ -617,5 +616,5 @@ define_splitter_process!(
             x.log_emitter.send(log).await;
         }
     },
-    log_method_pameter_type = ArrayProcessLogType
+    log_method_parameter_type = ArrayProcessLogType
 );

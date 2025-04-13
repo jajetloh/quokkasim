@@ -228,7 +228,7 @@ macro_rules! define_source {
         },
         log_record_type = $log_record_type:ty,
         log_method = $log_method:expr,
-        log_method_pameter_type = $log_method_pameter_type:ty
+        log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
         use nexosim::ports::Requestor;
         use nexosim::simulation::ActionKey;
@@ -291,7 +291,7 @@ macro_rules! define_source {
                 return self
             }
 
-            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
                 }
@@ -380,7 +380,7 @@ macro_rules! define_sink {
         },
         log_record_type = $log_record_type:ty,
         log_method = $log_method:expr,
-        log_method_pameter_type = $log_method_pameter_type:ty
+        log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
         use $crate::core::Sink;
 
@@ -441,7 +441,7 @@ macro_rules! define_sink {
                 return self
             }
 
-            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
                 }
@@ -534,7 +534,7 @@ macro_rules! define_process {
         },
         log_record_type = $log_record_type:ty,
         log_method = $log_method:expr,
-        log_method_pameter_type = $log_method_pameter_type:ty
+        log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
 
         use $crate::core::Process;
@@ -590,7 +590,7 @@ macro_rules! define_process {
                 return self
             }
 
-            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
                 }
@@ -658,7 +658,7 @@ macro_rules! define_combiner_process {
         },
         log_record_type = $log_record_type:ty,
         log_method = $log_method:expr,
-        log_method_pameter_type = $log_method_pameter_type:ty
+        log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
         $(#[$attr])*
         pub struct $struct_name {
@@ -736,7 +736,7 @@ macro_rules! define_combiner_process {
                 }
             }
 
-            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
                 }
@@ -773,7 +773,7 @@ macro_rules! define_splitter_process {
         },
         log_record_type = $log_record_type:ty,
         log_method = $log_method:expr,
-        log_method_pameter_type = $log_method_pameter_type:ty
+        log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
 
         $(#[$attr])*
@@ -852,7 +852,7 @@ macro_rules! define_splitter_process {
                 }
             }
 
-            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_pameter_type) -> impl Future<Output = ()> + Send {
+            pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
                 }
