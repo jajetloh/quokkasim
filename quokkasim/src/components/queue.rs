@@ -60,6 +60,17 @@ impl ResourceRemove<i32, Vec<i32>> for QueueVector {
     }
 }
 
+#[derive(Serialize, Debug, Clone)]
+pub struct QueueStockLog {
+    pub time: String,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub occupied: i32,
+    pub empty: i32,
+    pub state: String,
+    pub contents: String,
+}
 
 define_stock!(
     name = MyQueueStock,
@@ -96,16 +107,31 @@ define_stock!(
     check_update_method = |x: &mut MyQueueStock, cx: &mut Context<MyQueueStock>| {
         
     },
-    log_record_type = EventLog,
+    log_record_type = QueueStockLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, log_type: String| {
         async move {
             let state = x.get_state().await;
-            let log = EventLog {
-                time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
+            let log = QueueStockLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
                 log_type,
-                json_data: format!("{{\"message\": \"Queue state\", \"state\": {:?}}}", state),
+                empty: match state {
+                    QueueState::Empty { empty, .. } => empty,
+                    QueueState::Normal { empty, .. } => empty,
+                    QueueState::Full { empty, .. } => empty,
+                },
+                occupied: match state {
+                    QueueState::Empty { occupied, .. } => occupied,
+                    QueueState::Normal { occupied, .. } => occupied,
+                    QueueState::Full { occupied, .. } => occupied,
+                },
+                state: match state {
+                    QueueState::Empty {..} => "Empty".to_string(),
+                    QueueState::Normal {..} => "Normal".to_string(),
+                    QueueState::Full {..} => "Full".to_string(),
+                },
+                contents: x.resource.queue.iter().map(|z| z.to_string()).collect::<Vec<String>>().join(" "),
             };
             x.log_emitter.send(log).await;
         }

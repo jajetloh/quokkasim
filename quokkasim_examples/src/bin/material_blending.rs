@@ -5,7 +5,7 @@ use quokkasim::{
     common::EventLogger,
     components::array::{ArrayCombinerProcess, ArrayProcess, ArrayProcessLog, ArraySplitterProcess, ArrayStock, ArrayStockLog},
     core::{
-        Distribution, DistributionConfig, DistributionFactory, EventLog, Mailbox, NotificationMetadata, Process, SimInit, Stock
+        Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, Process, SimInit, Stock
     },
 };
 

@@ -151,7 +151,6 @@ define_stock!(
             let state = x.get_state().await;
             let log = ArrayStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                // time: format!("{}.{:09}", time.as_secs(), time.subsec_nanos()),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
                 log_type,
