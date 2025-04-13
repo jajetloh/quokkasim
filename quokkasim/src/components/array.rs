@@ -197,9 +197,9 @@ impl Serialize for ArrayProcessLog {
         state.serialize_field("time", &self.time)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let mut event_type: Option<&'static str> = None;
-        let mut quantity: Option<f64> = None;
-        let mut reason: Option<&'static str> = None;
+        let event_type: Option<&'static str>;
+        let quantity: Option<f64>;
+        let reason: Option<&'static str>;
         match &self.process_data {
             ArrayProcessLogType::SourceSuccess { quantity: q } => {
                 event_type = Some("SourceSuccess");
