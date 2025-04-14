@@ -1,5 +1,5 @@
 use crate::{
-    common::{Distribution, EventLog, EventLogger, NotificationMetadata}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
+    common::{Distribution, EventLog, EventLogger}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 use serde::{ser::SerializeStruct, Serialize};

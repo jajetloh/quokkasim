@@ -1,6 +1,6 @@
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 use serde::{ser::SerializeStruct, Serialize};
-use crate::{common::{Distribution, EventLogger, NotificationMetadata}, core::{ResourceAdd, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
+use crate::{common::{Distribution, EventLogger}, core::{ResourceAdd, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum QueueState {

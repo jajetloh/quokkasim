@@ -10,6 +10,17 @@ use quokkasim::{
 };
 use unzip3::Unzip3;
 
+/**
+ * This example demonstrates how an arbitrary number of processes can access a stock. This pattern
+ * works as long as the stock does not need to differentiate between processes.
+ * 
+ * Example use cases:
+ * - A number of processes all feeding from the same stock
+ * - A number of processes all pushing to the same stock
+ * 
+ * If the stock needs to differentiate between processes, this pattern is not suitable. For example:
+ * - A stock requesting the state of a single active instance of the process, within the population.
+ */
 fn main() {
 
     const NUM_SOURCES: usize = 50;

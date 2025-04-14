@@ -74,17 +74,16 @@ macro_rules! define_stock {
         log_record_type = $log_record_type:ty,
         log_method = $log_method:expr
     ) => {
-        use nexosim::model::Model;
-        use $crate::core::Stock;
-
+        use $crate::core::{Stock};
+ 
         $(#[$attr])*
         pub struct $struct_name {
             pub element_name: String,
             pub element_type: String,
             pub resource: $resource_type,
             $(pub $field_name: $field_type),*,
-            pub log_emitter: Output<$log_record_type>,
-            pub state_emitter: Output<NotificationMetadata>,
+            pub log_emitter: ::nexosim::ports::Output<$log_record_type>,
+            pub state_emitter: ::nexosim::ports::Output<$crate::core::NotificationMetadata>,
             prev_state: Option<$state_type>,
         }
 
@@ -97,8 +96,8 @@ macro_rules! define_stock {
                     element_type: stringify!($struct_name).to_string(),
                     resource: $initial_resource,
                     $($field_name: Default::default()),*,
-                    log_emitter: Output::new(),
-                    state_emitter: Output::new(),
+                    log_emitter: ::nexosim::ports::Output::new(),
+                    state_emitter: ::nexosim::ports::Output::new(),
                     prev_state: None,
                 }
             }
@@ -125,6 +124,8 @@ macro_rules! define_stock {
             }
         }
 
+        use $crate::core::NotificationMetadata;
+
         impl Stock for $struct_name {
             type ResourceType = $resource_type;
             type AddType = $add_type;
@@ -134,13 +135,15 @@ macro_rules! define_stock {
 
             fn check_update_state<'a>(
                 &mut self,
-                notif_meta: NotificationMetadata,
+                notif_meta: $crate::core::NotificationMetadata,
                 cx: &'a mut Context<Self>
             ) -> impl Future<Output = ()> + Send {
+
                 async {
+                    use $crate::core::StateEq;
+
                     $check_update_state(self, cx);
                     let current_state = self.get_state().await;
-    
                     match &self.prev_state {
                         None => {
                         },
@@ -775,6 +778,8 @@ macro_rules! define_splitter_process {
         log_method = $log_method:expr,
         log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
+
+        use $crate::core::Model;
 
         $(#[$attr])*
         pub struct $struct_name {
