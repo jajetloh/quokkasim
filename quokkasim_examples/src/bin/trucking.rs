@@ -110,7 +110,7 @@ define_combiner_process!(
         async move {
             let us_material_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
             let us_truck_state: LoadedHaulStockState = x.req_upstreams.1.send(()).await.next().unwrap();
-            match (us_material_state, us_truck_state) {
+            match (&us_material_state, &us_truck_state) {
                 (ArrayStockState::Normal { .. } | ArrayStockState::Full { .. }, LoadedHaulStockState::Normal { .. }) => {
                     let mut truck = x.withdraw_upstreams.1.send(((), NotificationMetadata {
                         time,
@@ -123,6 +123,7 @@ define_combiner_process!(
                         element_from: x.element_name.clone(),
                         message: "Material request".into(),
                     })).await.next().unwrap();
+                    println!("Truck: {:?} {:?}", truck, &us_truck_state);
                     truck.get_mut(0).unwrap().ore = material.clone();
                     x.push_downstream.send((truck, NotificationMetadata {
                         time,
@@ -308,7 +309,7 @@ impl StateEq for LoadedHaulStockState {
 
 define_stock!(
     /// LoadedHaulStock
-    name = LoadedHaulStock,
+    name = TruckStock,
     resource_type = TruckAndOreMap,
     initial_resource = Default::default(),
     add_type = Vec<TruckAndOre>,
@@ -347,7 +348,7 @@ define_stock!(
     }
 );
 
-impl LoadedHaulStock {
+impl TruckStock {
     pub fn remove_any(&mut self, data: ((), NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output=Vec<TruckAndOre>> {
         async move {
             let truck_and_ore = self.resource.sub(vec![0]);
@@ -367,25 +368,32 @@ fn main() {
     let mut source_stockpile = ArrayStock::new()
         .with_name("SourceStockpile".into())
         .with_log_consumer(&stock_logger);
-    source_stockpile.resource.add(ArrayResource { vec: [400., 300., 200., 100., 0.] });
+    source_stockpile.resource.add(ArrayResource { vec: [4000., 3000., 2000., 1000., 0.] });
     let source_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let source_stockpile_addr = source_stockpile_mbox.address();
 
-    let mut ready_to_load_trucks = LoadedHaulStock::new()
+    let mut ready_to_load_trucks = TruckStock::new()
         .with_name("TruckStock".into())
         .with_log_consumer(&queue_logger);
-    let truck_stock_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
+    let truck_stock_mbox: Mailbox<TruckStock> = Mailbox::new();
     let truck_stock_addr = truck_stock_mbox.address();
+
+    ready_to_load_trucks.resource.add(vec![
+        TruckAndOre { truck: 101, ore: ArrayResource { vec: [0.; 5] } },
+        TruckAndOre { truck: 102, ore: ArrayResource { vec: [0.; 5] } },
+        TruckAndOre { truck: 103, ore: ArrayResource { vec: [0.; 5] } },
+        TruckAndOre { truck: 104, ore: ArrayResource { vec: [0.; 5] } },
+    ]);
 
     let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
         .with_log_consumer(&process_logger);
     let loading_mbox: Mailbox<LoadingProcess> = Mailbox::new();
     let loading_addr = loading_mbox.address();
 
-    let mut loaded_trucks = LoadedHaulStock::new()
+    let mut loaded_trucks = TruckStock::new()
         .with_name("LoadedTrucks".into())
         .with_log_consumer(&stock_logger_2);
-    let loaded_trucks_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
+    let loaded_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
     let loaded_trucks_addr = loaded_trucks_mbox.address();
 
     let mut loaded_truck_movement_process = TruckMovementProcess::default()
@@ -394,10 +402,10 @@ fn main() {
     let loaded_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
     let loaded_truck_movement_addr = loaded_truck_movement_mbox.address();
 
-    let mut ready_to_dump_trucks = LoadedHaulStock::new()
+    let mut ready_to_dump_trucks = TruckStock::new()
         .with_name("ReadyToDumpTrucks".into())
         .with_log_consumer(&stock_logger_2);
-    let ready_to_dump_trucks_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
+    let ready_to_dump_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
     let ready_to_dump_trucks_addr = ready_to_dump_trucks_mbox.address();
 
     let mut dumping_process = DumpingProcess::default()
@@ -412,11 +420,11 @@ fn main() {
     let dumped_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let dumped_stockpile_addr = dumped_stockpile_mbox.address();
 
-    let mut empty_trucks = LoadedHaulStock::new()
+    let mut empty_trucks = TruckStock::new()
         .with_name("EmptyTrucks".into())
         .with_log_consumer(&queue_logger);
-    let empty_trucks_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
-    let empty_trucks_addr = empty_trucks_mbox.address();    
+    let empty_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
+    let empty_trucks_addr = empty_trucks_mbox.address();
 
     let mut empty_truck_movement_process = TruckMovementProcess::default()
         .with_name("EmptyTruckMovementProcess".into())
@@ -425,31 +433,31 @@ fn main() {
     let empty_truck_movement_addr = empty_truck_movement_mbox.address();
 
     loading_process.req_upstreams.0.connect(ArrayStock::get_state, &source_stockpile_addr);
-    loading_process.req_upstreams.1.connect(LoadedHaulStock::get_state, &truck_stock_addr);
+    loading_process.req_upstreams.1.connect(TruckStock::get_state, &truck_stock_addr);
     loading_process.withdraw_upstreams.0.connect(ArrayStock::remove, &source_stockpile_addr);
-    loading_process.withdraw_upstreams.1.connect(LoadedHaulStock::remove_any, &truck_stock_addr);
-    loading_process.push_downstream.connect(LoadedHaulStock::add, &loaded_trucks_addr);
+    loading_process.withdraw_upstreams.1.connect(TruckStock::remove_any, &truck_stock_addr);
+    loading_process.push_downstream.connect(TruckStock::add, &loaded_trucks_addr);
     source_stockpile.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
     ready_to_load_trucks.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
 
-    loaded_truck_movement_process.req_upstream.connect(LoadedHaulStock::get_state, &loaded_trucks_addr);
-    loaded_truck_movement_process.withdraw_upstream.connect(LoadedHaulStock::remove, &loaded_trucks_addr);
+    loaded_truck_movement_process.req_upstream.connect(TruckStock::get_state, &loaded_trucks_addr);
+    loaded_truck_movement_process.withdraw_upstream.connect(TruckStock::remove, &loaded_trucks_addr);
     loaded_trucks.state_emitter.connect(TruckMovementProcess::check_update_state, &loaded_truck_movement_addr);
-    loaded_truck_movement_process.req_downstream.connect(LoadedHaulStock::get_state, &ready_to_dump_trucks_addr);
-    loaded_truck_movement_process.push_downstream.connect(LoadedHaulStock::add, &ready_to_dump_trucks_addr);
+    loaded_truck_movement_process.req_downstream.connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
+    loaded_truck_movement_process.push_downstream.connect(TruckStock::add, &ready_to_dump_trucks_addr);
 
-    dumping_process.req_upstream.connect(LoadedHaulStock::get_state, &ready_to_dump_trucks_addr);
-    dumping_process.withdraw_upstream.connect(LoadedHaulStock::remove_any, &ready_to_dump_trucks_addr);
+    dumping_process.req_upstream.connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
+    dumping_process.withdraw_upstream.connect(TruckStock::remove_any, &ready_to_dump_trucks_addr);
     dumping_process.req_downstreams.0.connect(ArrayStock::get_state, &dumped_stockpile_addr);
     dumping_process.push_downstreams.0.connect(ArrayStock::add, &dumped_stockpile_addr);
-    dumping_process.push_downstreams.1.connect(LoadedHaulStock::add, &empty_trucks_addr);
+    dumping_process.push_downstreams.1.connect(TruckStock::add, &empty_trucks_addr);
     ready_to_dump_trucks.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
     dumped_stockpile.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
     
-    empty_truck_movement_process.req_upstream.connect(LoadedHaulStock::get_state, &empty_trucks_addr);
-    empty_truck_movement_process.withdraw_upstream.connect(LoadedHaulStock::remove, &empty_trucks_addr);
-    empty_truck_movement_process.req_downstream.connect(LoadedHaulStock::get_state, &truck_stock_addr);
-    empty_truck_movement_process.push_downstream.connect(LoadedHaulStock::add, &truck_stock_addr);
+    empty_truck_movement_process.req_upstream.connect(TruckStock::get_state, &empty_trucks_addr);
+    empty_truck_movement_process.withdraw_upstream.connect(TruckStock::remove, &empty_trucks_addr);
+    empty_truck_movement_process.req_downstream.connect(TruckStock::get_state, &truck_stock_addr);
+    empty_truck_movement_process.push_downstream.connect(TruckStock::add, &truck_stock_addr);
     empty_trucks.state_emitter.connect(TruckMovementProcess::check_update_state, &empty_truck_movement_addr);
 
     let sim_init = SimInit::new()
