@@ -100,30 +100,31 @@ enum TruckingProcessLogType {
 define_combiner_process!(
     /// Loading process for trucks. Draws from a truck stock and array stock, pushes out Vec<TruckAndOre>
     name = LoadingProcess,
-    inflow_stock_state_types = (ArrayStockState, QueueState),
-    resource_in_types = (ArrayResource, Vec<i32>),
-    resource_in_parameter_types = (f64, i32),
-    outflow_stock_state_type = QueueState,
+    inflow_stock_state_types = (ArrayStockState, LoadedHaulStockState),
+    resource_in_types = (ArrayResource, Vec<TruckAndOre>),
+    resource_in_parameter_types = (f64, ()),
+    outflow_stock_state_type = LoadedHaulStockState,
     resource_out_type = Vec<TruckAndOre>,
     resource_out_parameter_type = Vec<TruckAndOre>,
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
-            let us_truck_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
-            let us_material_state: QueueState = x.req_upstreams.1.send(()).await.next().unwrap();
-            match (us_truck_state, us_material_state) {
-                (ArrayStockState::Normal { .. } | ArrayStockState::Full { .. }, QueueState::Normal { .. } | QueueState::Full { .. }) => {
-                    let truck_id = *x.withdraw_upstreams.1.send((1, NotificationMetadata {
+            let us_material_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
+            let us_truck_state: LoadedHaulStockState = x.req_upstreams.1.send(()).await.next().unwrap();
+            match (us_material_state, us_truck_state) {
+                (ArrayStockState::Normal { .. } | ArrayStockState::Full { .. }, LoadedHaulStockState::Normal { .. }) => {
+                    let mut truck = x.withdraw_upstreams.1.send(((), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Truck request".into(),
-                    })).await.next().unwrap().first().unwrap();
+                    })).await.next().unwrap();
+                    // .unwrap().first().unwrap();
                     let material = x.withdraw_upstreams.0.send((100., NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Material request".into(),
                     })).await.next().unwrap();
-                    let truck_and_ore = vec![TruckAndOre { truck: truck_id, ore: material.clone() }];
-                    x.push_downstream.send((truck_and_ore.clone(), NotificationMetadata {
+                    truck.get_mut(0).unwrap().ore = material.clone();
+                    x.push_downstream.send((truck, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Truck and ore".into(),
@@ -135,7 +136,7 @@ define_combiner_process!(
                     x.log(time, TruckingProcessLogType::LoadFailure { reason: "No material available" }).await;
                     x.time_to_next_event_counter = Duration::from_secs(10);
                 },
-                (_, QueueState::Empty { .. }) => {
+                (_, LoadedHaulStockState::Empty) => {
                     x.log(time, TruckingProcessLogType::LoadFailure { reason: "No trucks available" }).await;
                     x.time_to_next_event_counter = Duration::from_secs(10);
                 }
@@ -225,8 +226,8 @@ define_splitter_process!(
     resource_in_type = Vec<TruckAndOre>,
     resource_in_parameter_type = i32,
     outflow_stock_state_types = (ArrayStockState, QueueState),
-    resource_out_types = (ArrayResource, Vec<i32>),
-    resource_out_parameter_types = (ArrayResource, Vec<i32>),
+    resource_out_types = (ArrayResource, Vec<TruckAndOre>),
+    resource_out_parameter_types = (ArrayResource, Vec<TruckAndOre>),
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             let us_state: QueueState = x.req_upstream.send(()).await.next().unwrap();
@@ -234,27 +235,32 @@ define_splitter_process!(
             let ds_truck_state: QueueState = x.req_downstreams.1.send(()).await.next().unwrap();
             match (us_state, ds_material_state, ds_truck_state) {
                 (QueueState::Normal { .. } | QueueState::Full { .. }, ArrayStockState::Normal { .. } | ArrayStockState::Empty { .. }, QueueState::Normal { .. } | QueueState::Empty { .. }) => {
-                    let truck_and_ore: Vec<TruckAndOre> = x.withdraw_upstream.send((1, NotificationMetadata {
+                    let mut truck_and_ore: Vec<TruckAndOre> = x.withdraw_upstream.send((1, NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Truck request".into(),
                     })).await.next().unwrap();
 
-                    for truck in truck_and_ore.iter() {
-                        let truck_id = truck.truck;
+                    let mut indexes_to_push: Vec<usize> = vec![];
+                    for (index, truck) in truck_and_ore.iter_mut().enumerate() {
                         let material = truck.ore.clone();
+                        truck.ore.vec = [0.; 5];
                         x.push_downstreams.0.send((material.clone(), NotificationMetadata {
                             time,
                             element_from: x.element_name.clone(),
                             message: "Material request".into(),
                         })).await;
-                        x.push_downstreams.1.send((vec![truck_id], NotificationMetadata {
-                            time,
-                            element_from: x.element_name.clone(),
-                            message: "Truck request".into(),
-                        })).await;
+                        indexes_to_push.push(index);
                         x.log(time, TruckingProcessLogType::DumpSuccess { tonnes: material.total(), components: material.vec } ).await;
                         x.time_to_next_event_counter = Duration::from_secs(10);
+                    }
+                    for index in indexes_to_push.iter().rev() {
+                        let truck = truck_and_ore.remove(*index);
+                        x.push_downstreams.1.send((vec![truck], NotificationMetadata {
+                            time,
+                            element_from: x.element_name.clone(),
+                            message: "Truck done".into(),
+                        })).await;
                     }
                 },
                 (QueueState::Empty { .. }, _, _) => {
@@ -290,13 +296,18 @@ define_splitter_process!(
 );
 
 #[derive(Debug, Clone)]
-pub struct LoadedHaulStockState {
-    occupied: i32,
+pub enum LoadedHaulStockState {
+    Empty,
+    Normal(i32),
 }
 
 impl StateEq for LoadedHaulStockState {
     fn is_same_state(&self, other: &Self) -> bool {
-        self.occupied == other.occupied
+        match (self, other) {
+            (LoadedHaulStockState::Empty, LoadedHaulStockState::Empty) => true,
+            (LoadedHaulStockState::Normal(x), LoadedHaulStockState::Normal(y)) => x == y,
+            _ => false,
+        }
     }
 }
 
@@ -314,8 +325,10 @@ define_stock!(
         max_capacity: f64
     },
     get_state_method = |x: &Self| -> LoadedHaulStockState {
-        LoadedHaulStockState {
-            occupied: x.resource.trucks.len() as i32,
+        if x.resource.trucks.is_empty() {
+            LoadedHaulStockState::Empty
+        } else {
+            LoadedHaulStockState::Normal(x.resource.trucks.len() as i32)
         }
     },
     check_update_method = |x: &mut Self, cx: &mut Context<Self>| {
@@ -339,6 +352,17 @@ define_stock!(
     }
 );
 
+impl LoadedHaulStock {
+    pub fn remove_any(&mut self, data: ((), NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output=Vec<TruckAndOre>> {
+        async move {
+            let truck_and_ore = self.resource.sub(vec![0]);
+            self.log(data.1.time, "SomeLog".into()).await;
+            self.check_update_state(data.1, cx);
+            truck_and_ore
+        }
+    }
+}
+
 fn main() {
     let stock_logger = EventLogger::<ArrayStockLog>::new(100_000);
     let stock_logger_2 = EventLogger::<QueueStockLog>::new(100_000);
@@ -352,11 +376,10 @@ fn main() {
     let source_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let source_stockpile_addr = source_stockpile_mbox.address();
 
-    let mut ready_to_load_trucks = MyQueueStock::new()
+    let mut ready_to_load_trucks = LoadedHaulStock::new()
         .with_name("TruckStock".into())
         .with_log_consumer(&queue_logger);
-    ready_to_load_trucks.resource.queue.push(100);
-    let truck_stock_mbox: Mailbox<MyQueueStock> = Mailbox::new();
+    let truck_stock_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
     let truck_stock_addr = truck_stock_mbox.address();
 
     let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
@@ -401,9 +424,9 @@ fn main() {
     let empty_trucks_addr = empty_trucks_mbox.address();    
 
     loading_process.req_upstreams.0.connect(ArrayStock::get_state, &source_stockpile_addr);
-    loading_process.req_upstreams.1.connect(MyQueueStock::get_state, &truck_stock_addr);
+    loading_process.req_upstreams.1.connect(LoadedHaulStock::get_state, &truck_stock_addr);
     loading_process.withdraw_upstreams.0.connect(ArrayStock::remove, &source_stockpile_addr);
-    loading_process.withdraw_upstreams.1.connect(MyQueueStock::remove, &truck_stock_addr);
+    loading_process.withdraw_upstreams.1.connect(LoadedHaulStock::remove_any, &truck_stock_addr);
     loading_process.push_downstream.connect(LoadedHaulStock::add, &loaded_trucks_addr);
 
     let sim_init = SimInit::new()
