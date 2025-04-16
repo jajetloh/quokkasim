@@ -87,7 +87,7 @@ macro_rules! define_stock {
             prev_state: Option<$state_type>,
         }
 
-        impl nexosim::model::Model for $struct_name {}
+        impl $crate::core::Model for $struct_name {}
 
         impl<'a> $struct_name {
             pub fn new() -> Self {
@@ -234,7 +234,6 @@ macro_rules! define_source {
         log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
         use nexosim::ports::Requestor;
-        use nexosim::simulation::ActionKey;
         use $crate::core::{Source, Duration};
 
         $(#[$attr])*
@@ -249,7 +248,7 @@ macro_rules! define_source {
 
             pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
-            next_scheduled_event_key: Option<ActionKey>,
+            next_scheduled_event_key: Option<$crate::core::ActionKey>,
 
             time_to_new_remaining: Duration,
             time_to_new_dist: Distribution,
@@ -258,7 +257,7 @@ macro_rules! define_source {
             pub push_downstream: Output<($add_type, NotificationMetadata)>,
         }
 
-        impl nexosim::model::Model for $struct_name {}
+        impl $crate::core::Model for $struct_name {}
 
         impl $struct_name {
 
@@ -399,7 +398,7 @@ macro_rules! define_sink {
 
             pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
-            next_scheduled_event_key: Option<ActionKey>,
+            next_scheduled_event_key: Option<$crate::core::ActionKey>,
 
             time_to_destroy_remaining: Duration,
             time_to_destroy_dist: Distribution,
@@ -408,7 +407,7 @@ macro_rules! define_sink {
             pub withdraw_upstream: Requestor<($subtract_parameters_type, NotificationMetadata), $subtract_type>,
         }
 
-        impl nexosim::model::Model for $struct_name {}
+        impl $crate::core::Model for $struct_name {}
 
         impl $struct_name {
             pub fn new() -> Self {
@@ -551,7 +550,7 @@ macro_rules! define_process {
 
             pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
-            next_scheduled_event_key: Option<ActionKey>,
+            next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Duration,
 
             pub req_upstream: Requestor<(), $stock_state_type>,
@@ -563,7 +562,7 @@ macro_rules! define_process {
             $(pub $field_name: $field_type,)*
         }
 
-        impl nexosim::model::Model for $struct_name {}
+        impl $crate::core::Model for $struct_name {}
 
         impl $struct_name {
             pub fn new() -> Self {
@@ -671,7 +670,7 @@ macro_rules! define_combiner_process {
         
             log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
-            next_scheduled_event_key: Option<ActionKey>,
+            next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Duration,
         
             pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
@@ -683,7 +682,7 @@ macro_rules! define_combiner_process {
             $(pub $field_name: $field_type,)*
         }
         
-        impl nexosim::model::Model for $struct_name {}
+        impl $crate::core::Model for $struct_name {}
         
         impl $struct_name {
             pub fn new() -> Self {
@@ -727,7 +726,10 @@ macro_rules! define_combiner_process {
                     self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
                     if self.time_to_next_event_counter.is_zero() {
                         let self_moved = std::mem::take(self);
-                        *self = $check_update_method(self_moved, current_time.clone()).await; 
+                        *self = $check_update_method(self_moved, current_time.clone()).await;
+                        if self.time_to_next_event_counter.is_zero() {
+                            panic!("self.time_to_next_event_counter was not set by check_update_method!");
+                        }
                     }
                     self.previous_check_time = Some(current_time);
                     self.next_scheduled_event_time = Some(current_time + self.time_to_next_event_counter);
@@ -779,8 +781,6 @@ macro_rules! define_splitter_process {
         log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
 
-        use $crate::core::Model;
-
         $(#[$attr])*
         pub struct $struct_name {
             element_name: String,
@@ -789,7 +789,7 @@ macro_rules! define_splitter_process {
         
             log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
-            next_scheduled_event_key: Option<ActionKey>,
+            next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Duration,
         
             pub req_upstream: Requestor<(),  $inflow_stock_state_type>,
@@ -801,7 +801,7 @@ macro_rules! define_splitter_process {
             $(pub $field_name: $field_type,)*
         }
         
-        impl Model for $struct_name {}
+        impl $crate::core::Model for $struct_name {}
         
         impl $struct_name {
             pub fn new() -> Self {
