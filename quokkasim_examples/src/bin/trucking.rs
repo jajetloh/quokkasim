@@ -352,12 +352,17 @@ fn main() {
     let source_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let source_stockpile_addr = source_stockpile_mbox.address();
 
-    let mut truck_stock = MyQueueStock::new()
+    let mut ready_to_load_trucks = MyQueueStock::new()
         .with_name("TruckStock".into())
         .with_log_consumer(&queue_logger);
-    truck_stock.resource.queue.push(100);
+    ready_to_load_trucks.resource.queue.push(100);
     let truck_stock_mbox: Mailbox<MyQueueStock> = Mailbox::new();
     let truck_stock_addr = truck_stock_mbox.address();
+
+    let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
+        .with_log_consumer(&process_logger);
+    let loading_mbox: Mailbox<LoadingProcess> = Mailbox::new();
+    let loading_addr = loading_mbox.address();
 
     let loaded_trucks = LoadedHaulStock::new()
         .with_name("LoadedTrucks".into())
@@ -365,10 +370,35 @@ fn main() {
     let loaded_trucks_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
     let loaded_trucks_addr = loaded_trucks_mbox.address();
 
-    let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
+    let mut loaded_truck_movement_process = LoadedTruckMovementProcess::default()
+        .with_name("LoadedTruckMovementProcess".into())
         .with_log_consumer(&process_logger);
-    let loading_mbox: Mailbox<LoadingProcess> = Mailbox::new();
-    let loading_addr = loading_mbox.address();
+    let loaded_truck_movement_mbox: Mailbox<LoadedTruckMovementProcess> = Mailbox::new();
+    let loaded_truck_movement_addr = loaded_truck_movement_mbox.address();
+
+    let mut ready_to_dump_trucks = LoadedHaulStock::new()
+        .with_name("ReadyToDumpTrucks".into())
+        .with_log_consumer(&stock_logger_2);
+    let ready_to_dump_trucks_mbox: Mailbox<LoadedHaulStock> = Mailbox::new();
+    let ready_to_dump_trucks_addr = ready_to_dump_trucks_mbox.address();
+
+    let mut dumping_process = DumpingProcess::default()
+        .with_name("DumpingProcess".into())
+        .with_log_consumer(&process_logger);
+    let dumping_mbox: Mailbox<DumpingProcess> = Mailbox::new();
+    let dumping_addr = dumping_mbox.address();
+
+    let mut dumped_stockpile = ArrayStock::new()
+        .with_name("DumpedStockpile".into())
+        .with_log_consumer(&stock_logger);
+    let dumped_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
+    let dumped_stockpile_addr = dumped_stockpile_mbox.address();
+
+    let mut empty_trucks = MyQueueStock::new()
+        .with_name("EmptyTrucks".into())
+        .with_log_consumer(&queue_logger);
+    let empty_trucks_mbox: Mailbox<MyQueueStock> = Mailbox::new();
+    let empty_trucks_addr = empty_trucks_mbox.address();    
 
     loading_process.req_upstreams.0.connect(ArrayStock::get_state, &source_stockpile_addr);
     loading_process.req_upstreams.1.connect(MyQueueStock::get_state, &truck_stock_addr);
@@ -376,11 +406,9 @@ fn main() {
     loading_process.withdraw_upstreams.1.connect(MyQueueStock::remove, &truck_stock_addr);
     loading_process.push_downstream.connect(LoadedHaulStock::add, &loaded_trucks_addr);
 
-
-
     let sim_init = SimInit::new()
         .add_model(source_stockpile, source_stockpile_mbox, "SourceStockpile")
-        .add_model(truck_stock, truck_stock_mbox, "TruckStock")
+        .add_model(ready_to_load_trucks, truck_stock_mbox, "TruckStock")
         .add_model(loading_process, loading_mbox, "LoadingProcess")
         .add_model(loaded_trucks, loaded_trucks_mbox, "LoadedTrucks");
 
