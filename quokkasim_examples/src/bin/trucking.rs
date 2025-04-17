@@ -39,7 +39,7 @@ impl ResourceRemove<Vec<i32>, Vec<TruckAndOre>> for TruckAndOreMap {
     fn sub(&mut self, ids: Vec<i32>) -> Vec<TruckAndOre> {
         let mut results = Vec::new();
         for id in ids {
-            if let Some(item) = self.trucks.remove(&id) {
+            if let Some(item) = self.trucks.swap_remove(&id) {
                 results.push(item);
             }
         }
@@ -118,7 +118,6 @@ define_combiner_process!(
                         element_from: x.element_name.clone(),
                         message: "Truck request".into(),
                     })).await.next().unwrap();
-                    // .unwrap().first().unwrap();
                     let material = x.withdraw_upstreams.0.send((100., NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
@@ -146,7 +145,9 @@ define_combiner_process!(
             x
         }
     },
-    fields = {},
+    fields = {
+        truck_stock_emitter: Output<TruckAndOreStockLog>
+    },
     log_record_type = TruckingProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: TruckingProcessLogType| {
         async move {
@@ -187,7 +188,7 @@ define_process!(
                 }
             }
             for id in items_ready {
-                x.time_counters.remove(&id);
+                x.time_counters.swap_remove(&id);
                 let truck_and_ores: Vec<TruckAndOre> = x.withdraw_upstream.send((vec![id], NotificationMetadata {
                     time,
                     element_from: x.element_name.clone(),
@@ -276,7 +277,9 @@ define_splitter_process!(
             x
         }
     },
-    fields = {},
+    fields = {
+        truck_stock_emitter: Output<TruckAndOreStockLog>
+    },
     log_record_type = TruckingProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: TruckingProcessLogType| {
         async move {
@@ -292,6 +295,32 @@ define_splitter_process!(
     log_method_parameter_type = TruckingProcessLogType
 );
 
+impl DumpingProcess {
+    pub fn log_truck_stock(mut self, time: MonotonicTime, details: TruckAndOreStockLogDetails) -> Future<Output=()> {
+        async move {
+            let (log_type, occupied, empty, contents) = match details {
+                TruckAndOreStockLogDetails::StockAdded { total, empty, contents } => {
+                    ("StockAdded".into(), total, empty, contents)
+                },
+                TruckAndOreStockLogDetails::StockRemoved { total, empty, contents } => {
+                    ("StockRemoved".into(), total, empty, contents)
+                }
+            };
+            let log: TruckAndOreStockLog = TruckAndOreStockLog {
+                time,
+                element_name: self.element_name,
+                element_type: self.element_type,
+                log_type: match details {
+                    TruckAndOreStockLogDetails::StockAdded { .. } => "StockAdded".into(),
+                    TruckAndOreStockLogDetails::StockRemoved { .. } => "StockRemoved".into(),
+                },
+                occupied: match details
+            };
+            self.truck_stock_emitter.send()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum LoadedHaulStockState {
     Empty,
@@ -306,6 +335,22 @@ impl StateEq for LoadedHaulStockState {
             _ => false,
         }
     }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct TruckAndOreStockLog {
+    pub time: String,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub occupied: i32,
+    pub empty: i32,
+    pub contents: [f64; 5],
+}
+
+pub enum TruckAndOreStockLogDetails {
+    StockAdded { total: f64, empty: f64, contents: [f64; 5] },
+    StockRemoved { total: f64, empty: f64, contents: [f64; 5] },
 }
 
 define_stock!(
@@ -489,4 +534,5 @@ fn main() {
     simu.step_until(start_time +  Duration::from_secs_f64(3600.)).unwrap();
 
     process_logger.write_csv("outputs/trucking_process_logs.csv").unwrap();
+    truck_and_ore_
 }
