@@ -623,7 +623,7 @@ macro_rules! define_process {
                         *self = $check_update_method(self_moved, current_time.clone()).await; 
                     }
                     self.previous_check_time = Some(current_time);
-                    self.next_scheduled_event_time = Some(current_time + self.time_to_next_event_counter);
+                    self.next_scheduled_event_time = Some(current_time.checked_add(self.time_to_next_event_counter).unwrap_or(MonotonicTime::MAX));
                     self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
                         self.next_scheduled_event_time.unwrap(),
                         Self::check_update_state,

@@ -1,7 +1,8 @@
 #![allow(unused)]
 
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
+use indexmap::IndexMap;
 use nexosim::{
     model::{Context, Model},
     ports::{Output, Requestor},
@@ -22,7 +23,7 @@ pub struct TruckAndOre {
 }
 
 pub struct TruckAndOreMap {
-    trucks: HashMap<i32, TruckAndOre>,
+    trucks: IndexMap<i32, TruckAndOre>,
 }
 
 impl ResourceAdd<Vec<TruckAndOre>> for TruckAndOreMap {
@@ -48,7 +49,7 @@ impl ResourceRemove<Vec<i32>, Vec<TruckAndOre>> for TruckAndOreMap {
 
 impl Default for TruckAndOreMap {
     fn default() -> Self {
-        TruckAndOreMap { trucks: HashMap::new() }
+        TruckAndOreMap { trucks: IndexMap::new() }
     }
 }
 
@@ -203,7 +204,7 @@ define_process!(
         }
     },
     fields = {
-        time_counters: HashMap<i32, Duration>
+        time_counters: IndexMap<i32, Duration>
     },
     log_record_type = TruckingProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: TruckingProcessLogType| {
@@ -351,10 +352,13 @@ define_stock!(
 impl TruckStock {
     pub fn remove_any(&mut self, data: ((), NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output=Vec<TruckAndOre>> {
         async move {
-            let truck_and_ore = self.resource.sub(vec![0]);
+            let truck_and_ore_vec = match self.resource.trucks.pop() {
+                Some((_, x)) => vec![x],
+                None => vec![],
+            };
             self.log(data.1.time, "SomeLog".into()).await;
             self.check_update_state(data.1, cx);
-            truck_and_ore
+            truck_and_ore_vec
         }
     }
 }
@@ -464,7 +468,12 @@ fn main() {
         .add_model(source_stockpile, source_stockpile_mbox, "SourceStockpile")
         .add_model(ready_to_load_trucks, truck_stock_mbox, "TruckStock")
         .add_model(loading_process, loading_mbox, "LoadingProcess")
-        .add_model(loaded_trucks, loaded_trucks_mbox, "LoadedTrucks");
+        .add_model(loaded_trucks, loaded_trucks_mbox, "LoadedTrucks")
+        .add_model(loaded_truck_movement_process, loaded_truck_movement_mbox, "LoadedTruckMovementProcess")
+        .add_model(ready_to_dump_trucks, ready_to_dump_trucks_mbox, "ReadyToDumpTrucks")
+        .add_model(dumping_process, dumping_mbox, "DumpingProcess")
+        .add_model(empty_trucks, empty_trucks_mbox, "EmptyTrucks")
+        .add_model(empty_truck_movement_process, empty_truck_movement_mbox, "EmptyTruckMovementProcess");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_init.init(start_time).unwrap().0;
