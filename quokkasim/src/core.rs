@@ -170,9 +170,10 @@ macro_rules! define_stock {
                 self.prev_state = Some(self.get_state().await);
                 self.resource.add(data.0.clone());
                 let new_state = Some(self.get_state().await);
-                println!("{:?} Adding to stock {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, new_state);
                 self.log(cx.time(), "Add".to_string()).await;
+                println!("{:?} Adding to stock {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, new_state);
                 self.check_update_state(data.1, cx).await;
+                println!("{:?} Added to stock {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, new_state);
             }
 
             async fn remove(
@@ -676,7 +677,7 @@ macro_rules! define_combiner_process {
             log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
-            time_to_next_event_counter: Duration,
+            time_to_next_event_counter: Option<Duration>,
         
             pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
             pub withdraw_upstreams: ( $( Requestor<($resource_in_parameter_types, NotificationMetadata), $resource_in_types> ),+ ),
@@ -698,7 +699,7 @@ macro_rules! define_combiner_process {
                     log_emitter: Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
-                    time_to_next_event_counter: Duration::from_secs(0),
+                    time_to_next_event_counter: Some(Duration::from_secs(0)),
                     req_upstreams: Default::default(),
                     withdraw_upstreams: Default::default(),
                     req_downstream: Default::default(),
@@ -728,21 +729,26 @@ macro_rules! define_combiner_process {
                         None => Duration::MAX,
                         Some(t) => current_time.duration_since(t),
                     };
-                    self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
-                    if self.time_to_next_event_counter.is_zero() {
-                        let self_moved = std::mem::take(self);
-                        *self = $check_update_method(self_moved, current_time.clone()).await;
-                        if self.time_to_next_event_counter.is_zero() {
-                            panic!("self.time_to_next_event_counter was not set by check_update_method!");
+                    // self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+                    // if self.time_to_next_event_counter.is_zero() {
+                    let self_moved = std::mem::take(self);
+                    *self = $check_update_method(self_moved, current_time.clone()).await;
+                    self.previous_check_time = Some(current_time);
+                    match self.time_to_next_event_counter {
+                        None => {},
+                        Some(time_to_next) => {
+                            if time_to_next.is_zero() {
+                                panic!("self.time_to_next_event_counter was not set by check_update_method!");
+                            } else {
+                                self.next_scheduled_event_time = Some(current_time + time_to_next);
+                                self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                                    self.next_scheduled_event_time.unwrap(),
+                                    Self::check_update_state,
+                                    notif_meta
+                                ).unwrap());
+                            }
                         }
                     }
-                    self.previous_check_time = Some(current_time);
-                    self.next_scheduled_event_time = Some(current_time + self.time_to_next_event_counter);
-                    self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
-                        self.next_scheduled_event_time.unwrap(),
-                        Self::check_update_state,
-                        notif_meta
-                    ).unwrap());
                 }
             }
 

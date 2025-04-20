@@ -72,6 +72,7 @@ impl Serialize for TruckingProcessLog {
         state.serialize_field("element_type", &self.element_type)?;
 
         let (event_type, truck_id, total, x0, x1, x2, x3, x4, reason): (Option<&'static str>, Option<i32>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<&'static str>) = match &self.process_data {
+            TruckingProcessLogType::LoadStart { truck_id, tonnes, components, .. } => (Some("LoadSuccess"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None),
             TruckingProcessLogType::LoadSuccess { truck_id, tonnes, components, .. } => (Some("LoadSuccess"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None),
             TruckingProcessLogType::LoadFailure { reason } => (Some("LoadFailure"), None, None, None, None, None, None, None, Some(*reason)),
             TruckingProcessLogType::DumpSuccess { truck_id, tonnes, components, .. } => (Some("DumpSuccess"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None),
@@ -94,11 +95,24 @@ impl Serialize for TruckingProcessLog {
 
 #[derive(Debug, Clone)]
 enum TruckingProcessLogType {
+    LoadStart { truck_id: i32, tonnes: f64, components: [f64; 5] },
     LoadSuccess { truck_id: i32, tonnes: f64, components: [f64; 5] },
     LoadFailure { reason: &'static str },
     DumpSuccess { truck_id: i32, tonnes: f64, components: [f64; 5] },
     DumpFailure { reason: &'static str },
     TruckMovement { truck_id: i32, tonnes: f64, components: [f64; 5] },
+}
+
+#[derive(Debug, Clone)]
+enum LoaderState {
+    Loading { truck: TruckAndOre, previous_check_time: MonotonicTime, time_until_done: Duration },
+    Idle,
+}
+
+impl Default for LoaderState {
+    fn default() -> Self {
+        LoaderState::Idle
+    }
 }
 
 define_combiner_process!(
@@ -112,6 +126,35 @@ define_combiner_process!(
     resource_out_parameter_type = Vec<TruckAndOre>,
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
+            // First resolve Loading state, if applicable
+            let is_still_loading;
+            match x.state.clone() {
+                LoaderState::Loading { truck, previous_check_time, time_until_done } => {
+                    let elapsed_time = time.duration_since(previous_check_time);
+                    let new_time_until_done = time_until_done.saturating_sub(elapsed_time);
+                    let new_previous_check_time = time;
+
+                    if time_until_done.is_zero() {
+                        x.log(time, TruckingProcessLogType::LoadSuccess { truck_id: truck.truck,  tonnes: truck.ore.total(), components: truck.ore.vec } ).await;
+                        x.log_truck_stock(time, TruckAndOreStockLogDetails::StockAdded { total: truck.ore.total(), empty: 999., contents: truck.ore.vec }).await;
+                        x.push_downstream.send((vec![truck.clone()], NotificationMetadata {
+                            time,
+                            element_from: x.element_name.clone(),
+                            message: "Truck and ore".into(),
+                        })).await;
+                        x.state = LoaderState::Idle;
+                        is_still_loading = false;
+                    } else {
+                        x.state = LoaderState::Loading { truck, previous_check_time: new_previous_check_time, time_until_done: new_time_until_done };
+                        x.time_to_next_event_counter = Some(time_until_done);
+                        is_still_loading = true;
+                        return x;
+                    }
+                },
+                LoaderState::Idle => {}
+            }
+
+            // Then execute new load
             let us_material_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
             let us_truck_state: TruckStockState = x.req_upstreams.1.send(()).await.next().unwrap();
             println!("{:?} LoadingProcess.check_update_state | upstream_mat {:?} | upstream_truck {:?}", time.to_string(), &us_material_state, &us_truck_state);
@@ -131,28 +174,32 @@ define_combiner_process!(
                     let truck_id = truck.get(0).unwrap().truck;
                     truck.get_mut(0).unwrap().ore = material.clone();
                     println!("{:?} LoadingProcess.push_downstream.send({:?})", time.to_string(), truck.clone());
-                    x.push_downstream.send((truck, NotificationMetadata {
-                        time,
-                        element_from: x.element_name.clone(),
-                        message: "Truck and ore".into(),
-                    })).await;
+                    // x.push_downstream.send((truck, NotificationMetadata {
+                    //     time,
+                    //     element_from: x.element_name.clone(),
+                    //     message: "Truck and ore".into(),
+                    // })).await;
+                    x.state = LoaderState::Loading { truck: truck.swap_remove(0), previous_check_time: time.clone(), time_until_done: Duration::from_secs(15) };
                     x.log(time, TruckingProcessLogType::LoadSuccess { truck_id,  tonnes: material.total(), components: material.vec.clone() } ).await;
-                    x.log_truck_stock(time, TruckAndOreStockLogDetails::StockAdded { total: material.total(), empty: 999., contents: material.vec }).await;
-                    x.time_to_next_event_counter = Duration::from_secs(10);
+                    // x.log_truck_stock(time, TruckAndOreStockLogDetails::StockAdded { total: material.total(), empty: 999., contents: material.vec }).await;
+                    x.time_to_next_event_counter = Some(Duration::from_secs(10));
                 },
                 (ArrayStockState::Empty { .. }, _) => {
                     x.log(time, TruckingProcessLogType::LoadFailure { reason: "No material available" }).await;
-                    x.time_to_next_event_counter = Duration::from_secs(10);
+                    // x.time_to_next_event_counter = Duration::from_secs(10);
+                    x.time_to_next_event_counter = None;
                 },
                 (_, TruckStockState::Empty) => {
                     x.log(time, TruckingProcessLogType::LoadFailure { reason: "No trucks available" }).await;
-                    x.time_to_next_event_counter = Duration::from_secs(10);
+                    // x.time_to_next_event_counter = Duration::from_secs(10);
+                    x.time_to_next_event_counter = None;
                 }
             }
             x
         }
     },
     fields = {
+        state: LoaderState,
         truck_stock_emitter: Output<TruckAndOreStockLog>
     },
     log_record_type = TruckingProcessLog,
@@ -480,9 +527,9 @@ fn main() {
 
     ready_to_load_trucks.resource.add(vec![
         TruckAndOre { truck: 101, ore: ArrayResource { vec: [0.; 5] } },
-        TruckAndOre { truck: 102, ore: ArrayResource { vec: [0.; 5] } },
-        TruckAndOre { truck: 103, ore: ArrayResource { vec: [0.; 5] } },
-        TruckAndOre { truck: 104, ore: ArrayResource { vec: [0.; 5] } },
+        // TruckAndOre { truck: 102, ore: ArrayResource { vec: [0.; 5] } },
+        // TruckAndOre { truck: 103, ore: ArrayResource { vec: [0.; 5] } },
+        // TruckAndOre { truck: 104, ore: ArrayResource { vec: [0.; 5] } },
     ]);
 
     let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
