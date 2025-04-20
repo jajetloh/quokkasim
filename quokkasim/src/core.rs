@@ -624,10 +624,8 @@ macro_rules! define_process {
                         Some(t) => current_time.duration_since(t),
                     };
                     self.time_to_next_event_counter = self.time_to_next_event_counter.saturating_sub(elapsed_time);
-                    // if self.time_to_next_event_counter.is_zero() {
                     let self_moved = std::mem::take(self);
                     *self = $check_update_method(self_moved, current_time.clone()).await; 
-                    // }
                     self.previous_check_time = Some(current_time);
                     self.next_scheduled_event_time = Some(current_time.checked_add(self.time_to_next_event_counter).unwrap_or(MonotonicTime::MAX));
                     self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
