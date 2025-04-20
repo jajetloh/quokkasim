@@ -595,9 +595,9 @@ define_splitter_process!(
                     x.log(time, ArrayProcessLogType::ProcessFailure { reason: "Downstream 1 is full" }).await;
                 },
             };
-            x.time_to_next_event_counter = Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
+            x.time_to_next_event_counter = Some(Duration::from_secs_f64(x.process_duration_secs_dist.as_mut().unwrap_or_else(
                 || panic!("Process duration distribution not set!")
-            ).sample());
+            ).sample()));
             x
         }
     },

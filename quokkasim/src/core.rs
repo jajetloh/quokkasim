@@ -801,7 +801,7 @@ macro_rules! define_splitter_process {
             log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
-            time_to_next_event_counter: Duration,
+            time_to_next_event_counter: Option<Duration>,
         
             pub req_upstream: Requestor<(),  $inflow_stock_state_type>,
             pub withdraw_upstream: Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
@@ -823,7 +823,7 @@ macro_rules! define_splitter_process {
                     log_emitter: Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
-                    time_to_next_event_counter: Duration::from_secs(0),
+                    time_to_next_event_counter: Some(Duration::from_secs(0)),
                     req_upstream: Default::default(),
                     withdraw_upstream: Default::default(),
                     req_downstreams: Default::default(),
@@ -853,18 +853,28 @@ macro_rules! define_splitter_process {
                         None => Duration::MAX,
                         Some(t) => current_time.duration_since(t),
                     };
-                    self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
-                    if self.time_to_next_event_counter.is_zero() {
-                        let self_moved = std::mem::take(self);
-                        *self = $check_update_method(self_moved, current_time.clone()).await; 
-                    }
+                    
+                    // self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
+                    // if self.time_to_next_event_counter.is_zero() {
+                    let self_moved = std::mem::take(self);
+                    *self = $check_update_method(self_moved, current_time.clone()).await; 
+                    // }
                     self.previous_check_time = Some(current_time);
-                    self.next_scheduled_event_time = Some(current_time + self.time_to_next_event_counter);
-                    self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
-                        self.next_scheduled_event_time.unwrap(),
-                        Self::check_update_state,
-                        notif_meta
-                    ).unwrap());
+                    match self.time_to_next_event_counter {
+                        None => {},
+                        Some(time_to_next) => {
+                            if time_to_next.is_zero() {
+                                panic!("self.time_to_next_event_counter was not set by check_update_method!");
+                            } else {
+                                self.next_scheduled_event_time = Some(current_time + time_to_next);
+                                self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                                    self.next_scheduled_event_time.unwrap(),
+                                    Self::check_update_state,
+                                    notif_meta
+                                ).unwrap());
+                            }
+                        }
+                    }
                 }
             }
 
