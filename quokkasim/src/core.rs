@@ -149,6 +149,7 @@ macro_rules! define_stock {
                         },
                         Some(ps) => {
                             if !ps.is_same_state(&current_state) {
+                                println!("{:?} State changed {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, current_state);
                                 self.log(cx.time(), "StateChange".to_string()).await;
                                 cx.schedule_event(
                                     cx.time() + ::std::time::Duration::from_nanos(1), $struct_name::notify_change, notif_meta
@@ -168,6 +169,8 @@ macro_rules! define_stock {
             ) {
                 self.prev_state = Some(self.get_state().await);
                 self.resource.add(data.0.clone());
+                let new_state = Some(self.get_state().await);
+                println!("{:?} Adding to stock {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, new_state);
                 self.log(cx.time(), "Add".to_string()).await;
                 self.check_update_state(data.1, cx).await;
             }
@@ -177,6 +180,7 @@ macro_rules! define_stock {
                 data: (Self::RemoveParameterType, NotificationMetadata),
                 cx: &mut Context<Self>
             ) -> Self::RemoveType {
+                self.prev_state = Some(self.get_state().await);
                 let result: Self::RemoveType = self.resource.sub(data.0.clone());
                 self.log(cx.time(), "Remove".to_string()).await;
                 self.check_update_state(data.1, cx).await;
@@ -184,6 +188,7 @@ macro_rules! define_stock {
             }
 
             async fn notify_change(&mut self, notif_meta: NotificationMetadata, cx: &mut Context<Self>) {
+                println!("{:?} Notifying change in stock {} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state);
                 self.state_emitter.send(NotificationMetadata {
                     time: cx.time(),
                     element_from: self.element_name.clone(),
@@ -618,10 +623,10 @@ macro_rules! define_process {
                         Some(t) => current_time.duration_since(t),
                     };
                     self.time_to_next_event_counter = self.time_to_next_event_counter.saturating_sub(elapsed_time);
-                    if self.time_to_next_event_counter.is_zero() {
-                        let self_moved = std::mem::take(self);
-                        *self = $check_update_method(self_moved, current_time.clone()).await; 
-                    }
+                    // if self.time_to_next_event_counter.is_zero() {
+                    let self_moved = std::mem::take(self);
+                    *self = $check_update_method(self_moved, current_time.clone()).await; 
+                    // }
                     self.previous_check_time = Some(current_time);
                     self.next_scheduled_event_time = Some(current_time.checked_add(self.time_to_next_event_counter).unwrap_or(MonotonicTime::MAX));
                     self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
