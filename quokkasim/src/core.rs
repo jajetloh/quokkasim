@@ -149,7 +149,6 @@ macro_rules! define_stock {
                         },
                         Some(ps) => {
                             if !ps.is_same_state(&current_state) {
-                                println!("{:?} State changed {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, current_state);
                                 self.log(cx.time(), "StateChange".to_string()).await;
                                 cx.schedule_event(
                                     cx.time() + ::std::time::Duration::from_nanos(1), $struct_name::notify_change, notif_meta
@@ -171,9 +170,7 @@ macro_rules! define_stock {
                 self.resource.add(data.0.clone());
                 let new_state = Some(self.get_state().await);
                 self.log(cx.time(), "Add".to_string()).await;
-                println!("{:?} Adding to stock {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, new_state);
                 self.check_update_state(data.1, cx).await;
-                println!("{:?} Added to stock {} | previous state {:?} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state, new_state);
             }
 
             async fn remove(
@@ -189,7 +186,6 @@ macro_rules! define_stock {
             }
 
             async fn notify_change(&mut self, notif_meta: NotificationMetadata, cx: &mut Context<Self>) {
-                println!("{:?} Notifying change in stock {} | new state {:?}", cx.time().to_string(), self.element_name, self.prev_state);
                 self.state_emitter.send(NotificationMetadata {
                     time: cx.time(),
                     element_from: self.element_name.clone(),
@@ -723,10 +719,10 @@ macro_rules! define_combiner_process {
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
                     let current_time = cx.time();
-                    let elapsed_time: Duration = match self.previous_check_time {
-                        None => Duration::MAX,
-                        Some(t) => current_time.duration_since(t),
-                    };
+                    // let elapsed_time: Duration = match self.previous_check_time {
+                    //     None => Duration::MAX,
+                    //     Some(t) => current_time.duration_since(t),
+                    // };
                     // self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
                     // if self.time_to_next_event_counter.is_zero() {
                     let self_moved = std::mem::take(self);

@@ -135,7 +135,7 @@ define_combiner_process!(
                     let new_time_until_done = time_until_done.saturating_sub(elapsed_time);
                     let new_previous_check_time = time;
 
-                    if time_until_done.is_zero() {
+                    if new_time_until_done.is_zero() {
                         x.log(time, TruckingProcessLogType::LoadSuccess { truck_id: truck.truck,  tonnes: truck.ore.total(), components: truck.ore.vec } ).await;
                         x.log_truck_stock(time, TruckAndOreStockLogDetails::StockAdded { truck_id: truck.truck, total: truck.ore.total(), empty: 999., contents: truck.ore.vec }).await;
                         x.push_downstream.send((vec![truck.clone()], NotificationMetadata {
@@ -156,7 +156,6 @@ define_combiner_process!(
             // Then execute new load
             let us_material_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
             let us_truck_state: TruckStockState = x.req_upstreams.1.send(()).await.next().unwrap();
-            println!("{:?} LoadingProcess.check_update_state | upstream_mat {:?} | upstream_truck {:?}", time.to_string(), &us_material_state, &us_truck_state);
 
             match (&us_material_state, &us_truck_state) {
                 (ArrayStockState::Normal { .. } | ArrayStockState::Full { .. }, TruckStockState::Normal { .. }) => {
@@ -231,7 +230,6 @@ define_process!(
     resource_out_parameter_type = Vec<TruckAndOre>,
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
-            println!("TruckMovementProcess check_update_method: {:?}", time.to_string());
             let elapsed_time: Duration = match x.previous_check_time {
                 None => Duration::MAX,
                 Some(t) => time.duration_since(t),
@@ -266,7 +264,6 @@ define_process!(
 
             // Check for new trucks upstream. If new, add a counter for it
             let us_state: TruckStockState = x.req_upstream.send(()).await.next().unwrap();
-            println!("TruckMovementProcess us_state: {:?}", us_state);
 
             match us_state {
                 TruckStockState::Normal(y) => {
@@ -330,7 +327,7 @@ define_splitter_process!(
                     let new_time_until_done = time_until_done.saturating_sub(elapsed_time);
                     let new_previous_check_time = time;
 
-                    if time_until_done.is_zero() {
+                    if new_time_until_done.is_zero() {
                         x.log(time, TruckingProcessLogType::DumpSuccess { truck_id: truck.truck, tonnes: truck.ore.total(), components: truck.ore.vec } ).await;
                         x.log_truck_stock(time, TruckAndOreStockLogDetails::StockRemoved { truck_id: truck.truck, total: truck.ore.total(), empty: 999., contents: truck.ore.vec }).await;
                         x.push_downstreams.1.send((vec![truck.clone()], NotificationMetadata {
@@ -534,6 +531,10 @@ impl TruckStock {
 }
 
 fn main() {
+
+    const NUM_TRUCKS: usize = 5;
+    const SIM_DURATION_SECS: f64 = 3600.;
+
     let stock_logger = EventLogger::<ArrayStockLog>::new(100_000);
     let stock_logger_2 = EventLogger::<QueueStockLog>::new(100_000);
     let queue_logger = EventLogger::<QueueStockLog>::new(100_000);
@@ -554,12 +555,9 @@ fn main() {
     let truck_stock_mbox: Mailbox<TruckStock> = Mailbox::new();
     let truck_stock_addr = truck_stock_mbox.address();
 
-    ready_to_load_trucks.resource.add(vec![
-        TruckAndOre { truck: 101, ore: ArrayResource { vec: [0.; 5] } },
-        TruckAndOre { truck: 102, ore: ArrayResource { vec: [0.; 5] } },
-        // TruckAndOre { truck: 103, ore: ArrayResource { vec: [0.; 5] } },
-        // TruckAndOre { truck: 104, ore: ArrayResource { vec: [0.; 5] } },
-    ]);
+    (0..NUM_TRUCKS).for_each(|i| {
+        ready_to_load_trucks.resource.add(vec![TruckAndOre { truck: (100 + i) as i32, ore: ArrayResource { vec: [0.; 5] } }]);
+    });
 
     let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
         .with_log_consumer(&process_logger);
@@ -662,8 +660,7 @@ fn main() {
         },
         &loading_addr,
     );
-    simu.step_until(start_time +  Duration::from_secs_f64(3600.)).unwrap();
-
+    simu.step_until(start_time +  Duration::from_secs_f64(SIM_DURATION_SECS)).unwrap();
 
     process_logger.write_csv("outputs/trucking_process_logs.csv").unwrap();
     truck_stock_logger.write_csv("outputs/trucking_truck_stock_logs.csv").unwrap();
