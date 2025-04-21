@@ -11,7 +11,7 @@ use quokkasim::{
     common::EventLogger, components::{
         array::{ArrayProcessLog, ArrayResource, ArrayStock, ArrayStockLog, ArrayStockState},
         queue::QueueState,
-    }, core::{Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_combiner_process, define_process, define_splitter_process, define_stock, prelude::{MyQueueStock, QueueStockLog}
+    }, core::{Distribution, DistributionFactory, DistributionConfig, Mailbox, ResourceAdd, ResourceRemove, SimInit, StateEq}, define_combiner_process, define_process, define_splitter_process, define_stock, prelude::{MyQueueStock, QueueStockLog}
 };
 use serde::{ser::SerializeStruct, Serialize};
 
@@ -165,16 +165,17 @@ define_combiner_process!(
                         element_from: x.element_name.clone(),
                         message: "Truck request".into(),
                     })).await.next().unwrap();
-                    let material = x.withdraw_upstreams.0.send((100., NotificationMetadata {
+                    let material = x.withdraw_upstreams.0.send((x.load_quantity_dist.as_mut().unwrap().sample(), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Material request".into(),
                     })).await.next().unwrap();
                     let truck_id = truck.get(0).unwrap().truck;
                     truck.get_mut(0).unwrap().ore = material.clone();
-                    x.state = LoadingProcessState::Loading { truck: truck.swap_remove(0), previous_check_time: time.clone(), time_until_done: Duration::from_secs(15) };
+                    let time_until_done = Duration::from_secs_f64(x.load_time_dist_secs.as_mut().unwrap().sample());
+                    x.state = LoadingProcessState::Loading { truck: truck.swap_remove(0), previous_check_time: time.clone(), time_until_done };
                     x.log(time, TruckingProcessLogType::LoadStart { truck_id,  tonnes: material.total(), components: material.vec.clone() } ).await;
-                    x.time_to_next_event_counter = Some(Duration::from_secs(15));
+                    x.time_to_next_event_counter = Some(time_until_done);
                 },
                 (ArrayStockState::Empty { .. }, _) => {
                     x.log(time, TruckingProcessLogType::LoadStartFailed { reason: "No material available" }).await;
@@ -190,7 +191,9 @@ define_combiner_process!(
     },
     fields = {
         state: LoadingProcessState,
-        truck_stock_emitter: Output<TruckAndOreStockLog>
+        truck_stock_emitter: Output<TruckAndOreStockLog>,
+        load_time_dist_secs: Option<Distribution>,
+        load_quantity_dist: Option<Distribution>
     },
     log_record_type = TruckingProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: TruckingProcessLogType| {
@@ -276,11 +279,12 @@ define_process!(
                 TruckStockState::Normal(y) => {
                     for id in y.iter() {
                         if !x.time_counters.contains_key(id) {
-                            x.time_counters.insert(*id, Duration::from_secs(120));
+                            let travel_time = Duration::from_secs_f64(x.travel_time_dist_secs.as_mut().unwrap_or_else(|| panic!("travel_time_dist_secs not set for {}", x.element_name)).sample());
+                            x.time_counters.insert(*id, travel_time);
                             match x.time_to_next_event_counter {
-                                None => x.time_to_next_event_counter = Some(Duration::from_secs(120)),
+                                None => x.time_to_next_event_counter = Some(travel_time),
                                 Some(y) => {
-                                    x.time_to_next_event_counter = Some(y.min(Duration::from_secs(120)));
+                                    x.time_to_next_event_counter = Some(y.min(travel_time));
                                 }
                             }
                         }
@@ -292,7 +296,8 @@ define_process!(
         }
     },
     fields = {
-        time_counters: IndexMap<i32, Duration>
+        time_counters: IndexMap<i32, Duration>,
+        travel_time_dist_secs: Option<Distribution>
     },
     log_record_type = TruckingProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: TruckingProcessLogType| {
@@ -373,13 +378,15 @@ define_splitter_process!(
                         message: "Truck request".into(),
                     })).await.next().unwrap();
 
+                    let time_until_done = Duration::from_secs_f64(x.dump_time_dist_secs.as_mut().unwrap().sample());
+
                     x.state = DumpingProcessState::Dumping {
                         truck: truck_and_ore.first().unwrap().clone(),
                         previous_check_time: time.clone(),
-                        time_until_done: Duration::from_secs(21),
+                        time_until_done,
                     };
                     x.log(time, TruckingProcessLogType::DumpStart { truck_id: truck_and_ore.first().unwrap().truck, tonnes: truck_and_ore.first().unwrap().ore.total(), components: truck_and_ore.first().unwrap().ore.vec } ).await;
-                    x.time_to_next_event_counter = Some(Duration::from_secs(21));
+                    x.time_to_next_event_counter = Some(time_until_done);
                 },
                 (TruckStockState::Empty, _) => {
                     x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "No trucks available" }).await;
@@ -395,7 +402,8 @@ define_splitter_process!(
     },
     fields = {
         state: DumpingProcessState,
-        truck_stock_emitter: Output<TruckAndOreStockLog>
+        truck_stock_emitter: Output<TruckAndOreStockLog>,
+        dump_time_dist_secs: Option<Distribution>
     },
     log_record_type = TruckingProcessLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, details: TruckingProcessLogType| {
@@ -546,11 +554,13 @@ impl TruckStock {
 
 fn main() {
 
-    const NUM_TRUCKS: usize = 1;
-    const SIM_DURATION_SECS: f64 = 1200.;
+    const NUM_TRUCKS: usize = 2;
+    const SIM_DURATION_SECS: f64 = 3600. * 6. * 1.;
 
-    let stock_logger = EventLogger::<ArrayStockLog>::new(100_000);
-    let stock_logger_2 = EventLogger::<QueueStockLog>::new(100_000);
+    let mut df: DistributionFactory = DistributionFactory { base_seed: 123, next_seed: 123 };
+
+    let stockpile_logger = EventLogger::<ArrayStockLog>::new(100_000);
+    let truck_queue_logger = EventLogger::<QueueStockLog>::new(100_000);
     let queue_logger = EventLogger::<QueueStockLog>::new(100_000);
     let process_logger = EventLogger::<TruckingProcessLog>::new(100_000);
 
@@ -558,8 +568,8 @@ fn main() {
 
     let mut source_stockpile = ArrayStock::new()
         .with_name("SourceStockpile".into())
-        .with_log_consumer(&stock_logger);
-    source_stockpile.resource.add(ArrayResource { vec: [8000., 6000., 4000., 2000., 0.] });
+        .with_log_consumer(&stockpile_logger);
+    source_stockpile.resource.add(ArrayResource { vec: [800000., 600000., 400000., 200000., 0.] });
     let source_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let source_stockpile_addr = source_stockpile_mbox.address();
 
@@ -576,24 +586,27 @@ fn main() {
     let mut loading_process = LoadingProcess::default().with_name("LoadingProcess".into())
         .with_log_consumer(&process_logger);
     loading_process.truck_stock_emitter.connect_sink(&truck_stock_logger.buffer);
+    loading_process.load_time_dist_secs = Some(df.create(DistributionConfig::TruncNormal { mean: 40., std: 10., min: Some(10.), max: Some(70.) }).unwrap());
+    loading_process.load_quantity_dist = Some(df.create(DistributionConfig::Uniform { min: 70., max: 130. }).unwrap());
     let loading_mbox: Mailbox<LoadingProcess> = Mailbox::new();
     let loading_addr = loading_mbox.address();
 
     let mut loaded_trucks = TruckStock::new()
         .with_name("LoadedTrucks".into())
-        .with_log_consumer(&stock_logger_2);
+        .with_log_consumer(&truck_queue_logger);
     let loaded_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
     let loaded_trucks_addr = loaded_trucks_mbox.address();
 
     let mut loaded_truck_movement_process = TruckMovementProcess::default()
         .with_name("LoadedTruckMovementProcess".into())
         .with_log_consumer(&process_logger);
+    loaded_truck_movement_process.travel_time_dist_secs = Some(df.create(DistributionConfig::Triangular { min: 100., max: 200., mode: 120. }).unwrap());
     let loaded_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
     let loaded_truck_movement_addr = loaded_truck_movement_mbox.address();
 
     let mut ready_to_dump_trucks = TruckStock::new()
         .with_name("ReadyToDumpTrucks".into())
-        .with_log_consumer(&stock_logger_2);
+        .with_log_consumer(&truck_queue_logger);
     let ready_to_dump_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
     let ready_to_dump_trucks_addr = ready_to_dump_trucks_mbox.address();
 
@@ -601,12 +614,13 @@ fn main() {
         .with_name("DumpingProcess".into())
         .with_log_consumer(&process_logger);
     dumping_process.truck_stock_emitter.connect_sink(&truck_stock_logger.buffer);
+    dumping_process.dump_time_dist_secs = Some(df.create(DistributionConfig::TruncNormal { mean: 30., std: 8., min: Some(14.), max: Some(46.) }).unwrap());
     let dumping_mbox: Mailbox<DumpingProcess> = Mailbox::new();
     let dumping_addr = dumping_mbox.address();
 
     let mut dumped_stockpile = ArrayStock::new()
         .with_name("DumpedStockpile".into())
-        .with_log_consumer(&stock_logger);
+        .with_log_consumer(&stockpile_logger);
     dumped_stockpile.max_capacity = 999_999_999.;
     let dumped_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
     let dumped_stockpile_addr = dumped_stockpile_mbox.address();
@@ -620,6 +634,7 @@ fn main() {
     let mut empty_truck_movement_process = TruckMovementProcess::default()
         .with_name("EmptyTruckMovementProcess".into())
         .with_log_consumer(&process_logger);
+    empty_truck_movement_process.travel_time_dist_secs = Some(df.create(DistributionConfig::Triangular { min: 50., max: 100., mode: 60. }).unwrap());
     let empty_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
     let empty_truck_movement_addr = empty_truck_movement_mbox.address();
 
@@ -678,5 +693,6 @@ fn main() {
 
     process_logger.write_csv("outputs/trucking_process_logs.csv").unwrap();
     truck_stock_logger.write_csv("outputs/trucking_truck_stock_logs.csv").unwrap();
-    stock_logger_2.write_csv("outputs/trucking_stock_logs_2.csv").unwrap();
+    truck_queue_logger.write_csv("outputs/trucking_truck_queue_logs.csv").unwrap();
+    stockpile_logger.write_csv("outputs/trucking_stockpile_logs.csv").unwrap();
 }
