@@ -1,7 +1,6 @@
 #![allow(unused)]
 
 use std::time::Duration;
-
 use indexmap::{IndexMap, IndexSet};
 use nexosim::{
     model::{Context, Model},
@@ -58,6 +57,7 @@ struct TruckingProcessLog {
     pub time: String,
     pub element_name: String,
     pub element_type: String,
+    pub event_id: String,
     pub process_data: TruckingProcessLogType,
 }
 
@@ -67,6 +67,7 @@ impl Serialize for TruckingProcessLog {
         S: serde::Serializer,
     {
         let mut state = serializer.serialize_struct("TruckingProcessLog", 10)?;
+        state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
@@ -198,6 +199,7 @@ define_combiner_process!(
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
+                event_id: x.get_event_id(),
                 process_data: details,
             };
             x.log_emitter.send(log).await;
@@ -236,13 +238,18 @@ define_process!(
             };
 
             let mut items_ready: Vec<i32> = vec![];
-            x.time_to_next_event_counter = Duration::MAX; 
+            x.time_to_next_event_counter = None; 
             for (id, counter) in x.time_counters.iter_mut() {
                 *counter = counter.saturating_sub(elapsed_time);
                 if counter.is_zero() {
                     items_ready.push(*id);
                 } else {
-                    x.time_to_next_event_counter = x.time_to_next_event_counter.min(*counter);
+                    match x.time_to_next_event_counter {
+                        None => x.time_to_next_event_counter = Some(*counter),
+                        Some(y) => {
+                            x.time_to_next_event_counter = Some(y.min(*counter));
+                        },
+                    }
                 }
             }
             
@@ -270,7 +277,12 @@ define_process!(
                     for id in y.iter() {
                         if !x.time_counters.contains_key(id) {
                             x.time_counters.insert(*id, Duration::from_secs(120));
-                            x.time_to_next_event_counter = x.time_to_next_event_counter.min(Duration::from_secs(120));
+                            match x.time_to_next_event_counter {
+                                None => x.time_to_next_event_counter = Some(Duration::from_secs(120)),
+                                Some(y) => {
+                                    x.time_to_next_event_counter = Some(y.min(Duration::from_secs(120)));
+                                }
+                            }
                         }
                     }
                 },
@@ -289,6 +301,7 @@ define_process!(
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
+                event_id: x.get_event_id(),
                 process_data: details,
             };
             x.log_emitter.send(log).await;
@@ -391,6 +404,7 @@ define_splitter_process!(
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),
                 element_type: x.element_type.clone(),
+                event_id: x.get_event_id(),
                 process_data: details,
             };
             x.log_emitter.send(log).await;
@@ -532,8 +546,8 @@ impl TruckStock {
 
 fn main() {
 
-    const NUM_TRUCKS: usize = 5;
-    const SIM_DURATION_SECS: f64 = 3600.;
+    const NUM_TRUCKS: usize = 1;
+    const SIM_DURATION_SECS: f64 = 1200.;
 
     let stock_logger = EventLogger::<ArrayStockLog>::new(100_000);
     let stock_logger_2 = EventLogger::<QueueStockLog>::new(100_000);

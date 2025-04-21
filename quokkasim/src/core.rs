@@ -113,11 +113,6 @@ macro_rules! define_stock {
             }
 
             pub fn log(&'a mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
-                // async move {
-                //     // let record: $log_record_type = $log_method(self, time, log_type).await;
-                //     // self.log_emitter.send(record).await
-                //     $log_method(self, time, log_type).await;
-                // }
                 async move {
                     $log_method(self, time, log_type).await;
                 }
@@ -553,7 +548,8 @@ macro_rules! define_process {
             pub log_emitter: Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
-            time_to_next_event_counter: Duration,
+            time_to_next_event_counter: Option<Duration>,
+            next_event_index: i64,
 
             pub req_upstream: Requestor<(), $stock_state_type>,
             pub withdraw_upstream: Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
@@ -576,7 +572,8 @@ macro_rules! define_process {
                     log_emitter: Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
-                    time_to_next_event_counter: Duration::ZERO,
+                    next_event_index: 0,
+                    time_to_next_event_counter: Some(Duration::ZERO),
                     req_upstream: Requestor::new(),
                     withdraw_upstream: Requestor::new(),
                     req_downstream: Requestor::new(),
@@ -599,6 +596,10 @@ macro_rules! define_process {
                     $log_method(self, time, details).await;
                 }
             }
+                        
+            fn get_event_id(&self) -> String {
+                format!("{}-{:0>7}", self.element_name, self.next_event_index)
+            }
         }
 
         impl Process for $struct_name {
@@ -614,21 +615,26 @@ macro_rules! define_process {
                 cx: &'a mut Context<Self>,
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
+                    self.next_event_index += 1;
                     let current_time = cx.time();
-                    let elapsed_time: Duration = match self.previous_check_time {
-                        None => Duration::MAX,
-                        Some(t) => current_time.duration_since(t),
-                    };
-                    self.time_to_next_event_counter = self.time_to_next_event_counter.saturating_sub(elapsed_time);
                     let self_moved = std::mem::take(self);
                     *self = $check_update_method(self_moved, current_time.clone()).await; 
                     self.previous_check_time = Some(current_time);
-                    self.next_scheduled_event_time = Some(current_time.checked_add(self.time_to_next_event_counter).unwrap_or(MonotonicTime::MAX));
-                    self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
-                        self.next_scheduled_event_time.unwrap(),
-                        Self::check_update_state,
-                        notif_meta
-                    ).unwrap());
+                    match self.time_to_next_event_counter {
+                        None => {},
+                        Some(time_to_next) => {
+                            if time_to_next.is_zero() {
+                                panic!("self.time_to_next_event_counter was not set by check_update_method!");
+                            } else {
+                                self.next_scheduled_event_time = Some(current_time + time_to_next);
+                                self.next_scheduled_event_key = Some(cx.schedule_keyed_event(
+                                    self.next_scheduled_event_time.unwrap(),
+                                    Self::check_update_state,
+                                    notif_meta
+                                ).unwrap());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -672,6 +678,7 @@ macro_rules! define_combiner_process {
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Option<Duration>,
+            next_event_index: i64,
         
             pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
             pub withdraw_upstreams: ( $( Requestor<($resource_in_parameter_types, NotificationMetadata), $resource_in_types> ),+ ),
@@ -694,6 +701,7 @@ macro_rules! define_combiner_process {
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_next_event_counter: Some(Duration::from_secs(0)),
+                    next_event_index: 0,
                     req_upstreams: Default::default(),
                     withdraw_upstreams: Default::default(),
                     req_downstream: Default::default(),
@@ -718,13 +726,8 @@ macro_rules! define_combiner_process {
                 cx: &'a mut Context<Self>,
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
+                    self.next_event_index += 1;
                     let current_time = cx.time();
-                    // let elapsed_time: Duration = match self.previous_check_time {
-                    //     None => Duration::MAX,
-                    //     Some(t) => current_time.duration_since(t),
-                    // };
-                    // self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
-                    // if self.time_to_next_event_counter.is_zero() {
                     let self_moved = std::mem::take(self);
                     *self = $check_update_method(self_moved, current_time.clone()).await;
                     self.previous_check_time = Some(current_time);
@@ -750,6 +753,10 @@ macro_rules! define_combiner_process {
                 async move {
                     $log_method(self, time, details).await;
                 }
+            }
+
+            fn get_event_id(&self) -> String {
+                format!("{}-{:0>7}", self.element_name, self.next_event_index)
             }
         
         }
@@ -796,6 +803,7 @@ macro_rules! define_splitter_process {
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Option<Duration>,
+            next_event_index: i64,
         
             pub req_upstream: Requestor<(),  $inflow_stock_state_type>,
             pub withdraw_upstream: Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
@@ -818,6 +826,7 @@ macro_rules! define_splitter_process {
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_next_event_counter: Some(Duration::from_secs(0)),
+                    next_event_index: 0,
                     req_upstream: Default::default(),
                     withdraw_upstream: Default::default(),
                     req_downstreams: Default::default(),
@@ -842,17 +851,15 @@ macro_rules! define_splitter_process {
                 cx: &'a mut Context<Self>,
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
+                    self.next_event_index += 1;
                     let current_time = cx.time();
                     let elapsed_time: Duration = match self.previous_check_time {
                         None => Duration::MAX,
                         Some(t) => current_time.duration_since(t),
                     };
                     
-                    // self.time_to_next_event_counter = self.time_to_next_event_counter.checked_sub(elapsed_time).unwrap_or(Duration::ZERO);
-                    // if self.time_to_next_event_counter.is_zero() {
                     let self_moved = std::mem::take(self);
                     *self = $check_update_method(self_moved, current_time.clone()).await; 
-                    // }
                     self.previous_check_time = Some(current_time);
                     match self.time_to_next_event_counter {
                         None => {},
@@ -876,6 +883,10 @@ macro_rules! define_splitter_process {
                 async move {
                     $log_method(self, time, details).await;
                 }
+            }
+
+            fn get_event_id(&self) -> String {
+                format!("{}-{:0>7}", self.element_name, self.next_event_index)
             }
         }
         
