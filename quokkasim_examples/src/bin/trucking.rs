@@ -1,3 +1,4 @@
+use clap::Parser;
 use indexmap::{IndexMap, IndexSet};
 use nexosim::{
     model::Context,
@@ -716,7 +717,6 @@ define_stock!(
     log_record_type = QueueStockLog,
     log_method = |x: &'a mut Self, time: MonotonicTime, log_type: String| {
         async move {
-            let state = x.get_state().await;
             let log = QueueStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 element_name: x.element_name.clone(),
@@ -751,13 +751,71 @@ impl TruckStock {
     }
 }
 
-fn main() {
-    const NUM_TRUCKS: usize = 2;
-    const SIM_DURATION_SECS: f64 = 3600. * 6. * 1.;
+/// Trucking simulation command line options.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// The base seed used for random distributions.
+    #[arg(long, default_value = "1")]
+    seed: String,
+
+    /// The number of trucks to simulate.
+    #[arg(long, default_value = "2")]
+    num_trucks: usize,
+
+    /// The simulation duration in seconds.
+    #[arg(long, default_value = "21600")]
+    sim_duration_secs: f64,
+}
+
+struct ParsedArgs {
+    seed: u64,
+    num_trucks: usize,
+    sim_duration_secs: f64,
+}
+
+/// Parse a seed string such as "0..6" or "0..=7" into a vector of u64 values.
+fn parse_seed_range(seed_str: &str) -> Result<Vec<u64>, String> {
+    if let Some(idx) = seed_str.find("..=") {
+        let (start, end) = seed_str.split_at(idx);
+        let end = &end[3..]; // skip "..="
+        let start: u64 = start
+            .trim()
+            .parse()
+            .map_err(|e| format!("Invalid start seed '{}': {}", start.trim(), e))?;
+        let end: u64 = end
+            .trim()
+            .parse()
+            .map_err(|e| format!("Invalid end seed '{}': {}", end.trim(), e))?;
+        Ok((start..=end).collect())
+    } else if let Some(idx) = seed_str.find("..") {
+        let (start, end) = seed_str.split_at(idx);
+        let end = &end[2..]; // skip ".."
+        let start: u64 = start
+            .trim()
+            .parse()
+            .map_err(|e| format!("Invalid start seed '{}': {}", start.trim(), e))?;
+        let end: u64 = end
+            .trim()
+            .parse()
+            .map_err(|e| format!("Invalid end seed '{}': {}", end.trim(), e))?;
+        Ok((start..end).collect())
+    } else {
+        seed_str
+            .trim()
+            .parse::<u64>()
+            .map(|v| vec![v])
+            .map_err(|e| format!("Invalid seed value '{}': {}", seed_str, e))
+    }
+}
+
+fn build_and_run_model(args: ParsedArgs) {
+
+    let base_seed = args.seed;
 
     let mut df: DistributionFactory = DistributionFactory {
-        base_seed: 123,
-        next_seed: 123,
+        base_seed,
+        next_seed: base_seed,
     };
 
     let stockpile_logger = EventLogger::<ArrayStockLog>::new(100_000);
@@ -782,7 +840,7 @@ fn main() {
     let truck_stock_mbox: Mailbox<TruckStock> = Mailbox::new();
     let truck_stock_addr = truck_stock_mbox.address();
 
-    (0..NUM_TRUCKS).for_each(|i| {
+    (0..args.num_trucks).for_each(|i| {
         ready_to_load_trucks.resource.add(vec![TruckAndOre {
             truck: (100 + i) as i32,
             ore: ArrayResource { vec: [0.; 5] },
@@ -937,10 +995,38 @@ fn main() {
         &loading_addr,
     )
     .unwrap();
-    simu.step_until(start_time + Duration::from_secs_f64(SIM_DURATION_SECS)).unwrap();
+    simu.step_until(start_time + Duration::from_secs_f64(args.sim_duration_secs)).unwrap();
 
-    process_logger.write_csv("outputs/trucking_process_logs.csv").unwrap();
-    truck_stock_logger.write_csv("outputs/trucking_truck_stock_logs.csv").unwrap();
-    truck_queue_logger.write_csv("outputs/trucking_truck_queue_logs.csv").unwrap();
-    stockpile_logger.write_csv("outputs/trucking_stockpile_logs.csv").unwrap();
+    // Create dir if doesn't exist
+    let dir = format!("outputs/trucking/{:04}", base_seed);
+    if !std::path::Path::new(&dir).exists() {
+        std::fs::create_dir_all(&dir).unwrap();
+    }
+
+    process_logger.write_csv(&format!("outputs/trucking/{:04}/process_logs.csv", base_seed)).unwrap();
+    truck_stock_logger.write_csv(&format!("outputs/trucking/{:04}/truck_stock_logs.csv", base_seed)).unwrap();
+    truck_queue_logger.write_csv(&format!("outputs/trucking/{:04}/truck_queue_logs.csv", base_seed)).unwrap();
+    stockpile_logger.write_csv(&format!("outputs/trucking/{:04}/stockpile_logs.csv", base_seed)).unwrap();
+}
+
+fn main() {
+    let args = Args::parse();
+
+    let seeds = match parse_seed_range(&args.seed) {
+        Ok(seeds) => seeds,
+        Err(err) => {
+            eprintln!("Error parsing seed range: {}", err);
+            std::process::exit(1);
+        }
+    };
+
+    seeds.iter().for_each(|seed| {
+        let args = ParsedArgs {
+            seed: *seed,
+            num_trucks: args.num_trucks,
+            sim_duration_secs: args.sim_duration_secs,
+        };
+        build_and_run_model(args);
+    });
+
 }
