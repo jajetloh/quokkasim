@@ -881,15 +881,15 @@ fn build_and_run_model(args: ParsedArgs) {
 
     let mut loaded_truck_movement_process = TruckMovementProcess::default()
         .with_name("LoadedTruckMovementProcess".into())
-        .with_log_consumer(&process_logger);
-    loaded_truck_movement_process.travel_time_dist_secs = Some(
-        df.create(DistributionConfig::Triangular {
-            min: 100.,
-            max: 200.,
-            mode: 120.,
-        })
-        .unwrap(),
-    );
+        .with_log_consumer(&process_logger)
+        .with_travel_time_dist_secs(Some(
+            df.create(DistributionConfig::Triangular {
+                min: 100.,
+                max: 200.,
+                mode: 120.,
+            })
+            .unwrap(),
+        ));
     let loaded_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
     let loaded_truck_movement_addr = loaded_truck_movement_mbox.address();
 

@@ -111,6 +111,15 @@ macro_rules! define_stock {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
+            
+            paste::item! {
+                $(
+                    pub fn [<with_ $field_name>](mut self, $field_name: $field_type) -> Self {
+                        self.$field_name = $field_name;
+                        self
+                    }
+                )*
+            }
 
             pub fn log(&'a mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
                 async move {
@@ -289,6 +298,15 @@ macro_rules! define_source {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
+            
+            paste::item! {
+                $(
+                    pub fn [<with_ $field_name>](mut self, $field_name: $field_type) -> Self {
+                        self.$field_name = $field_name;
+                        self
+                    }
+                )*
+            }
 
             pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
@@ -438,6 +456,15 @@ macro_rules! define_sink {
             pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
+            }
+            
+            paste::item! {
+                $(
+                    pub fn [<with_ $field_name>](mut self, $field_name: $field_type) -> Self {
+                        self.$field_name = $field_name;
+                        self
+                    }
+                )*
             }
 
             pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
@@ -591,6 +618,15 @@ macro_rules! define_process {
                 return self
             }
 
+            paste::item! {
+                $(
+                    pub fn [<with_ $field_name>](mut self, $field_name: $field_type) -> Self {
+                        self.$field_name = $field_name;
+                        self
+                    }
+                )*
+            }
+
             pub fn log<'a>(&'a mut self, time: MonotonicTime, details: $log_method_parameter_type) -> impl Future<Output = ()> + Send {
                 async move {
                     $log_method(self, time, details).await;
@@ -719,6 +755,15 @@ macro_rules! define_combiner_process {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
             }
+            
+            paste::item! {
+                $(
+                    pub fn [<with_ $field_name>](mut self, $field_name: $field_type) -> Self {
+                        self.$field_name = $field_name;
+                        self
+                    }
+                )*
+            }
         
             pub fn check_update_state<'a>(
                 &'a mut self,
@@ -843,6 +888,15 @@ macro_rules! define_splitter_process {
             pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
                 self.log_emitter.connect_sink(&logger.buffer);
                 return self
+            }
+            
+            paste::item! {
+                $(
+                    pub fn [<with_ $field_name>](mut self, $field_name: $field_type) -> Self {
+                        self.$field_name = $field_name;
+                        self
+                    }
+                )*
             }
         
             pub fn check_update_state<'a>(
