@@ -15,6 +15,7 @@ use quokkasim::{
     define_combiner_process, define_process, define_splitter_process, define_stock,
     prelude::QueueStockLog,
 };
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Serialize, ser::SerializeStruct};
 use std::time::Duration;
 
@@ -1020,7 +1021,7 @@ fn main() {
         }
     };
 
-    seeds.iter().for_each(|seed| {
+    seeds.par_iter().for_each(|seed| {
         let args = ParsedArgs {
             seed: *seed,
             num_trucks: args.num_trucks,
