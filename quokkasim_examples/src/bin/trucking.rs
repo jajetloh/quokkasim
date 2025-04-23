@@ -885,114 +885,45 @@ fn main() {
     let empty_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
     let empty_truck_movement_addr = empty_truck_movement_mbox.address();
 
-    loading_process
-        .req_upstreams
-        .0
-        .connect(ArrayStock::get_state, &source_stockpile_addr);
-    loading_process
-        .req_upstreams
-        .1
-        .connect(TruckStock::get_state, &truck_stock_addr);
-    loading_process
-        .withdraw_upstreams
-        .0
-        .connect(ArrayStock::remove, &source_stockpile_addr);
-    loading_process
-        .withdraw_upstreams
-        .1
-        .connect(TruckStock::remove_any, &truck_stock_addr);
-    loading_process
-        .push_downstream
-        .connect(TruckStock::add, &loaded_trucks_addr);
-    source_stockpile
-        .state_emitter
-        .connect(LoadingProcess::check_update_state, &loading_addr);
-    ready_to_load_trucks
-        .state_emitter
-        .connect(LoadingProcess::check_update_state, &loading_addr);
+    loading_process.req_upstreams.0.connect(ArrayStock::get_state, &source_stockpile_addr);
+    loading_process.req_upstreams.1.connect(TruckStock::get_state, &truck_stock_addr);
+    loading_process.withdraw_upstreams.0.connect(ArrayStock::remove, &source_stockpile_addr);
+    loading_process.withdraw_upstreams.1.connect(TruckStock::remove_any, &truck_stock_addr);
+    loading_process.push_downstream.connect(TruckStock::add, &loaded_trucks_addr);
+    source_stockpile.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
+    ready_to_load_trucks.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
 
-    loaded_truck_movement_process
-        .req_upstream
-        .connect(TruckStock::get_state, &loaded_trucks_addr);
-    loaded_truck_movement_process
-        .withdraw_upstream
-        .connect(TruckStock::remove, &loaded_trucks_addr);
-    loaded_trucks.state_emitter.connect(
-        TruckMovementProcess::check_update_state,
-        &loaded_truck_movement_addr,
-    );
-    loaded_truck_movement_process
-        .req_downstream
-        .connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
-    loaded_truck_movement_process
-        .push_downstream
-        .connect(TruckStock::add, &ready_to_dump_trucks_addr);
+    loaded_truck_movement_process.req_upstream.connect(TruckStock::get_state, &loaded_trucks_addr);
+    loaded_truck_movement_process.withdraw_upstream.connect(TruckStock::remove, &loaded_trucks_addr);
+    loaded_trucks.state_emitter.connect(TruckMovementProcess::check_update_state,&loaded_truck_movement_addr);
+    loaded_truck_movement_process.req_downstream.connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
+    loaded_truck_movement_process.push_downstream.connect(TruckStock::add, &ready_to_dump_trucks_addr);
 
-    dumping_process
-        .req_upstream
-        .connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
-    dumping_process
-        .withdraw_upstream
-        .connect(TruckStock::remove_any, &ready_to_dump_trucks_addr);
-    dumping_process
-        .req_downstreams
-        .0
-        .connect(ArrayStock::get_state, &dumped_stockpile_addr);
-    dumping_process
-        .push_downstreams
-        .0
-        .connect(ArrayStock::add, &dumped_stockpile_addr);
-    dumping_process
-        .push_downstreams
-        .1
-        .connect(TruckStock::add, &empty_trucks_addr);
-    ready_to_dump_trucks
-        .state_emitter
-        .connect(DumpingProcess::check_update_state, &dumping_addr);
-    dumped_stockpile
-        .state_emitter
-        .connect(DumpingProcess::check_update_state, &dumping_addr);
+    dumping_process.req_upstream.connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
+    dumping_process.withdraw_upstream.connect(TruckStock::remove_any, &ready_to_dump_trucks_addr);
+    dumping_process.req_downstreams.0.connect(ArrayStock::get_state, &dumped_stockpile_addr);
+    dumping_process.push_downstreams.0.connect(ArrayStock::add, &dumped_stockpile_addr);
+    dumping_process.push_downstreams.1.connect(TruckStock::add, &empty_trucks_addr);
+    ready_to_dump_trucks.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
+    dumped_stockpile.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
 
-    empty_truck_movement_process
-        .req_upstream
-        .connect(TruckStock::get_state, &empty_trucks_addr);
-    empty_truck_movement_process
-        .withdraw_upstream
-        .connect(TruckStock::remove, &empty_trucks_addr);
-    empty_truck_movement_process
-        .req_downstream
-        .connect(TruckStock::get_state, &truck_stock_addr);
-    empty_truck_movement_process
-        .push_downstream
-        .connect(TruckStock::add, &truck_stock_addr);
-    empty_trucks.state_emitter.connect(
-        TruckMovementProcess::check_update_state,
-        &empty_truck_movement_addr,
-    );
+    empty_truck_movement_process.req_upstream.connect(TruckStock::get_state, &empty_trucks_addr);
+    empty_truck_movement_process.withdraw_upstream.connect(TruckStock::remove, &empty_trucks_addr);
+    empty_truck_movement_process.req_downstream.connect(TruckStock::get_state, &truck_stock_addr);
+    empty_truck_movement_process.push_downstream.connect(TruckStock::add, &truck_stock_addr);
+    empty_trucks.state_emitter.connect(TruckMovementProcess::check_update_state, &empty_truck_movement_addr);
 
     let sim_init = SimInit::new()
         .add_model(source_stockpile, source_stockpile_mbox, "SourceStockpile")
         .add_model(ready_to_load_trucks, truck_stock_mbox, "TruckStock")
         .add_model(loading_process, loading_mbox, "LoadingProcess")
         .add_model(loaded_trucks, loaded_trucks_mbox, "LoadedTrucks")
-        .add_model(
-            loaded_truck_movement_process,
-            loaded_truck_movement_mbox,
-            "LoadedTruckMovementProcess",
-        )
-        .add_model(
-            ready_to_dump_trucks,
-            ready_to_dump_trucks_mbox,
-            "ReadyToDumpTrucks",
-        )
+        .add_model(loaded_truck_movement_process,loaded_truck_movement_mbox,"LoadedTruckMovementProcess")
+        .add_model(ready_to_dump_trucks,ready_to_dump_trucks_mbox,"ReadyToDumpTrucks")
         .add_model(dumping_process, dumping_mbox, "DumpingProcess")
         .add_model(dumped_stockpile, dumped_stockpile_mbox, "DumpedStockpile")
         .add_model(empty_trucks, empty_trucks_mbox, "EmptyTrucks")
-        .add_model(
-            empty_truck_movement_process,
-            empty_truck_movement_mbox,
-            "EmptyTruckMovementProcess",
-        );
+        .add_model(empty_truck_movement_process,empty_truck_movement_mbox,"EmptyTruckMovementProcess");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_init.init(start_time).unwrap().0;
@@ -1006,19 +937,10 @@ fn main() {
         &loading_addr,
     )
     .unwrap();
-    simu.step_until(start_time + Duration::from_secs_f64(SIM_DURATION_SECS))
-        .unwrap();
+    simu.step_until(start_time + Duration::from_secs_f64(SIM_DURATION_SECS)).unwrap();
 
-    process_logger
-        .write_csv("outputs/trucking_process_logs.csv")
-        .unwrap();
-    truck_stock_logger
-        .write_csv("outputs/trucking_truck_stock_logs.csv")
-        .unwrap();
-    truck_queue_logger
-        .write_csv("outputs/trucking_truck_queue_logs.csv")
-        .unwrap();
-    stockpile_logger
-        .write_csv("outputs/trucking_stockpile_logs.csv")
-        .unwrap();
+    process_logger.write_csv("outputs/trucking_process_logs.csv").unwrap();
+    truck_stock_logger.write_csv("outputs/trucking_truck_stock_logs.csv").unwrap();
+    truck_queue_logger.write_csv("outputs/trucking_truck_queue_logs.csv").unwrap();
+    stockpile_logger.write_csv("outputs/trucking_stockpile_logs.csv").unwrap();
 }
