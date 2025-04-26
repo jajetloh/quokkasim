@@ -18,6 +18,7 @@ use quokkasim::{
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Serialize, ser::SerializeStruct};
 use std::time::Duration;
+use log::warn;
 
 #[derive(Debug, Clone)]
 pub struct TruckAndOre {
@@ -29,24 +30,20 @@ pub struct TruckAndOreMap {
     trucks: IndexMap<i32, TruckAndOre>,
 }
 
-impl ResourceAdd<Vec<TruckAndOre>> for TruckAndOreMap {
-    fn add(&mut self, mut truck_and_ore: Vec<TruckAndOre>) {
-        while !truck_and_ore.is_empty() {
-            let item = truck_and_ore.pop().unwrap();
-            self.trucks.insert(item.truck, item);
+impl ResourceAdd<Option<TruckAndOre>> for TruckAndOreMap {
+    fn add(&mut self, truck_and_ore: Option<TruckAndOre>) {
+        match truck_and_ore {
+            Some(item) => {
+                self.trucks.insert(item.truck, item);
+            }
+            None => {}
         }
     }
 }
 
-impl ResourceRemove<Vec<i32>, Vec<TruckAndOre>> for TruckAndOreMap {
-    fn sub(&mut self, ids: Vec<i32>) -> Vec<TruckAndOre> {
-        let mut results = Vec::new();
-        for id in ids {
-            if let Some(item) = self.trucks.swap_remove(&id) {
-                results.push(item);
-            }
-        }
-        results
+impl ResourceRemove<i32, Option<TruckAndOre>> for TruckAndOreMap {
+    fn sub(&mut self, id: i32) -> Option<TruckAndOre> {
+        self.trucks.swap_remove(&id)
     }
 }
 
@@ -168,11 +165,11 @@ define_combiner_process!(
     /// Loading process for trucks. Draws from a truck stock and array stock, pushes out Vec<TruckAndOre>
     name = LoadingProcess,
     inflow_stock_state_types = (ArrayStockState, TruckStockState),
-    resource_in_types = (ArrayResource, Vec<TruckAndOre>),
+    resource_in_types = (ArrayResource, Option<TruckAndOre>),
     resource_in_parameter_types = (f64, ()),
     outflow_stock_state_type = TruckStockState,
-    resource_out_type = Vec<TruckAndOre>,
-    resource_out_parameter_type = Vec<TruckAndOre>,
+    resource_out_type = Option<TruckAndOre>,
+    resource_out_parameter_type = Option<TruckAndOre>,
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             // First resolve Loading state, if applicable
@@ -185,7 +182,7 @@ define_combiner_process!(
                     if new_time_until_done.is_zero() {
                         x.log(time, TruckingProcessLogType::LoadSuccess { truck_id: truck.truck,  tonnes: truck.ore.total(), components: truck.ore.vec } ).await;
                         x.log_truck_stock(time, TruckAndOreStockLogDetails::StockAdded { truck_id: truck.truck, total: truck.ore.total(), empty: 999., contents: truck.ore.vec }).await;
-                        x.push_downstream.send((vec![truck.clone()], NotificationMetadata {
+                        x.push_downstream.send((Some(truck.clone()), NotificationMetadata {
                             time,
                             element_from: x.element_name.clone(),
                             message: "Truck and ore".into(),
@@ -216,12 +213,22 @@ define_combiner_process!(
                         element_from: x.element_name.clone(),
                         message: "Material request".into(),
                     })).await.next().unwrap();
-                    let truck_id = truck.get(0).unwrap().truck;
-                    truck.get_mut(0).unwrap().ore = material.clone();
-                    let time_until_done = Duration::from_secs_f64(x.load_time_dist_secs.as_mut().unwrap().sample());
-                    x.state = LoadingProcessState::Loading { truck: truck.swap_remove(0), previous_check_time: time.clone(), time_until_done };
-                    x.log(time, TruckingProcessLogType::LoadStart { truck_id,  tonnes: material.total(), components: material.vec.clone() } ).await;
-                    x.time_to_next_event_counter = Some(time_until_done);
+
+                    match truck.take() {
+                        Some(mut truck) => {
+                            let truck_id = truck.truck;
+                            truck.ore = material.clone();
+                            let time_until_done = Duration::from_secs_f64(x.load_time_dist_secs.as_mut().unwrap().sample());
+                            x.state = LoadingProcessState::Loading { truck, previous_check_time: time.clone(), time_until_done };
+                            x.log(time, TruckingProcessLogType::LoadStart { truck_id,  tonnes: material.total(), components: material.vec.clone() } ).await;
+                            x.time_to_next_event_counter = Some(time_until_done);
+                        },
+                        None => {
+                            x.state = LoadingProcessState::Idle;
+                            x.log(time, TruckingProcessLogType::LoadStartFailed { reason: "No trucks available" }).await;
+                            x.time_to_next_event_counter = None;
+                        }
+                    }
                 },
                 (ArrayStockState::Empty { .. }, _) => {
                     x.log(time, TruckingProcessLogType::LoadStartFailed { reason: "No material available" }).await;
@@ -279,10 +286,10 @@ define_process!(
     /// TruckMovementProcess
     name = TruckMovementProcess,
     stock_state_type = TruckStockState,
-    resource_in_type = Vec<TruckAndOre>,
-    resource_in_parameter_type = Vec<i32>,
-    resource_out_type = Vec<TruckAndOre>,
-    resource_out_parameter_type = Vec<TruckAndOre>,
+    resource_in_type = Option<TruckAndOre>,
+    resource_in_parameter_type = i32,
+    resource_out_type = Option<TruckAndOre>,
+    resource_out_parameter_type = Option<TruckAndOre>,
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             let elapsed_time: Duration = match x.previous_check_time {
@@ -309,17 +316,27 @@ define_process!(
             // Check for trucks that are done
             for id in items_ready {
                 x.time_counters.swap_remove(&id);
-                let truck_and_ores: Vec<TruckAndOre> = x.withdraw_upstream.send((vec![id], NotificationMetadata {
+                let truck_and_ore: Option<TruckAndOre> = x.withdraw_upstream.send((id, NotificationMetadata {
                     time,
                     element_from: x.element_name.clone(),
                     message: "Truck request".into(),
                 })).await.next().unwrap();
-                x.push_downstream.send((truck_and_ores.clone(), NotificationMetadata {
-                    time,
-                    element_from: x.element_name.clone(),
-                    message: "Truck and ore".into(),
-                })).await;
-                x.log(time, TruckingProcessLogType::TruckMovement { truck_id: id, tonnes: truck_and_ores.first().unwrap().ore.total(), components: truck_and_ores.first().unwrap().ore.vec } ).await;
+                match truck_and_ore {
+                    Some(truck_and_ore) => {
+                        x.log(time, TruckingProcessLogType::TruckMovement { truck_id: id, tonnes: truck_and_ore.ore.total(), components: truck_and_ore.ore.vec } ).await;
+                        x.push_downstream.send((Some(truck_and_ore), NotificationMetadata {
+                            time,
+                            element_from: x.element_name.clone(),
+                            message: "Truck and ore".into(),
+                        })).await;
+                    },
+                    None => {
+                        x.log(time, TruckingProcessLogType::LoadStartFailed { reason: "No truck with requested id exists upstream" }).await;
+                        warn!("TruckMovementProcess {}: No truck with requested id {} exists upstream", x.element_name, id);
+                        x.time_to_next_event_counter = None;
+                        return x;
+                    }
+                }
             }
 
             // Check for new trucks upstream. If new, add a counter for it
@@ -385,11 +402,11 @@ define_splitter_process!(
     /// DumpingProcess
     name = DumpingProcess,
     inflow_stock_state_type = TruckStockState,
-    resource_in_type = Vec<TruckAndOre>,
+    resource_in_type = Option<TruckAndOre>,
     resource_in_parameter_type = (),
     outflow_stock_state_types = (ArrayStockState, TruckStockState),
-    resource_out_types = (ArrayResource, Vec<TruckAndOre>),
-    resource_out_parameter_types = (ArrayResource, Vec<TruckAndOre>),
+    resource_out_types = (ArrayResource, Option<TruckAndOre>),
+    resource_out_parameter_types = (ArrayResource, Option<TruckAndOre>),
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             // Resolve Dumping state, if applicable
@@ -402,7 +419,7 @@ define_splitter_process!(
                     if new_time_until_done.is_zero() {
                         x.log(time, TruckingProcessLogType::DumpSuccess { truck_id: truck.truck, tonnes: truck.ore.total(), components: truck.ore.vec } ).await;
                         x.log_truck_stock(time, TruckAndOreStockLogDetails::StockRemoved { truck_id: truck.truck, total: truck.ore.total(), empty: 999., contents: truck.ore.vec }).await;
-                        x.push_downstreams.1.send((vec![truck.clone()], NotificationMetadata {
+                        x.push_downstreams.1.send((Some(truck.clone()), NotificationMetadata {
                             time,
                             element_from: x.element_name.clone(),
                             message: "Truck done".into(),
@@ -426,21 +443,30 @@ define_splitter_process!(
             let ds_material_state: ArrayStockState = x.req_downstreams.0.send(()).await.next().unwrap();
             match (us_state, ds_material_state) {
                 (TruckStockState::Normal { .. }, ArrayStockState::Normal { .. } | ArrayStockState::Empty { .. }) => {
-                    let truck_and_ore: Vec<TruckAndOre> = x.withdraw_upstream.send(((), NotificationMetadata {
+                    let truck_and_ore: Option<TruckAndOre> = x.withdraw_upstream.send(((), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
                         message: "Truck request".into(),
                     })).await.next().unwrap();
 
-                    let time_until_done = Duration::from_secs_f64(x.dump_time_dist_secs.as_mut().unwrap().sample());
-
-                    x.state = DumpingProcessState::Dumping {
-                        truck: truck_and_ore.first().unwrap().clone(),
-                        previous_check_time: time.clone(),
-                        time_until_done,
-                    };
-                    x.log(time, TruckingProcessLogType::DumpStart { truck_id: truck_and_ore.first().unwrap().truck, tonnes: truck_and_ore.first().unwrap().ore.total(), components: truck_and_ore.first().unwrap().ore.vec } ).await;
-                    x.time_to_next_event_counter = Some(time_until_done);
+                    match truck_and_ore {
+                        Some(truck_and_ore) => {
+                            let time_until_done = Duration::from_secs_f64(x.dump_time_dist_secs.as_mut().unwrap().sample());
+                            x.state = DumpingProcessState::Dumping {
+                                truck: truck_and_ore.clone(),
+                                previous_check_time: time.clone(),
+                                time_until_done,
+                            };
+                            x.log(time, TruckingProcessLogType::DumpStart { truck_id: truck_and_ore.truck, tonnes: truck_and_ore.ore.total(), components: truck_and_ore.ore.vec } ).await;
+                            x.time_to_next_event_counter = Some(time_until_done);
+                        },
+                        None => {
+                            x.state = DumpingProcessState::Idle;
+                            x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "No trucks available" }).await;
+                            x.time_to_next_event_counter = None;
+                            return x;
+                        }
+                    }
                 },
                 (TruckStockState::Empty, _) => {
                     x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "No trucks available" }).await;
@@ -570,9 +596,9 @@ define_stock!(
     name = TruckStock,
     resource_type = TruckAndOreMap,
     initial_resource = Default::default(),
-    add_type = Vec<TruckAndOre>,
-    remove_type = Vec<TruckAndOre>,
-    remove_parameter_type = Vec<i32>,
+    add_type = Option<TruckAndOre>,
+    remove_type = Option<TruckAndOre>,
+    remove_parameter_type = i32,
     state_type = TruckStockState,
     fields = {
         low_capacity: f64,
@@ -611,16 +637,18 @@ impl TruckStock {
         &mut self,
         data: ((), NotificationMetadata),
         cx: &mut Context<Self>,
-    ) -> impl Future<Output = Vec<TruckAndOre>> {
+    ) -> impl Future<Output = Option<TruckAndOre>> {
         async move {
             self.prev_state = Some(self.get_state().await);
-            let truck_and_ore_vec = match self.resource.trucks.pop() {
-                Some((_, x)) => vec![x],
-                None => vec![],
+            let truck = match self.resource.trucks.pop() {
+                Some((_, truck)) => Some(truck),
+                None => {
+                    None
+                }
             };
             self.log(data.1.time, "SomeLog".into()).await;
             self.check_update_state(data.1, cx).await;
-            truck_and_ore_vec
+            truck
         }
     }
 }
@@ -715,10 +743,10 @@ fn build_and_run_model(args: ParsedArgs) {
     let truck_stock_addr = truck_stock_mbox.address();
 
     (0..args.num_trucks).for_each(|i| {
-        ready_to_load_trucks.resource.add(vec![TruckAndOre {
+        ready_to_load_trucks.resource.add(Some(TruckAndOre {
             truck: (100 + i) as i32,
             ore: ArrayResource { vec: [0.; 5] },
-        }]);
+        }));
     });
 
     let mut loading_process = LoadingProcess::default()

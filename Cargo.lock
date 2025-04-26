@@ -727,6 +727,7 @@ dependencies = [
  "clap",
  "csv",
  "indexmap",
+ "log",
  "nexosim",
  "paste",
  "quokkasim",
