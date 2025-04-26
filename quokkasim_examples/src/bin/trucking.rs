@@ -79,118 +79,25 @@ impl Serialize for TruckingProcessLog {
         state.serialize_field("element_type", &self.element_type)?;
 
         let (event_type, truck_id, total, x0, x1, x2, x3, x4, reason): (
-            Option<&'static str>,
-            Option<i32>,
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<&'static str>,
+            Option<&'static str>, Option<i32>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<&'static str>,
         ) = match &self.process_data {
-            TruckingProcessLogType::LoadStart {
-                truck_id,
-                tonnes,
-                components,
-                ..
-            } => (
-                Some("LoadStart"),
-                Some(*truck_id),
-                Some(*tonnes),
-                Some(components[0]),
-                Some(components[1]),
-                Some(components[2]),
-                Some(components[3]),
-                Some(components[4]),
-                None,
+            TruckingProcessLogType::LoadStart { truck_id, tonnes, components, .. } => (
+                Some("LoadStart"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None,
             ),
-            TruckingProcessLogType::LoadSuccess {
-                truck_id,
-                tonnes,
-                components,
-                ..
-            } => (
-                Some("LoadSuccess"),
-                Some(*truck_id),
-                Some(*tonnes),
-                Some(components[0]),
-                Some(components[1]),
-                Some(components[2]),
-                Some(components[3]),
-                Some(components[4]),
-                None,
+            TruckingProcessLogType::LoadSuccess { truck_id, tonnes, components, .. } => (
+                Some("LoadSuccess"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None,
             ),
             TruckingProcessLogType::LoadStartFailed { reason } => (
-                Some("LoadStartFailed"),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(*reason),
+                Some("LoadStartFailed"), None, None, None, None, None, None, None, Some(*reason),
             ),
-            TruckingProcessLogType::DumpStart {
-                truck_id,
-                tonnes,
-                components,
-                ..
-            } => (
-                Some("DumpStart"),
-                Some(*truck_id),
-                Some(*tonnes),
-                Some(components[0]),
-                Some(components[1]),
-                Some(components[2]),
-                Some(components[3]),
-                Some(components[4]),
-                None,
+            TruckingProcessLogType::DumpStart { truck_id, tonnes, components, .. } => (
+                Some("DumpStart"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None,
             ),
-            TruckingProcessLogType::DumpSuccess {
-                truck_id,
-                tonnes,
-                components,
-                ..
-            } => (
-                Some("DumpSuccess"),
-                Some(*truck_id),
-                Some(*tonnes),
-                Some(components[0]),
-                Some(components[1]),
-                Some(components[2]),
-                Some(components[3]),
-                Some(components[4]),
-                None,
+            TruckingProcessLogType::DumpSuccess { truck_id, tonnes, components, .. } => (
+                Some("DumpSuccess"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None,
             ),
-            TruckingProcessLogType::DumpStartFailed { reason } => (
-                Some("DumpStartFailed"),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(*reason),
-            ),
-            TruckingProcessLogType::TruckMovement {
-                truck_id,
-                tonnes,
-                components,
-                ..
-            } => (
-                Some("TruckMovement"),
-                Some(*truck_id),
-                Some(*tonnes),
-                Some(components[0]),
-                Some(components[1]),
-                Some(components[2]),
-                Some(components[3]),
-                Some(components[4]),
-                None,
-            ),
+            TruckingProcessLogType::DumpStartFailed { reason } => ( Some("DumpStartFailed"), None, None, None, None, None, None, None, Some(*reason), ),
+            TruckingProcessLogType::TruckMovement { truck_id, tonnes, components, .. } => (Some("TruckMovement"), Some(*truck_id), Some(*tonnes), Some(components[0]), Some(components[1]), Some(components[2]), Some(components[3]), Some(components[4]), None),
         };
 
         state.serialize_field("event_type", &event_type)?;
@@ -620,47 +527,13 @@ impl Serialize for TruckAndOreStockLog {
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         let (log_type, truck_id, occupied, empty, x0, x1, x2, x3, x4): (
-            &str,
-            i32,
-            f64,
-            f64,
-            f64,
-            f64,
-            f64,
-            f64,
-            f64,
+            &str, i32, f64, f64, f64, f64, f64, f64, f64,
         ) = match self.details {
-            TruckAndOreStockLogDetails::StockAdded {
-                truck_id,
-                total,
-                empty,
-                contents,
-            } => (
-                "StockAdded".into(),
-                truck_id,
-                total,
-                empty,
-                contents[0],
-                contents[1],
-                contents[2],
-                contents[3],
-                contents[4],
+            TruckAndOreStockLogDetails::StockAdded { truck_id, total, empty, contents,} => (
+                "StockAdded".into(), truck_id, total, empty, contents[0], contents[1], contents[2], contents[3], contents[4],
             ),
-            TruckAndOreStockLogDetails::StockRemoved {
-                truck_id,
-                total,
-                empty,
-                contents,
-            } => (
-                "StockRemoved".into(),
-                truck_id,
-                total,
-                empty,
-                contents[0],
-                contents[1],
-                contents[2],
-                contents[3],
-                contents[4],
+            TruckAndOreStockLogDetails::StockRemoved { truck_id, total, empty, contents,} => (
+                "StockRemoved".into(), truck_id, total, empty, contents[0], contents[1], contents[2], contents[3], contents[4],
             ),
         };
         state.serialize_field("event_type", &log_type)?;
