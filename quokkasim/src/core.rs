@@ -107,10 +107,10 @@ macro_rules! define_stock {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-                self.log_emitter.connect_sink(&logger.buffer);
-                return self
-            }
+            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
+            //     self.log_emitter.connect_sink(&logger.buffer);
+            //     return self
+            // }
             
             paste::item! {
                 $(
@@ -294,10 +294,10 @@ macro_rules! define_source {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-                self.log_emitter.connect_sink(&logger.buffer);
-                return self
-            }
+            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
+            //     self.log_emitter.connect_sink(&logger.buffer);
+            //     return self
+            // }
             
             paste::item! {
                 $(
@@ -453,10 +453,10 @@ macro_rules! define_sink {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-                self.log_emitter.connect_sink(&logger.buffer);
-                return self
-            }
+            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
+            //     self.log_emitter.connect_sink(&logger.buffer);
+            //     return self
+            // }
             
             paste::item! {
                 $(
@@ -613,10 +613,10 @@ macro_rules! define_process {
                 return self
             }
 
-            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-                self.log_emitter.connect_sink(&logger.buffer);
-                return self
-            }
+            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
+            //     self.log_emitter.connect_sink(&logger.buffer);
+            //     return self
+            // }
 
             paste::item! {
                 $(
@@ -751,10 +751,10 @@ macro_rules! define_combiner_process {
                 self
             }
         
-            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-                self.log_emitter.connect_sink(&logger.buffer);
-                return self
-            }
+            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
+            //     self.log_emitter.connect_sink(&logger.buffer);
+            //     return self
+            // }
             
             paste::item! {
                 $(
@@ -885,10 +885,10 @@ macro_rules! define_splitter_process {
                 self
             }
         
-            pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-                self.log_emitter.connect_sink(&logger.buffer);
-                return self
-            }
+            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
+            //     self.log_emitter.connect_sink(&logger.buffer);
+            //     return self
+            // }
             
             paste::item! {
                 $(

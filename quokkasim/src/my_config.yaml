@@ -1,0 +1,12 @@
+---
+productId: 1234
+productName: HelloWorld
+tags: [ "tag1", "tag2" ]
+price: 1234
+dimensions:
+  length: 1234
+  width: 12
+dimensions2:
+  length: 1234
+  width: 12
+  height: 12345

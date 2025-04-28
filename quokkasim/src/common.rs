@@ -2,7 +2,7 @@ use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}};
 use nexosim::{ports::EventBuffer, time::MonotonicTime};
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EventLog {
@@ -53,6 +53,8 @@ pub enum Distribution {
     Exponential(Exp<f64>, SmallRng),
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(tag = "type")]
 pub enum DistributionConfig {
     Uniform { min: f64, max: f64},
     Triangular { min: f64, max: f64, mode: f64 },
