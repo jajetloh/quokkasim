@@ -1,13 +1,9 @@
-use std::{error::Error, fs::File, time::Duration};
-
-use csv::WriterBuilder;
+use std::time::Duration;
 use indexmap::IndexMap;
 use log::warn;
-use nexosim::{ports::{EventBuffer, Output}, time::MonotonicTime};
+use nexosim::{ports::Output, time::MonotonicTime};
 use quokkasim::{core::{Distribution, NotificationMetadata}, define_combiner_process, define_process, define_splitter_process, prelude::{ArrayResource, ArrayStockState}};
 use serde::{ser::SerializeStruct, Serialize};
-
-use crate::utils::Logger;
 
 use super::{stock::{TruckAndOreStockLog, TruckAndOreStockLogDetails, TruckStockState}, TruckAndOre};
 
@@ -410,8 +406,6 @@ define_process!(
                 }
             }
 
-            println!("TruckMovementProcess {}: {:?}, time_counters {:?}", x.element_name, time.to_string(), x.time_counters);
-
             // Check for trucks that are done
             for id in items_ready {
                 x.time_counters.swap_remove(&id);
@@ -440,8 +434,6 @@ define_process!(
 
             // Check for new trucks upstream. If new, add a counter for it
             let us_state: TruckStockState = x.req_upstream.send(()).await.next().unwrap();
-
-            println!("TruckMovementProcess {}: {:?}, us_state {:?}", x.element_name, time.to_string(), us_state);
 
             match us_state {
                 TruckStockState::Normal(y) => {
@@ -482,41 +474,3 @@ define_process!(
     },
     log_method_parameter_type = TruckingProcessLogType
 );
-
-
-struct TruckingProcessLogger {
-    name: String,
-    buffer: EventBuffer<<Self as Logger>::RecordType>,
-}
-
-impl Logger for TruckingProcessLogger {
-
-    type RecordType = TruckingProcessLog;
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
-        &self.buffer
-    }
-    fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>> {
-        // let file = File::create(path)?;
-        let file = File::create(format!("{}/{}.csv", dir, self.name))?;
-        let mut writer = WriterBuilder::new()
-            .has_headers(true)
-            .from_writer(file);
-        self.buffer.for_each(|log| {
-            writer.serialize(log).expect("Failed to write log record to CSV file");
-        });
-        writer.flush()?;
-        Ok(())
-    }
-}
-
-impl TruckingProcessLogger {
-    fn new(name: String, buffer_size: usize) -> Self {
-        TruckingProcessLogger {
-            name,
-            buffer: EventBuffer::with_capacity(buffer_size),
-        }
-    }
-}

@@ -1,0 +1,146 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/product.schema.json",
+    "title": "Product",
+    "description": "A product from Acme's catalog",
+    "type": "object",
+    "properties": {
+        "id": {
+            "description": "Unique identifier for this model",
+            "type": "string"
+        },
+        "name": {
+            "description": "Short human-readable identifier for this model",
+            "type": "string"
+        },
+        "description": {
+            "description": "Free-text field for further model context",
+            "type": "string"
+        },
+        "loggers": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "Unique logger name",
+                        "type": "string"
+                    },
+                    "record_type": {
+                        "enum": ["ArrayStockLog", "QueueStockLog", "TruckingProcessLog", "TruckAndOreStockLog"]
+                    },
+                    "log_path": {
+                        "description": "Destination path of the log file",
+                        "type": "string"
+                    },
+                    "max_length": {
+                        "description": "Maximum length of the log file",
+                        "type": "integer"
+                    }
+                },
+                "required": ["name", "record_type", "log_path"],
+                "additionalProperties": false
+            }
+        },
+        "components": {
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "ArrayStock" },
+                            "name": { "description": "Unique component name", "type": "string" },
+                            "vec": { "type": "array", "items": { "type": "number" } },
+                            "max_capacity": { "type": "number" },
+                            "low_capacity": { "type": "number" },
+                            "loggers": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "LoadingProcess" },
+                            "name": { "description": "Unique component name", "type": "string" },
+                            "load_time_dist_secs": { "$ref": "#/$defs/Distribution" },
+                            "load_quantity_dist": { "$ref": "#/$defs/Distribution" },
+                            "loggers": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "DumpingProcess" },
+                            "name": { "description": "Unique component name", "type": "string" },
+                            "dump_time_dist_secs": { "$ref": "#/$defs/Distribution" },
+                            "loggers": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "TruckMovementProcess" },
+                            "name": { "description": "Unique component name", "type": "string" },
+                            "travel_time_dist_secs": { "$ref": "#/$defs/Distribution" },
+                            "loggers": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "TruckStock" },
+                            "name": { "description": "Unique component name", "type": "string" },
+                            "dump_time_dist_secs": { "$ref": "#/$defs/Distribution" },
+                            "dump_quantity_dist": { "$ref": "#/$defs/Distribution" },
+                            "loggers": { "type": "array", "items": { "type": "string" } }
+                        },
+                        "additionalProperties": false
+                    }
+                ]
+            }
+        }
+    },
+    "$defs": {
+        "Distribution": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "type": { "const": "TruncNormal" },
+                        "mean": { "type": "number" },
+                        "std": { "type": "number" },
+                        "min": { "type": "number" },
+                        "max": { "type": ["number", "null"] }
+                    },
+                    "required": ["type", "mean", "std", "min", "max"],
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "type": { "const": "Uniform" },
+                        "min": { "type": "number" },
+                        "max": { "type": "number" }
+                    },
+                    "required": ["type", "min", "max"],
+                    "additionalProperties": false
+                    },
+                {
+                    "type": "object",
+                    "properties": {
+                        "type": { "const": "Triangular" },
+                        "min": { "type": "number" },
+                        "max": { "type": "number" },
+                        "mode": { "type": "number" }
+                    },
+                    "required": ["type", "min", "max", "mode"],
+                    "additionalProperties": false
+                }
+            ]
+        }
+    }
+}

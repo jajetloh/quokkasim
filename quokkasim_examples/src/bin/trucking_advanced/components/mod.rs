@@ -4,7 +4,6 @@ pub mod stock;
 use process::{DumpingProcess, LoadingProcess, TruckMovementProcess};
 use nexosim::simulation::Address;
 use quokkasim::{core::Mailbox, prelude::{ArrayResource, ArrayStock}};
-use serde::Deserialize;
 use stock::TruckStock;
 
 pub enum ComponentModel {
@@ -26,15 +25,6 @@ impl ComponentModel {
         }
     }
 }
-
-pub enum ComponentModelAddress {
-    ArrayStock(Address<ArrayStock>),
-    TruckStock(Address<TruckStock>),
-    LoadingProcess(Address<LoadingProcess>),
-    DumpingProcess(Address<DumpingProcess>),
-    TruckMovementProcess(Address<TruckMovementProcess>),
-}
-
 
 #[derive(Debug, Clone)]
 pub struct TruckAndOre {

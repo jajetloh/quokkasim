@@ -659,7 +659,7 @@ impl TruckStock {
 /// Trucking simulation command line options.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+struct CLIArgs {
     /// The base seed used for random distributions.
     #[arg(long, default_value = "1")]
     seed: String,
@@ -756,7 +756,6 @@ enum ComponentModelAddress {
 
 trait CreateComponent {
     fn create_component(&self, df: &mut DistributionFactory, loggers: &mut IndexMap<String, EventLogger>) -> Result<ComponentModel, Box<dyn Error>>;
-    // fn get_name(&self) -> &String;
 }
 
 impl CreateComponent for ComponentConfig {
@@ -936,7 +935,6 @@ fn connect_components(
             ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)))
         },
         (ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::TruckMovementProcess(mut movement, movement_mbox, movement_addr)) => {
-            println!("Connecting TruckStock to TruckMovementProcess: {} to {}", stock_model.element_name, movement.element_name);
             movement.req_upstream.connect(TruckStock::get_state, &stock_addr);
             movement.withdraw_upstream.connect(TruckStock::remove, &stock_addr); 
             stock_model.state_emitter.connect(TruckMovementProcess::check_update_state, &movement_addr);
@@ -971,42 +969,6 @@ fn connect_components(
             Ok((ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr),
             ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)))
         },
-        // },
-        // (ComponentModel::ArrayStock(_, _, stock_addr), ComponentModel::LoadingProcess(mut loading, _, _)) => {
-        //     loading.req_upstreams.0.connect(ArrayStock::get_state, &stock_addr);
-        //     loading.withdraw_upstreams.0.connect(ArrayStock::remove, &stock_addr);
-        //     Ok(())
-        // },
-        // (ComponentModel::LoadingProcess(mut loading, _, _), ComponentModel::TruckStock(_, _, stock_addr)) => {
-        //     loading.req_downstream.connect(TruckStock::get_state, &stock_addr);
-        //     loading.push_downstream.connect(TruckStock::add, &stock_addr);
-        //     Ok(())
-        // },
-        // (ComponentModel::TruckStock(_, _, stock_addr), ComponentModel::TruckMovementProcess(mut movement, _, _)) => {
-        //     movement.req_upstream.connect(TruckStock::get_state, &stock_addr);
-        //     movement.withdraw_upstream.connect(TruckStock::remove, &stock_addr);
-        //     Ok(())
-        // },
-        // (ComponentModel::TruckMovementProcess(mut movement, _, _), ComponentModel::TruckStock(_, _, stock_addr)) => {
-        //     movement.req_downstream.connect(TruckStock::get_state, &stock_addr);
-        //     movement.push_downstream.connect(TruckStock::add, &stock_addr);
-        //     Ok(())
-        // },
-        // (ComponentModel::TruckStock(_, _, stock_addr), ComponentModel::DumpingProcess(mut dumping, _, _)) => {
-        //     dumping.req_upstream.connect(TruckStock::get_state, &stock_addr);
-        //     dumping.withdraw_upstream.connect(TruckStock::remove_any, &stock_addr);
-        //     Ok(())
-        // },
-        // (ComponentModel::DumpingProcess(mut dumping, _, _), ComponentModel::ArrayStock(_, _, stock_addr)) => {
-        //     dumping.req_downstreams.0.connect(ArrayStock::get_state, &stock_addr);
-        //     dumping.push_downstreams.0.connect(ArrayStock::add, &stock_addr);
-        //     Ok(())
-        // },
-        // (ComponentModel::DumpingProcess(mut dumping, _, _), ComponentModel::TruckStock(_, _, stock_addr)) => {
-        //     dumping.req_downstreams.1.connect(TruckStock::get_state, &stock_addr);
-        //     dumping.push_downstreams.1.connect(TruckStock::add, &stock_addr);
-        //     Ok(())
-        // },
         _ => Err(format!("Connection error: Implementation does not exist for instances {} to {}", comp1_name, comp2_name).into()),
     }
 }
@@ -1590,7 +1552,7 @@ struct ModelConfig {
 }
 
 fn main() {
-    let args = Args::parse();
+    let args = CLIArgs::parse();
 
     let seeds = match parse_seed_range(&args.seed) {
         Ok(seeds) => seeds,

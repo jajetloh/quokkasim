@@ -4,13 +4,14 @@ use std::time::Duration;
 use crate::components::process::{DumpingProcess, LoadingProcess, TruckMovementProcess};
 use crate::components::stock::TruckStock;
 use crate::components::{ComponentModel, TruckAndOre};
-use crate::utils::{self, connect_components, create_logger, ComponentModelAddress, EventLogger, Logger, ModelConfig};
+use crate::loggers::{create_logger, EventLogger, Logger};
+use crate::model_construction::{connect_components, ComponentModelAddress, ModelConfig};
+use crate::ParsedArgs;
 use indexmap::IndexMap;
 use nexosim::time::MonotonicTime;
 use quokkasim::core::{NotificationMetadata, Process, ResourceAdd, SimInit, Stock};
 use quokkasim::prelude::{ArrayResource, ArrayStock};
-use quokkasim::{core::DistributionFactory};
-use utils::{ParsedArgs, CLIArgs};
+use quokkasim::core::DistributionFactory;
 
 pub fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
 
@@ -85,10 +86,6 @@ pub fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
             println!("{}", error);
         }
     }
-
-
-    println!("Init loc: {:?}", config.truck_init_location);
-    println!("Components: {:?}", components.keys());
 
     match components.get_mut(&config.truck_init_location) {
         Some(ComponentModel::TruckStock(comp, _, _)) => {

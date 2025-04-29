@@ -14,35 +14,6 @@ pub enum TruckStockState {
     Normal(IndexSet<i32>),
 }
 
-pub struct TruckAndOreMap {
-    pub trucks: IndexMap<i32, TruckAndOre>,
-}
-
-impl ResourceAdd<Option<TruckAndOre>> for TruckAndOreMap {
-    fn add(&mut self, truck_and_ore: Option<TruckAndOre>) {
-        match truck_and_ore {
-            Some(item) => {
-                self.trucks.insert(item.truck, item);
-            }
-            None => {}
-        }
-    }
-}
-
-impl ResourceRemove<i32, Option<TruckAndOre>> for TruckAndOreMap {
-    fn sub(&mut self, id: i32) -> Option<TruckAndOre> {
-        self.trucks.swap_remove(&id)
-    }
-}
-
-impl Default for TruckAndOreMap {
-    fn default() -> Self {
-        TruckAndOreMap {
-            trucks: IndexMap::new(),
-        }
-    }
-}
-
 impl StateEq for TruckStockState {
     fn is_same_state(&self, other: &Self) -> bool {
         match (self, other) {
@@ -164,9 +135,39 @@ impl TruckStock {
                     None
                 }
             };
-            self.log(data.1.time, "SomeLog".into()).await;
+            self.log(data.1.time, "RemoveAny".into()).await;
             self.check_update_state(data.1, cx).await;
             truck
+        }
+    }
+}
+
+
+pub struct TruckAndOreMap {
+    pub trucks: IndexMap<i32, TruckAndOre>,
+}
+
+impl ResourceAdd<Option<TruckAndOre>> for TruckAndOreMap {
+    fn add(&mut self, truck_and_ore: Option<TruckAndOre>) {
+        match truck_and_ore {
+            Some(item) => {
+                self.trucks.insert(item.truck, item);
+            }
+            None => {}
+        }
+    }
+}
+
+impl ResourceRemove<i32, Option<TruckAndOre>> for TruckAndOreMap {
+    fn sub(&mut self, id: i32) -> Option<TruckAndOre> {
+        self.trucks.swap_remove(&id)
+    }
+}
+
+impl Default for TruckAndOreMap {
+    fn default() -> Self {
+        TruckAndOreMap {
+            trucks: IndexMap::new(),
         }
     }
 }
