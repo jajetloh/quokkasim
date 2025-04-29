@@ -2,6 +2,7 @@
 id: MyModel0001
 name: TruckingModel
 description: A model for simulating a trucking process with stockpiles and trucks.
+truck_init_location: ReadyToLoad
 
 loggers:
   - name: StockpileLogger

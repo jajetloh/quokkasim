@@ -1274,7 +1274,7 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         }
     }
 
-
+    
 
 
     // source_stockpile.resource.add(ArrayResource {
@@ -1420,6 +1420,25 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
     // empty_truck_movement_process.push_downstream.connect(TruckStock::add, &truck_stock_addr);
     // empty_trucks.state_emitter.connect(TruckMovementProcess::check_update_state, &empty_truck_movement_addr);
 
+
+    println!("Init loc: {:?}", config.truck_init_location);
+    println!("Components: {:?}", components.keys());
+
+    match components.get_mut(&config.truck_init_location) {
+        Some(ComponentModel::TruckStock(comp, _, _)) => {
+            (0..args.num_trucks).for_each(|i| {
+                comp.resource.add(Some(TruckAndOre {
+                    truck: (100 + i) as i32,
+                    ore: ArrayResource { vec: [0.; 5] },
+                }));
+            });
+        },
+        _ => {
+            eprintln!("Truck init component not found");
+            return;
+        }
+    };
+
     let mut sim_init = SimInit::new();
     let mut addresses: IndexMap<String, ComponentModelAddress> = IndexMap::new();
 
@@ -1453,6 +1472,7 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         }
     }
 
+
     // let sim_init = SimInit::new()
     //     .add_model(source_stockpile, source_stockpile_mbox, "SourceStockpile")
     //     .add_model(ready_to_load_trucks, truck_stock_mbox, "TruckStock")
@@ -1467,6 +1487,32 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_init.init(start_time).unwrap().0;
+
+    addresses.iter().for_each(|(name, addr)| {
+        let nm = NotificationMetadata {
+            time: start_time,
+            element_from: name.clone(),
+            message: "Start".into(),
+        };
+        match addr {
+            ComponentModelAddress::ArrayStock(addr) =>  {
+                simu.process_event(ArrayStock::check_update_state, nm, addr).unwrap();
+            },
+            ComponentModelAddress::TruckStock(addr) => {
+                simu.process_event(TruckStock::check_update_state, nm, addr).unwrap();
+            },
+            ComponentModelAddress::LoadingProcess(addr) => {
+                simu.process_event(LoadingProcess::check_update_state, nm, addr).unwrap();
+            },
+            ComponentModelAddress::DumpingProcess(addr) => {
+                simu.process_event(DumpingProcess::check_update_state, nm, addr).unwrap();
+            },
+            ComponentModelAddress::TruckMovementProcess(addr) => {
+                simu.process_event(TruckMovementProcess::check_update_state, nm, addr).unwrap();
+            },
+        }
+    });
+
     // simu.process_event(
     //     LoadingProcess::check_update_state,
     //     NotificationMetadata {
@@ -1521,6 +1567,7 @@ struct ModelConfig {
     id: String,
     name: String,
     description: Option<String>,
+    truck_init_location: String,
     loggers: Vec<LoggerConfig>,
     components: Vec<ComponentConfig>,
     connections: Vec<ConnectionConfig>,
@@ -1541,7 +1588,7 @@ fn main() {
     let reader = BufReader::new(file);
     let config: ModelConfig = serde_yaml::from_reader(reader).unwrap();
 
-    println!("{:#?}", config);
+    // println!("{:#?}", config);
 
     seeds.par_iter().for_each(|seed| {
         let args = ParsedArgs {
