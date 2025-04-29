@@ -312,6 +312,8 @@ define_process!(
                 }
             }
 
+            println!("TruckMovementProcess {}: {:?}, time_counters {:?}", x.element_name, time.to_string(), x.time_counters);
+
             // Check for trucks that are done
             for id in items_ready {
                 x.time_counters.swap_remove(&id);
@@ -340,6 +342,8 @@ define_process!(
 
             // Check for new trucks upstream. If new, add a counter for it
             let us_state: TruckStockState = x.req_upstream.send(()).await.next().unwrap();
+
+            println!("TruckMovementProcess {}: {:?}, us_state {:?}", x.element_name, time.to_string(), us_state);
 
             match us_state {
                 TruckStockState::Normal(y) => {
@@ -910,51 +914,60 @@ fn connect_components(
     let comp1_name = comp1.get_name().clone();
     let comp2_name = comp2.get_name().clone();
     match (comp1, comp2) {
-        (ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
+        (ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
             loading.req_upstreams.1.connect(TruckStock::get_state, &stock_addr);
             loading.withdraw_upstreams.1.connect(TruckStock::remove_any, &stock_addr);
+            stock_model.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
             Ok((ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr)))
         },
-        (ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
+        (ComponentModel::ArrayStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
             loading.req_upstreams.0.connect(ArrayStock::get_state, &stock_addr);
             loading.withdraw_upstreams.0.connect(ArrayStock::remove, &stock_addr);
+            stock_model.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
             Ok((ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr)))
         },
-        (ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr), ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)) => {
+        (ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr), ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr)) => {
             loading.req_downstream.connect(TruckStock::get_state, &stock_addr);
             loading.push_downstream.connect(TruckStock::add, &stock_addr);
+            stock_model.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
             Ok((ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr),
             ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)))
         },
-        (ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr), ComponentModel::TruckMovementProcess(mut movement, movement_mbox, movement_addr)) => {
+        (ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::TruckMovementProcess(mut movement, movement_mbox, movement_addr)) => {
+            println!("Connecting TruckStock to TruckMovementProcess: {} to {}", stock_model.element_name, movement.element_name);
             movement.req_upstream.connect(TruckStock::get_state, &stock_addr);
-            movement.withdraw_upstream.connect(TruckStock::remove, &stock_addr);
+            movement.withdraw_upstream.connect(TruckStock::remove, &stock_addr); 
+            stock_model.state_emitter.connect(TruckMovementProcess::check_update_state, &movement_addr);
             Ok((ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::TruckMovementProcess(movement, movement_mbox, movement_addr)))
         },
-        (ComponentModel::TruckMovementProcess(mut movement, movement_mbox, movement_addr), ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)) => {
+        (ComponentModel::TruckMovementProcess(mut movement, movement_mbox, movement_addr), ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr)) => {
             movement.req_downstream.connect(TruckStock::get_state, &stock_addr);
             movement.push_downstream.connect(TruckStock::add, &stock_addr);
+            stock_model.state_emitter.connect(TruckMovementProcess::check_update_state, &movement_addr);
             Ok((ComponentModel::TruckMovementProcess(movement, movement_mbox, movement_addr),
             ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)))
         },
-        (ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr), ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr)) => {
+        (ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr)) => {
             dumping.req_upstream.connect(TruckStock::get_state, &stock_addr);
             dumping.withdraw_upstream.connect(TruckStock::remove_any, &stock_addr);
+            stock_model.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
             Ok((ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr)))
         },
-        (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr)) => {
+        (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::ArrayStock(mut stock_model, stock_mbox, stock_addr)) => {
             dumping.req_downstreams.0.connect(ArrayStock::get_state, &stock_addr);
             dumping.push_downstreams.0.connect(ArrayStock::add, &stock_addr);
+            stock_model.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
             Ok((ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr),
             ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr)))
         },
-        (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)) => {
+        (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr)) => {
             dumping.req_downstreams.1.connect(TruckStock::get_state, &stock_addr);
             dumping.push_downstreams.1.connect(TruckStock::add, &stock_addr);
+            stock_model.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
             Ok((ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr),
             ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr)))
         },
@@ -1252,6 +1265,7 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         let comp_ds = components.swap_remove(&connection.downstream);
         match (comp_us, comp_ds) {
             (Some(comp1), Some(comp2)) => {
+                // println!("Connecting {} to {}", comp1.get_name(), comp2.get_name());
                 match connect_components(comp1, comp2) {
                     Ok((comp1, comp2)) => {
                         components.insert(connection.upstream.clone(), comp1);
@@ -1271,6 +1285,13 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
             (None, None) => {
                 connection_errors.push(format!("Connection error: Component instances {} and {} not defined", connection.upstream, connection.downstream));
             }
+        }
+    }
+
+    if !connection_errors.is_empty() {
+        for error in connection_errors {
+            eprintln!("{}", error);
+            println!("{}", error);
         }
     }
 
@@ -1555,11 +1576,6 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
             },
         }
     }
-
-    // process_logger.write_csv(&format!("outputs/trucking/{:04}/process_logs.csv", base_seed)).unwrap();
-    // truck_stock_logger.write_csv(&format!("outputs/trucking/{:04}/truck_stock_logs.csv", base_seed)).unwrap();
-    // truck_queue_logger.write_csv(&format!("outputs/trucking/{:04}/truck_queue_logs.csv", base_seed)).unwrap();
-    // stockpile_logger.write_csv(&format!("outputs/trucking/{:04}/stockpile_logs.csv", base_seed)).unwrap();
 }
 
 #[derive(Clone, Debug, Deserialize)]
