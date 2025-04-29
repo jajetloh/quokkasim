@@ -35,22 +35,22 @@ pub trait Stock: Model {
     fn check_update_state<'a>(
         &mut self,
         notif_meta: NotificationMetadata,
-        cx: &'a mut Context<Self>
+        cx: &'a mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output = ()> + Send;
     fn add(
         &mut self,
         data: (Self::AddType, NotificationMetadata),
-        cx: &mut Context<Self>
+        cx: &mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output = ()> + Send;
     fn remove(
         &mut self,
         data: (Self::RemoveParameterType, NotificationMetadata),
-        cx: &mut Context<Self>
+        cx: &mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output=Self::RemoveType> + Send;
     fn notify_change(
         &mut self,
         notif_meta: NotificationMetadata,
-        cx: &mut Context<Self>
+        cx: &mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output = ()> + Send;
     fn get_state(&mut self) -> impl Future<Output=Self::StateType> + Send;
 }
@@ -140,7 +140,7 @@ macro_rules! define_stock {
             fn check_update_state<'a>(
                 &mut self,
                 notif_meta: $crate::core::NotificationMetadata,
-                cx: &'a mut Context<Self>
+                cx: &'a mut ::nexosim::model::Context<Self>
             ) -> impl Future<Output = ()> + Send {
 
                 async {
@@ -168,7 +168,7 @@ macro_rules! define_stock {
             async fn add(
                 &mut self,
                 data: (Self::AddType, NotificationMetadata),
-                cx: &mut Context<Self>
+                cx: &mut ::nexosim::model::Context<Self>
             ) {
                 self.prev_state = Some(self.get_state().await);
                 self.resource.add(data.0.clone());
@@ -180,7 +180,7 @@ macro_rules! define_stock {
             async fn remove(
                 &mut self,
                 data: (Self::RemoveParameterType, NotificationMetadata),
-                cx: &mut Context<Self>
+                cx: &mut ::nexosim::model::Context<Self>
             ) -> Self::RemoveType {
                 self.prev_state = Some(self.get_state().await);
                 let result: Self::RemoveType = self.resource.sub(data.0.clone());
@@ -189,7 +189,7 @@ macro_rules! define_stock {
                 result
             }
 
-            async fn notify_change(&mut self, notif_meta: NotificationMetadata, cx: &mut Context<Self>) {
+            async fn notify_change(&mut self, notif_meta: NotificationMetadata, cx: &mut ::nexosim::model::Context<Self>) {
                 self.state_emitter.send(NotificationMetadata {
                     time: cx.time(),
                     element_from: self.element_name.clone(),
@@ -217,7 +217,7 @@ pub trait Source: Model {
     fn check_update_state<'a>(
         &'a mut self,
         notif_meta: NotificationMetadata,
-        cx: &'a mut Context<Self>
+        cx: &'a mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output = ()> + Send + 'a;
 }
 
@@ -252,15 +252,15 @@ macro_rules! define_source {
 
             previous_check_time: Option<MonotonicTime>,
 
-            pub log_emitter: Output<$log_record_type>,
+            pub log_emitter: ::nexosim::ports::Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
 
             time_to_new_remaining: Duration,
             time_to_new_dist: Distribution,
 
-            pub req_downstream: Requestor<(), $stock_state_type>,
-            pub push_downstream: Output<($add_type, NotificationMetadata)>,
+            pub req_downstream: ::nexosim::ports::Requestor<(), $stock_state_type>,
+            pub push_downstream: ::nexosim::ports::Output<($add_type, NotificationMetadata)>,
         }
 
         impl $crate::core::Model for $struct_name {}
@@ -274,13 +274,13 @@ macro_rules! define_source {
                     resource: Default::default(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
-                    log_emitter: Output::new(),
+                    log_emitter: ::nexosim::ports::Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_new_remaining: Duration::ZERO,
                     time_to_new_dist: Distribution::Constant(1.),
-                    req_downstream: Requestor::new(),
-                    push_downstream: Output::new(),
+                    req_downstream: ::nexosim::ports::Requestor::new(),
+                    push_downstream: ::nexosim::ports::Output::new(),
                 }
             }
 
@@ -333,7 +333,7 @@ macro_rules! define_source {
             fn check_update_state<'a>(
                 &'a mut self,
                 notif_meta: NotificationMetadata,
-                cx: &'a mut Context<Self>
+                cx: &'a mut ::nexosim::model::Context<Self>
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
                     let current_time = cx.time();
@@ -378,7 +378,7 @@ pub trait Sink: Model {
     fn check_update_state<'a>(
         &'a mut self,
         notif_meta: NotificationMetadata,
-        cx: &'a mut Context<Self>
+        cx: &'a mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output = ()> + Send + 'a;
 }
 
@@ -411,15 +411,15 @@ macro_rules! define_sink {
 
             previous_check_time: Option<MonotonicTime>,
 
-            pub log_emitter: Output<$log_record_type>,
+            pub log_emitter: ::nexosim::ports::Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
 
             time_to_destroy_remaining: Duration,
             time_to_destroy_dist: Distribution,
 
-            pub req_upstream: Requestor<(), $stock_state_type>,
-            pub withdraw_upstream: Requestor<($subtract_parameters_type, NotificationMetadata), $subtract_type>,
+            pub req_upstream: ::nexosim::ports::Requestor<(), $stock_state_type>,
+            pub withdraw_upstream: ::nexosim::ports::Requestor<($subtract_parameters_type, NotificationMetadata), $subtract_type>,
         }
 
         impl $crate::core::Model for $struct_name {}
@@ -432,14 +432,14 @@ macro_rules! define_sink {
                     resource: Default::default(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
-                    log_emitter: Output::new(),
+                    log_emitter: ::nexosim::ports::Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_destroy_remaining: Duration::ZERO,
                     time_to_destroy_dist: Distribution::Constant(1.),
 
-                    req_upstream: Requestor::new(),
-                    withdraw_upstream: Requestor::new(),
+                    req_upstream: ::nexosim::ports::Requestor::new(),
+                    withdraw_upstream: ::nexosim::ports::Requestor::new(),
                 }
             }
 
@@ -487,7 +487,7 @@ macro_rules! define_sink {
             fn check_update_state<'a>(
                 &'a mut self,
                 notif_meta: NotificationMetadata,
-                cx: &'a mut Context<Self>
+                cx: &'a mut ::nexosim::model::Context<Self>
             ) -> impl Future<Output = ()> + Send + 'a {
             
                 async move {
@@ -537,7 +537,7 @@ pub trait Process: Model {
     fn check_update_state<'a>(
         &'a mut self,
         notif_meta: NotificationMetadata,
-        cx: &'a mut Context<Self>
+        cx: &'a mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output = ()> + Send + 'a;
 
 }
@@ -572,17 +572,17 @@ macro_rules! define_process {
 
             previous_check_time: Option<MonotonicTime>,
 
-            pub log_emitter: Output<$log_record_type>,
+            pub log_emitter: ::nexosim::ports::Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Option<Duration>,
             next_event_index: i64,
 
-            pub req_upstream: Requestor<(), $stock_state_type>,
-            pub withdraw_upstream: Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
+            pub req_upstream: ::nexosim::ports::Requestor<(), $stock_state_type>,
+            pub withdraw_upstream: ::nexosim::ports::Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
 
-            pub req_downstream: Requestor<(), $stock_state_type>,
-            pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
+            pub req_downstream: ::nexosim::ports::Requestor<(), $stock_state_type>,
+            pub push_downstream: ::nexosim::ports::Output<($resource_out_type, NotificationMetadata)>,
 
             $(pub $field_name: $field_type,)*
         }
@@ -596,15 +596,15 @@ macro_rules! define_process {
                     element_type: stringify!($struct_name).to_string(),
                     $($field_name: Default::default(),)*
                     previous_check_time: None,
-                    log_emitter: Output::new(),
+                    log_emitter: ::nexosim::ports::Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     next_event_index: 0,
                     time_to_next_event_counter: Some(Duration::ZERO),
-                    req_upstream: Requestor::new(),
-                    withdraw_upstream: Requestor::new(),
-                    req_downstream: Requestor::new(),
-                    push_downstream: Output::new(),
+                    req_upstream: ::nexosim::ports::Requestor::new(),
+                    withdraw_upstream: ::nexosim::ports::Requestor::new(),
+                    req_downstream: ::nexosim::ports::Requestor::new(),
+                    push_downstream: ::nexosim::ports::Output::new(),
                 }
             }
 
@@ -648,7 +648,7 @@ macro_rules! define_process {
             fn check_update_state<'a>(
                 &'a mut self,
                 notif_meta: NotificationMetadata,
-                cx: &'a mut Context<Self>,
+                cx: &'a mut ::nexosim::model::Context<Self>,
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
                     self.next_event_index += 1;
@@ -706,21 +706,21 @@ macro_rules! define_combiner_process {
     ) => {
         $(#[$attr])*
         pub struct $struct_name {
-            element_name: String,
-            element_type: String,
+            pub element_name: String,
+            pub element_type: String,
             previous_check_time: Option<MonotonicTime>,
         
-            log_emitter: Output<$log_record_type>,
+            pub log_emitter: ::nexosim::ports::Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Option<Duration>,
             next_event_index: i64,
         
-            pub req_upstreams: ( $( Requestor<(), $inflow_stock_state_types> ),+ ),
-            pub withdraw_upstreams: ( $( Requestor<($resource_in_parameter_types, NotificationMetadata), $resource_in_types> ),+ ),
+            pub req_upstreams: ( $( ::nexosim::ports::Requestor<(), $inflow_stock_state_types> ),+ ),
+            pub withdraw_upstreams: ( $( ::nexosim::ports::Requestor<($resource_in_parameter_types, NotificationMetadata), $resource_in_types> ),+ ),
         
-            pub req_downstream: Requestor<(), $outflow_stock_state_type>,
-            pub push_downstream: Output<($resource_out_type, NotificationMetadata)>,
+            pub req_downstream: ::nexosim::ports::Requestor<(), $outflow_stock_state_type>,
+            pub push_downstream: ::nexosim::ports::Output<($resource_out_type, NotificationMetadata)>,
         
             $(pub $field_name: $field_type,)*
         }
@@ -733,7 +733,7 @@ macro_rules! define_combiner_process {
                     element_name: stringify!($struct_name).to_string(),
                     element_type: stringify!($struct_name).to_string(),
                     previous_check_time: None,
-                    log_emitter: Output::new(),
+                    log_emitter: ::nexosim::ports::Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_next_event_counter: Some(Duration::from_secs(0)),
@@ -768,7 +768,7 @@ macro_rules! define_combiner_process {
             pub fn check_update_state<'a>(
                 &'a mut self,
                 notif_meta: NotificationMetadata,
-                cx: &'a mut Context<Self>,
+                cx: &'a mut ::nexosim::model::Context<Self>,
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
                     self.next_event_index += 1;
@@ -840,21 +840,21 @@ macro_rules! define_splitter_process {
 
         $(#[$attr])*
         pub struct $struct_name {
-            element_name: String,
-            element_type: String,
+            pub element_name: String,
+            pub element_type: String,
             previous_check_time: Option<MonotonicTime>,
         
-            log_emitter: Output<$log_record_type>,
+            pub log_emitter: ::nexosim::ports::Output<$log_record_type>,
             next_scheduled_event_time: Option<MonotonicTime>,
             next_scheduled_event_key: Option<$crate::core::ActionKey>,
             time_to_next_event_counter: Option<Duration>,
             next_event_index: i64,
         
-            pub req_upstream: Requestor<(),  $inflow_stock_state_type>,
-            pub withdraw_upstream: Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
+            pub req_upstream: ::nexosim::ports::Requestor<(),  $inflow_stock_state_type>,
+            pub withdraw_upstream: ::nexosim::ports::Requestor<($resource_in_parameter_type, NotificationMetadata), $resource_in_type>,
         
-            pub req_downstreams: ( $( Requestor<(), $outflow_stock_state_types> ),+ ),
-            pub push_downstreams: ( $( Output<($resource_out_parameter_types, NotificationMetadata)> ),+ ),
+            pub req_downstreams: ( $( ::nexosim::ports::Requestor<(), $outflow_stock_state_types> ),+ ),
+            pub push_downstreams: ( $( ::nexosim::ports::Output<($resource_out_parameter_types, NotificationMetadata)> ),+ ),
         
             $(pub $field_name: $field_type,)*
         }
@@ -867,7 +867,7 @@ macro_rules! define_splitter_process {
                     element_name: stringify!($struct_name).to_string(),
                     element_type: stringify!($struct_name).to_string(),
                     previous_check_time: None,
-                    log_emitter: Output::new(),
+                    log_emitter: ::nexosim::ports::Output::new(),
                     next_scheduled_event_time: None,
                     next_scheduled_event_key: None,
                     time_to_next_event_counter: Some(Duration::from_secs(0)),
@@ -902,7 +902,7 @@ macro_rules! define_splitter_process {
             pub fn check_update_state<'a>(
                 &'a mut self,
                 notif_meta: NotificationMetadata,
-                cx: &'a mut Context<Self>,
+                cx: &'a mut ::nexosim::model::Context<Self>,
             ) -> impl Future<Output = ()> + Send + 'a {
                 async move {
                     self.next_event_index += 1;
