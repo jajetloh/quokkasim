@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use nexosim::time::MonotonicTime;
+use nexosim::{ports::EventBuffer, time::MonotonicTime};
 use quokkasim::{
-    common::EventLogger,
-    components::array::{ArrayCombinerProcess, ArrayProcess, ArrayProcessLog, ArraySplitterProcess, ArrayStock, ArrayStockLog},
+    common::{EventLogger, Logger},
+    components::array::{ArrayCombinerProcess, ArrayProcess, ArrayProcessLog, ArrayProcessLogger, ArraySplitterProcess, ArrayStock, ArrayStockLog, ArrayStockLogger},
     core::{
         Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, Process, SimInit, Stock
     },
@@ -12,8 +12,14 @@ use quokkasim::{
 fn main() {
     // Declarations
 
-    let logger: ArrayProcessLogger = EventLogger::new(100_000);
-    let stock_logger: EventLogger<ArrayStockLog> = EventLogger::new(100_000);
+    let logger: ArrayProcessLogger = ArrayProcessLogger {
+        buffer: EventBuffer::with_capacity(100_000),
+        name: "ProcessLogger".into(),
+    };
+    let stock_logger: ArrayStockLogger = ArrayStockLogger { 
+        buffer: EventBuffer::with_capacity(100_000),
+        name: "StockLogger".into(),
+    };
     let mut df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
@@ -101,8 +107,8 @@ fn main() {
     let output_stockpile_2_addr = output_stockpile_2_mbox.address();
 
     let mut reclaimer_3 = ArrayProcess::new()
-        .with_name("Reclaimer 3".into())
-        .with_log_consumer(&logger);
+        .with_name("Reclaimer 3".into());
+    reclaimer_3.log_emitter.connect_sink(&logger.buffer);
     reclaimer_3.process_quantity_dist = Some(Distribution::Constant(100.));
     reclaimer_3.process_duration_secs_dist = Some(Distribution::Constant(60.));
     let reclaimer_3_mbox: Mailbox<ArrayProcess> = Mailbox::new();
@@ -292,8 +298,10 @@ fn main() {
         &stacker_addr,
     ).unwrap();
 
-    simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 2))
+    simu.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 1))
         .unwrap();
-    logger.write_csv("outputs/material_blending_logs.csv").unwrap();
-    stock_logger.write_csv("outputs/material_blending_stock_logs.csv").unwrap();
+
+    std::fs::create_dir_all("outputs/material_blending").unwrap();
+    logger.write_csv("outputs/material_blending".into()).unwrap();
+    stock_logger.write_csv("outputs/material_blending".into()).unwrap();
 }

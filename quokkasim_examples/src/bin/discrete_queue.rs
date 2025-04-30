@@ -1,22 +1,22 @@
 use std::time::Duration;
 
 use nexosim::time::MonotonicTime;
-use quokkasim::components::queue::{MyQueueCombinerProcess, MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueProcessLog, QueueStockLog};
-use quokkasim::common::EventLogger;
+use quokkasim::components::queue::{MyQueueCombinerProcess, MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueProcessLog, QueueProcessLogger, QueueStockLog, QueueStockLogger};
+use quokkasim::common::{EventLogger, Logger};
 use quokkasim::core::{Distribution, DistributionConfig, DistributionFactory, NotificationMetadata, Process, SimInit, Sink, Source, Stock};
 use nexosim::simulation::Mailbox;
 
 
 fn main() {
-    let stock_logger = EventLogger::<QueueStockLog>::new(100_000);
-    let process_logger = EventLogger::<QueueProcessLog>::new(100_000);
+    let stock_logger = QueueStockLogger::new("StockLogger".into(), 100_000);
+    let process_logger = QueueProcessLogger::new("ProcessLogger".into(), 100_000);
 
     let mut df = DistributionFactory { base_seed: 1234, next_seed: 0 };
 
     let mut source1 = MyQueueSource::new()
         .with_name("Source1".into())
-        .with_time_to_new_dist(df.create(DistributionConfig::Constant(500.0)).unwrap())
-        .with_log_consumer(&process_logger);
+        .with_time_to_new_dist(df.create(DistributionConfig::Constant(500.0)).unwrap());
+    source1.log_emitter.connect_sink(process_logger.get_buffer());
     source1.next_id = 50;
     let source1_mbox: Mailbox<MyQueueSource> = Mailbox::new();
     let source1_addr = source1_mbox.address();
@@ -32,8 +32,8 @@ fn main() {
 
     let mut source2 = MyQueueSource::new()
         .with_name("Source2".into())
-        .with_time_to_new_dist(df.create(DistributionConfig::Constant(10.)).unwrap())
-        .with_log_consumer(&process_logger);
+        .with_time_to_new_dist(df.create(DistributionConfig::Constant(10.)).unwrap());
+    source2.log_emitter.connect_sink(process_logger.get_buffer());
     let source2_mbox: Mailbox<MyQueueSource> = Mailbox::new();
     let source2_addr = source2_mbox.address();
     source2.next_id = 1001;
@@ -55,8 +55,8 @@ fn main() {
     let combiner_addr = combiner_mbox.address();
 
     let mut process = MyQueueProcess::new()
-        .with_name("Process".into())
-        .with_log_consumer(&process_logger);
+        .with_name("Process".into());
+    process.log_emitter.connect_sink(process_logger.get_buffer());
     process.process_quantity_dist = Some(Distribution::Constant(1.));
     process.process_duration_secs_dist = Some(Distribution::Constant(15.));
     let process_mbox: Mailbox<MyQueueProcess> = Mailbox::new();
@@ -72,8 +72,8 @@ fn main() {
 
     let mut sink= MyQueueSink::new()
         .with_name("Sink".into())
-        .with_time_to_destroy_dist(Distribution::Constant( 1. ))
-        .with_log_consumer(&process_logger);
+        .with_time_to_destroy_dist(Distribution::Constant( 1. ));
+    sink.log_emitter.connect_sink(process_logger.get_buffer());
     let sink_mbox: Mailbox<MyQueueSink> = Mailbox::new();
     let sink_addr = sink_mbox.address();
 
@@ -147,6 +147,8 @@ fn main() {
     }, &process_addr).unwrap();
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
-    process_logger.write_csv("outputs/discrete_queue_logs.csv").unwrap();
-    stock_logger.write_csv("outputs/discrete_queue_stock_logs.csv").unwrap();
+    // Create the output directory if it doesn't exist
+    std::fs::create_dir_all("outputs/discrete_queue").unwrap();
+    process_logger.write_csv("outputs/discrete_queue".into()).unwrap();
+    stock_logger.write_csv("outputs/discrete_queue".into()).unwrap();
 }

@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use nexosim::{simulation::Address, time::MonotonicTime};
 use quokkasim::{
-    common::EventLogger,
-    components::array::{ArrayProcessLog, ArrayResource, ArraySource, ArrayStock, ArrayStockLog},
+    common::{EventLogger, Logger},
+    components::array::{ArrayProcessLog, ArrayProcessLogger, ArrayResource, ArraySource, ArrayStock, ArrayStockLog, ArrayStockLogger},
     core::{
         DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, SimInit, Source, Stock
     },
@@ -25,8 +25,8 @@ fn main() {
 
     const NUM_SOURCES: usize = 50;
 
-    let process_logger: EventLogger<ArrayProcessLog> = EventLogger::new(100_000);
-    let stock_logger: EventLogger<ArrayStockLog> = EventLogger::new(100_000);
+    let process_logger: ArrayProcessLogger = ArrayProcessLogger::new("ProcessLogger".into(), 100_000);
+    let stock_logger: ArrayStockLogger = ArrayStockLogger::new("StockLogger".into(), 100_000);
     let mut df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
@@ -45,8 +45,8 @@ fn main() {
     let (mut sources, source_mboxes, source_addrs): (Vec<ArraySource>, Vec<Mailbox<ArraySource>>, Vec<Address::<ArraySource>>) = (0..NUM_SOURCES).into_iter().map(|i| {
         let mut source = ArraySource::new()
             .with_name(format!("Source{}", i).into())
-            .with_time_to_new_dist(df.create(DistributionConfig::Triangular { min: 10., mode: 50., max: 60. }).unwrap())
-            .with_log_consumer(&process_logger);
+            .with_time_to_new_dist(df.create(DistributionConfig::Triangular { min: 10., mode: 50., max: 60. }).unwrap());
+        source.log_emitter.connect_sink(process_logger.get_buffer());
         let source_mbox: Mailbox<ArraySource> = Mailbox::new();
         let source_addr: Address<ArraySource> = source_mbox.address();
         source.component_split = Some(ArrayResource { vec: [0.4, 0.3, 0.2, 0.1, 0.0 ]});
@@ -87,6 +87,7 @@ fn main() {
 
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 2)).unwrap();
 
-    process_logger.write_csv("outputs/source_population_with_array_process_logs.csv").unwrap();
-    stock_logger.write_csv("outputs/source_population_with_array_stock_logs.csv").unwrap();
+    std::fs::create_dir_all("outputs/source_population_with_array").unwrap();
+    process_logger.write_csv("outputs/source_population_with_array".into()).unwrap();
+    stock_logger.write_csv("outputs/source_population_with_array".into()).unwrap();
 }

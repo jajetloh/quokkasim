@@ -89,6 +89,15 @@ impl Logger for QueueStockLogger {
     }
 }
 
+impl QueueStockLogger {
+    pub fn new(name: String, capacity: usize) -> Self {
+        QueueStockLogger {
+            name,
+            buffer: EventBuffer::with_capacity(capacity),
+        }
+    }
+}
+
 #[derive(Serialize, Debug, Clone)]
 pub struct QueueStockLog {
     pub time: String,
@@ -166,6 +175,41 @@ define_stock!(
         }
     }
 );
+
+pub struct QueueProcessLogger {
+    name: String,
+    buffer: EventBuffer<QueueProcessLog>,
+}
+
+impl Logger for QueueProcessLogger {
+    type RecordType = QueueProcessLog;
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
+        &self.buffer
+    }
+    fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>> {
+        let file = File::create(format!("{}/{}.csv", dir, self.name))?;
+        let mut writer = WriterBuilder::new()
+            .has_headers(true)
+            .from_writer(file);
+        self.buffer.for_each(|log| {
+            writer.serialize(log).expect("Failed to write log record to CSV file");
+        });
+        writer.flush()?;
+        Ok(())
+    }
+}
+
+impl QueueProcessLogger {
+    pub fn new(name: String, capacity: usize) -> Self {
+        QueueProcessLogger {
+            name,
+            buffer: EventBuffer::with_capacity(capacity),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct QueueProcessLog {

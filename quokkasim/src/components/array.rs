@@ -1,7 +1,7 @@
 use crate::{
     common::{Distribution, EventLog, EventLogger, Logger}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
-use nexosim::{model::Context, ports::Output, time::MonotonicTime};
+use nexosim::{model::Context, ports::{EventBuffer, Output}, time::MonotonicTime};
 use serde::{ser::SerializeStruct, Serialize};
 use serde_json::to_string;
 
@@ -95,6 +95,41 @@ impl ResourceMultiply<f64> for ArrayResource {
     }
 }
 
+pub struct ArrayStockLogger {
+    pub buffer: EventBuffer<ArrayStockLog>,
+    pub name: String,
+}
+
+impl Logger for ArrayStockLogger {
+    type RecordType = ArrayStockLog;
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
+        &self.buffer
+    }
+    fn write_csv(self, dir: String) -> Result<(), Box<dyn std::error::Error>> {
+        let file = std::fs::File::create(format!("{}/{}.csv", dir, self.name))?;
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(true)
+            .from_writer(file);
+        self.buffer.for_each(|log| {
+            writer.serialize(log).expect("Failed to write log record to CSV file");
+        });
+        writer.flush()?;
+        Ok(())
+    }
+}
+
+impl ArrayStockLogger {
+    pub fn new(name: String, capacity: usize) -> Self {
+        ArrayStockLogger {
+            buffer: EventBuffer::with_capacity(capacity),
+            name,
+        }
+    }
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct ArrayStockLog {
     pub time: String,
@@ -181,21 +216,37 @@ define_stock!(
 );
 
 pub struct ArrayProcessLogger {
-    pub buffer: EventLogger<ArrayProcessLog>,
+    pub buffer: EventBuffer<ArrayProcessLog>,
     pub name: String,
-    
 }
 
 impl Logger for ArrayProcessLogger {
     type RecordType = ArrayProcessLog;
     fn get_name(&self) -> &String {
-        &self.buffer.get_name()
+        &self.name
     }
     fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
-        &self.buffer.get_buffer()
+        &self.buffer
     }
     fn write_csv(self, dir: String) -> Result<(), Box<dyn std::error::Error>> {
-        self.buffer.write_csv(dir)
+        let file = std::fs::File::create(format!("{}/{}.csv", dir, self.name))?;
+        let mut writer = csv::WriterBuilder::new()
+            .has_headers(true)
+            .from_writer(file);
+        self.buffer.for_each(|log| {
+            writer.serialize(log).expect("Failed to write log record to CSV file");
+        });
+        writer.flush()?;
+        Ok(())
+    }
+}
+
+impl ArrayProcessLogger {
+    pub fn new(name: String, capacity: usize) -> Self {
+        ArrayProcessLogger {
+            buffer: EventBuffer::with_capacity(capacity),
+            name,
+        }
     }
 }
 
