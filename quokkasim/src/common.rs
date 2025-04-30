@@ -13,6 +13,13 @@ pub struct EventLog {
     pub json_data: String,
 }
 
+pub trait Logger {
+    type RecordType: Serialize;
+    fn get_name(&self) -> &String;
+    fn get_buffer(&self) -> &EventBuffer<Self::RecordType>;
+    fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>>;
+}
+
 #[derive()]
 pub struct EventLogger<T: Serialize> {
     pub buffer: EventBuffer<T>

@@ -1,5 +1,5 @@
 use crate::{
-    common::{Distribution, EventLog, EventLogger}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
+    common::{Distribution, EventLog, EventLogger, Logger}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
 use nexosim::{model::Context, ports::Output, time::MonotonicTime};
 use serde::{ser::SerializeStruct, Serialize};
@@ -179,6 +179,25 @@ define_stock!(
         }
     }
 );
+
+pub struct ArrayProcessLogger {
+    pub buffer: EventLogger<ArrayProcessLog>,
+    pub name: String,
+    
+}
+
+impl Logger for ArrayProcessLogger {
+    type RecordType = ArrayProcessLog;
+    fn get_name(&self) -> &String {
+        &self.buffer.get_name()
+    }
+    fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
+        &self.buffer.get_buffer()
+    }
+    fn write_csv(self, dir: String) -> Result<(), Box<dyn std::error::Error>> {
+        self.buffer.write_csv(dir)
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ArrayProcessLog {

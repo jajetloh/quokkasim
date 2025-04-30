@@ -1,6 +1,9 @@
-use nexosim::{model::Context, time::MonotonicTime};
+use std::{error::Error, fs::File};
+
+use csv::WriterBuilder;
+use nexosim::{model::Context, ports::EventBuffer, time::MonotonicTime};
 use serde::{ser::SerializeStruct, Serialize};
-use crate::{common::Distribution, core::{ResourceAdd, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
+use crate::{common::{Distribution, Logger}, core::{ResourceAdd, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_stock};
 
 #[derive(Debug, Clone)]
 pub enum QueueState {
@@ -57,6 +60,32 @@ impl ResourceRemove<i32, Vec<i32>> for QueueVector {
             }
         }
         removed_items
+    }
+}
+
+pub struct QueueStockLogger {
+    name: String,
+    buffer: EventBuffer<QueueStockLog>,
+}
+
+impl Logger for QueueStockLogger {
+    type RecordType = QueueStockLog;
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
+        &self.buffer
+    }
+    fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>> {
+        let file = File::create(format!("{}/{}.csv", dir, self.name))?;
+        let mut writer = WriterBuilder::new()
+            .has_headers(true)
+            .from_writer(file);
+        self.buffer.for_each(|log| {
+            writer.serialize(log).expect("Failed to write log record to CSV file");
+        });
+        writer.flush()?;
+        Ok(())
     }
 }
 

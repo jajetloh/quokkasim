@@ -106,11 +106,12 @@ macro_rules! define_stock {
                 self.element_name = name;
                 return self
             }
-
-            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-            //     self.log_emitter.connect_sink(&logger.buffer);
-            //     return self
-            // }
+        
+            pub fn with_log_consumer(mut self, logger: &impl $crate::common::Logger<RecordType = $log_record_type>) -> Self {
+                let log_buffer: &$crate::core::EventBuffer<$log_record_type> = &logger.get_buffer();
+                self.log_emitter.connect_sink(log_buffer);
+                return self
+            }
             
             paste::item! {
                 $(
@@ -751,10 +752,11 @@ macro_rules! define_combiner_process {
                 self
             }
         
-            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-            //     self.log_emitter.connect_sink(&logger.buffer);
-            //     return self
-            // }
+            pub fn with_log_consumer(mut self, logger: &impl $crate::common::Logger<RecordType = $log_record_type>) -> Self {
+                let log_buffer: &$crate::core::EventBuffer<$log_record_type> = &logger.get_buffer();
+                self.log_emitter.connect_sink(log_buffer);
+                return self
+            }
             
             paste::item! {
                 $(
@@ -885,10 +887,11 @@ macro_rules! define_splitter_process {
                 self
             }
         
-            // pub fn with_log_consumer(mut self, logger: &EventLogger<$log_record_type>) -> Self {
-            //     self.log_emitter.connect_sink(&logger.buffer);
-            //     return self
-            // }
+            pub fn with_log_consumer(mut self, logger: &impl $crate::common::Logger<RecordType = $log_record_type>) -> Self {
+                let log_buffer: &$crate::core::EventBuffer<$log_record_type> = &logger.get_buffer();
+                self.log_emitter.connect_sink(log_buffer);
+                return self
+            }
             
             paste::item! {
                 $(

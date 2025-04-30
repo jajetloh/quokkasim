@@ -12,7 +12,7 @@ use quokkasim::{
 fn main() {
     // Declarations
 
-    let logger: EventLogger<ArrayProcessLog> = EventLogger::new(100_000);
+    let logger: ArrayProcessLogger = EventLogger::new(100_000);
     let stock_logger: EventLogger<ArrayStockLog> = EventLogger::new(100_000);
     let mut df = DistributionFactory {
         base_seed: 1234,
