@@ -2,7 +2,7 @@ use clap::Parser;
 use csv::WriterBuilder;
 use indexmap::{IndexMap, IndexSet};
 use nexosim::{
-    model::{Context, Model}, ports::{EventBuffer, Output, Requestor}, simulation::Address, time::MonotonicTime
+    model::{Context, Model}, ports::{EventBuffer, Output}, simulation::Address, time::MonotonicTime
 };
 use quokkasim::{
     // common::EventLogger,

@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use nexosim::time::MonotonicTime;
-use quokkasim::components::queue::{MyQueueCombinerProcess, MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueProcessLog, QueueProcessLogger, QueueStockLog, QueueStockLogger};
-use quokkasim::common::{EventLogger, Logger};
+use quokkasim::components::queue::{MyQueueCombinerProcess, MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueProcessLogger, QueueStockLogger};
+use quokkasim::common::Logger;
 use quokkasim::core::{Distribution, DistributionConfig, DistributionFactory, NotificationMetadata, Process, SimInit, Sink, Source, Stock};
 use nexosim::simulation::Mailbox;
 

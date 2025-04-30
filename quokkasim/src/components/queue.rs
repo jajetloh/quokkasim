@@ -289,7 +289,7 @@ define_source!(
     stock_state_type = QueueState,
     add_type = Vec<i32>,
     add_parameter_type = i32,
-    create_method = |mut source: &mut Self, x: i32| -> Vec<i32> {
+    create_method = |source: &mut Self, x: i32| -> Vec<i32> {
         let mut resource = source.resource.clone();
         resource.push(x);
         resource

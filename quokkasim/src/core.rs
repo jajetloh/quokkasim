@@ -240,7 +240,7 @@ macro_rules! define_source {
         log_method = $log_method:expr,
         log_method_parameter_type = $log_method_parameter_type:ty
     ) => {
-        use nexosim::ports::Requestor;
+        
         use $crate::core::{Source, Duration};
 
         $(#[$attr])*

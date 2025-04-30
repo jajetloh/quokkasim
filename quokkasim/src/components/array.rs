@@ -1,9 +1,8 @@
 use crate::{
-    common::{Distribution, EventLog, EventLogger, Logger}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
+    common::{Distribution, Logger}, core::{ResourceAdd, ResourceMultiply, ResourceRemove, StateEq}, define_combiner_process, define_process, define_sink, define_source, define_splitter_process, define_stock
 };
-use nexosim::{model::Context, ports::{EventBuffer, Output}, time::MonotonicTime};
+use nexosim::{model::Context, ports::EventBuffer, time::MonotonicTime};
 use serde::{ser::SerializeStruct, Serialize};
-use serde_json::to_string;
 
 /**
  * This module is based around the `ArrayResource` type, which holds an array of 5 f64 values.
@@ -326,7 +325,7 @@ define_source!(
     stock_state_type = ArrayStockState,
     add_type = ArrayResource,
     add_parameter_type = f64,
-    create_method = |mut source: &mut Self, x: f64| -> ArrayResource {
+    create_method = |source: &mut Self, x: f64| -> ArrayResource {
         let component_split = source.component_split.as_mut().unwrap_or_else(
             || panic!("Source component split not defined!")
         );

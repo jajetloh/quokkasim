@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use nexosim::{simulation::Address, time::MonotonicTime};
 use quokkasim::{
-    common::{EventLogger, Logger},
-    components::array::{ArrayProcessLog, ArrayProcessLogger, ArrayResource, ArraySource, ArrayStock, ArrayStockLog, ArrayStockLogger},
+    common::Logger,
+    components::array::{ArrayProcessLogger, ArrayResource, ArraySource, ArrayStock, ArrayStockLogger},
     core::{
         DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, SimInit, Source, Stock
     },
