@@ -10,7 +10,7 @@ use crate::ParsedArgs;
 use indexmap::IndexMap;
 use nexosim::time::MonotonicTime;
 use quokkasim::core::{NotificationMetadata, Process, ResourceAdd, SimInit, Stock};
-use quokkasim::prelude::{ArrayResource, ArrayStock};
+use quokkasim::prelude::{VectorResource, VectorStock};
 use quokkasim::core::DistributionFactory;
 
 pub fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
@@ -92,7 +92,7 @@ pub fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
             (0..args.num_trucks).for_each(|i| {
                 comp.resource.add(Some(TruckAndOre {
                     truck: (100 + i) as i32,
-                    ore: ArrayResource { vec: [0.; 5] },
+                    ore: VectorResource { vec: [0.; 5] },
                 }));
             });
         },
@@ -107,7 +107,7 @@ pub fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
 
     for (_, component) in components.drain(..) {
         match component {
-            ComponentModel::ArrayStock(stock, mbox, addr) => {
+            ComponentModel::VectorStock(stock, mbox, addr) => {
                 let element_name = stock.element_name.clone();
                 addresses.insert(stock.element_name.clone(), ComponentModelAddress::ArrayStock(addr));
                 sim_init = sim_init.add_model(stock, mbox, element_name);
@@ -146,7 +146,7 @@ pub fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         };
         match addr {
             ComponentModelAddress::ArrayStock(addr) =>  {
-                simu.process_event(ArrayStock::check_update_state, nm, addr).unwrap();
+                simu.process_event(VectorStock::check_update_state, nm, addr).unwrap();
             },
             ComponentModelAddress::TruckStock(addr) => {
                 simu.process_event(TruckStock::check_update_state, nm, addr).unwrap();

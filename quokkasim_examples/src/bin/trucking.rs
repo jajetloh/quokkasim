@@ -2,11 +2,10 @@ use clap::Parser;
 use csv::WriterBuilder;
 use indexmap::{IndexMap, IndexSet};
 use nexosim::{
-    model::{Context, Model}, ports::{EventBuffer, Output}, simulation::Address, time::MonotonicTime
+    model::Context, ports::{EventBuffer, Output}, simulation::Address, time::MonotonicTime
 };
 use quokkasim::{
-    // common::EventLogger,
-    components::array::{ArrayResource, ArrayStock, ArrayStockLog, ArrayStockState},
+    components::vector::{VectorResource, VectorStock, VectorStockLog, VectorStockState},
     core::{
         Distribution, DistributionConfig, DistributionFactory, Mailbox, ResourceAdd,
         ResourceRemove, SimInit, StateEq,
@@ -22,7 +21,7 @@ use log::warn;
 #[derive(Debug, Clone)]
 pub struct TruckAndOre {
     truck: i32,
-    ore: ArrayResource,
+    ore: VectorResource,
 }
 
 pub struct TruckAndOreMap {
@@ -161,10 +160,10 @@ impl Default for LoadingProcessState {
 }
 
 define_combiner_process!(
-    /// Loading process for trucks. Draws from a truck stock and array stock, pushes out Vec<TruckAndOre>
+    /// Loading process for trucks. Draws from a truck stock and vector stock, pushes out Vec<TruckAndOre>
     name = LoadingProcess,
-    inflow_stock_state_types = (ArrayStockState, TruckStockState),
-    resource_in_types = (ArrayResource, Option<TruckAndOre>),
+    inflow_stock_state_types = (VectorStockState, TruckStockState),
+    resource_in_types = (VectorResource, Option<TruckAndOre>),
     resource_in_parameter_types = (f64, ()),
     outflow_stock_state_type = TruckStockState,
     resource_out_type = Option<TruckAndOre>,
@@ -197,11 +196,11 @@ define_combiner_process!(
             }
 
             // Then execute new load
-            let us_material_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
+            let us_material_state: VectorStockState = x.req_upstreams.0.send(()).await.next().unwrap();
             let us_truck_state: TruckStockState = x.req_upstreams.1.send(()).await.next().unwrap();
 
             match (&us_material_state, &us_truck_state) {
-                (ArrayStockState::Normal { .. } | ArrayStockState::Full { .. }, TruckStockState::Normal { .. }) => {
+                (VectorStockState::Normal { .. } | VectorStockState::Full { .. }, TruckStockState::Normal { .. }) => {
                     let mut truck = x.withdraw_upstreams.1.send(((), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
@@ -229,7 +228,7 @@ define_combiner_process!(
                         }
                     }
                 },
-                (ArrayStockState::Empty { .. }, _) => {
+                (VectorStockState::Empty { .. }, _) => {
                     x.log(time, TruckingProcessLogType::LoadStartFailed { reason: "No material available" }).await;
                     x.time_to_next_event_counter = None;
                 },
@@ -312,8 +311,6 @@ define_process!(
                 }
             }
 
-            println!("TruckMovementProcess {}: {:?}, time_counters {:?}", x.element_name, time.to_string(), x.time_counters);
-
             // Check for trucks that are done
             for id in items_ready {
                 x.time_counters.swap_remove(&id);
@@ -342,8 +339,6 @@ define_process!(
 
             // Check for new trucks upstream. If new, add a counter for it
             let us_state: TruckStockState = x.req_upstream.send(()).await.next().unwrap();
-
-            println!("TruckMovementProcess {}: {:?}, us_state {:?}", x.element_name, time.to_string(), us_state);
 
             match us_state {
                 TruckStockState::Normal(y) => {
@@ -407,9 +402,9 @@ define_splitter_process!(
     inflow_stock_state_type = TruckStockState,
     resource_in_type = Option<TruckAndOre>,
     resource_in_parameter_type = (),
-    outflow_stock_state_types = (ArrayStockState, TruckStockState),
+    outflow_stock_state_types = (VectorStockState, TruckStockState),
     resource_out_types = (ArrayResource, Option<TruckAndOre>),
-    resource_out_parameter_types = (ArrayResource, Option<TruckAndOre>),
+    resource_out_parameter_types = (VectorResource, Option<TruckAndOre>),
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             // Resolve Dumping state, if applicable
@@ -443,9 +438,9 @@ define_splitter_process!(
             }
 
             let us_state: TruckStockState = x.req_upstream.send(()).await.next().unwrap();
-            let ds_material_state: ArrayStockState = x.req_downstreams.0.send(()).await.next().unwrap();
+            let ds_material_state: VectorStockState = x.req_downstreams.0.send(()).await.next().unwrap();
             match (us_state, ds_material_state) {
-                (TruckStockState::Normal { .. }, ArrayStockState::Normal { .. } | ArrayStockState::Empty { .. }) => {
+                (TruckStockState::Normal { .. }, VectorStockState::Normal { .. } | VectorStockState::Empty { .. }) => {
                     let truck_and_ore: Option<TruckAndOre> = x.withdraw_upstream.send(((), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
@@ -475,7 +470,7 @@ define_splitter_process!(
                     x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "No trucks available" }).await;
                     x.time_to_next_event_counter = None;
                 },
-                (_, ArrayStockState::Full { .. }) => {
+                (_, VectorStockState::Full { .. }) => {
                     x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "Downstream material stock is full" }).await;
                     x.time_to_next_event_counter = None;
                 },
@@ -727,7 +722,7 @@ enum ComponentConfig {
 }
 
 enum ComponentModel {
-    ArrayStock(ArrayStock, Mailbox<ArrayStock>, Address<ArrayStock>),
+    ArrayStock(VectorStock, Mailbox<VectorStock>, Address<VectorStock>),
     TruckStock(TruckStock, Mailbox<TruckStock>, Address<TruckStock>),
     LoadingProcess(LoadingProcess, Mailbox<LoadingProcess>, Address<LoadingProcess>),
     DumpingProcess(DumpingProcess, Mailbox<DumpingProcess>, Address<DumpingProcess>),
@@ -747,7 +742,7 @@ impl ComponentModel {
 }
 
 enum ComponentModelAddress {
-    ArrayStock(Address<ArrayStock>),
+    ArrayStock(Address<VectorStock>),
     TruckStock(Address<TruckStock>),
     LoadingProcess(Address<LoadingProcess>),
     DumpingProcess(Address<DumpingProcess>),
@@ -781,9 +776,9 @@ struct ArrayStockConfig {
 
 impl ArrayStockConfig {
     fn create_component(&self, df: &mut DistributionFactory, loggers: &mut IndexMap<String, EventLogger>) -> Result<ComponentModel, Box<dyn Error>> {
-        let mut stock = ArrayStock::new()
+        let mut stock = VectorStock::new()
             .with_name(self.name.clone());
-        stock.resource.add(ArrayResource { vec: self.vec });
+        stock.resource.add(VectorResource { vec: self.vec });
         stock.low_capacity = self.low_capacity;
         stock.max_capacity = self.max_capacity;
         self.loggers.iter().for_each(|logger_name| {
@@ -921,8 +916,8 @@ fn connect_components(
             ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr)))
         },
         (ComponentModel::ArrayStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
-            loading.req_upstreams.0.connect(ArrayStock::get_state, &stock_addr);
-            loading.withdraw_upstreams.0.connect(ArrayStock::remove, &stock_addr);
+            loading.req_upstreams.0.connect(VectorStock::get_state, &stock_addr);
+            loading.withdraw_upstreams.0.connect(VectorStock::remove, &stock_addr);
             stock_model.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
             Ok((ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr)))
@@ -956,8 +951,8 @@ fn connect_components(
             ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr)))
         },
         (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::ArrayStock(mut stock_model, stock_mbox, stock_addr)) => {
-            dumping.req_downstreams.0.connect(ArrayStock::get_state, &stock_addr);
-            dumping.push_downstreams.0.connect(ArrayStock::add, &stock_addr);
+            dumping.req_downstreams.0.connect(VectorStock::get_state, &stock_addr);
+            dumping.push_downstreams.0.connect(VectorStock::add, &stock_addr);
             stock_model.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
             Ok((ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr),
             ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr)))
@@ -977,7 +972,7 @@ fn connect_components(
 enum LogRecordType {
     TruckingProcessLog(TruckingProcessLog),
     QueueStockLog(QueueStockLog),
-    ArrayStockLog(ArrayStockLog),
+    ArrayStockLog(VectorStockLog),
 }
 
 enum EventLogger {
@@ -1070,11 +1065,11 @@ impl QueueStockLogger {
 
 struct ArrayStockLogger {
     name: String,
-    buffer: EventBuffer<ArrayStockLog>,
+    buffer: EventBuffer<VectorStockLog>,
 }
 
 impl Logger for ArrayStockLogger {
-    type RecordType = ArrayStockLog;
+    type RecordType = VectorStockLog;
     fn get_name(&self) -> &String {
         &self.name
     }
@@ -1181,20 +1176,9 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         next_seed: base_seed,
     };
 
-    // let stockpile_logger = EventLogger::<ArrayStockLog>::new(100_000);
-    // let truck_queue_logger = EventLogger::<QueueStockLog>::new(100_000);
-    // // let queue_logger = EventLogger::<QueueStockLog>::new(100_000);
-    // let process_logger = EventLogger::<TruckingProcessLog>::new(100_000);
-
-    // let truck_stock_logger = EventLogger::<TruckAndOreStockLog>::new(100_000);
-
-    // let logger_configs: Vec<LoggerConfig> = vec![];
     let mut loggers: IndexMap<String, EventLogger> = IndexMap::new();
     for config in config.loggers {
-        // );logger = create_logger(config).unwrap_or_else(|e| {
-        //     eprintln!("Error creating logger: {}", e);
-        //     EventLogger::TruckingProcessLogger(TruckingProcessLogger::new("default".into(), 100_000))
-        // }
+
         let logger_result: Result<EventLogger, Box<dyn Error>> = create_logger(config);
         match logger_result {
             Ok(logger) => {
@@ -1257,162 +1241,12 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         }
     }
 
-    
-
-
-    // source_stockpile.resource.add(ArrayResource {
-    //     vec: [800000., 600000., 400000., 200000., 0.],
-    // });
-    // let source_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
-    // let source_stockpile_addr = source_stockpile_mbox.address();
-
-    // let mut ready_to_load_trucks = TruckStock::new()
-    //     .with_name("ReadyToLoadTrucks".into())
-    //     .with_log_consumer(&truck_queue_logger);
-    // let truck_stock_mbox: Mailbox<TruckStock> = Mailbox::new();
-    // let truck_stock_addr = truck_stock_mbox.address();
-
-    // (0..args.num_trucks).for_each(|i| {
-    //     ready_to_load_trucks.resource.add(Some(TruckAndOre {
-    //         truck: (100 + i) as i32,
-    //         ore: ArrayResource { vec: [0.; 5] },
-    //     }));
-    // });
-
-    // let mut loading_process = LoadingProcess::default()
-    //     .with_name("LoadingProcess".into())
-    //     .with_log_consumer(&process_logger);
-    // loading_process
-    //     .truck_stock_emitter
-    //     .connect_sink(&truck_stock_logger.buffer);
-    // loading_process.load_time_dist_secs = Some(
-    //     df.create(DistributionConfig::TruncNormal {
-    //         mean: 40.,
-    //         std: 10.,
-    //         min: Some(10.),
-    //         max: Some(70.),
-    //     })
-    //     .unwrap(),
-    // );
-    // loading_process.load_quantity_dist = Some(
-    //     df.create(DistributionConfig::Uniform {
-    //         min: 70.,
-    //         max: 130.,
-    //     })
-    //     .unwrap(),
-    // );
-    // let loading_mbox: Mailbox<LoadingProcess> = Mailbox::new();
-    // let loading_addr = loading_mbox.address();
-
-    // let mut loaded_trucks = TruckStock::new()
-    //     .with_name("LoadedTrucks".into())
-    //     .with_log_consumer(&truck_queue_logger);
-    // let loaded_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
-    // let loaded_trucks_addr = loaded_trucks_mbox.address();
-
-    // let mut loaded_truck_movement_process = TruckMovementProcess::default()
-    //     .with_name("LoadedTruckMovementProcess".into())
-    //     .with_log_consumer(&process_logger)
-    //     .with_travel_time_dist_secs(Some(
-    //         df.create(DistributionConfig::Triangular {
-    //             min: 100.,
-    //             max: 200.,
-    //             mode: 120.,
-    //         })
-    //         .unwrap(),
-    //     ));
-    // let loaded_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
-    // let loaded_truck_movement_addr = loaded_truck_movement_mbox.address();
-
-    // let mut ready_to_dump_trucks = TruckStock::new()
-    //     .with_name("ReadyToDumpTrucks".into())
-    //     .with_log_consumer(&truck_queue_logger);
-    // let ready_to_dump_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
-    // let ready_to_dump_trucks_addr = ready_to_dump_trucks_mbox.address();
-
-    // let mut dumping_process = DumpingProcess::default()
-    //     .with_name("DumpingProcess".into())
-    //     .with_log_consumer(&process_logger);
-    // dumping_process
-    //     .truck_stock_emitter
-    //     .connect_sink(&truck_stock_logger.buffer);
-    // dumping_process.dump_time_dist_secs = Some(
-    //     df.create(DistributionConfig::TruncNormal {
-    //         mean: 30.,
-    //         std: 8.,
-    //         min: Some(14.),
-    //         max: Some(46.),
-    //     })
-    //     .unwrap(),
-    // );
-    // let dumping_mbox: Mailbox<DumpingProcess> = Mailbox::new();
-    // let dumping_addr = dumping_mbox.address();
-
-    // let mut dumped_stockpile = ArrayStock::new()
-    //     .with_name("DumpedStockpile".into())
-    //     .with_log_consumer(&stockpile_logger);
-    // dumped_stockpile.max_capacity = 999_999_999.;
-    // let dumped_stockpile_mbox: Mailbox<ArrayStock> = Mailbox::new();
-    // let dumped_stockpile_addr = dumped_stockpile_mbox.address();
-
-    // let mut empty_trucks = TruckStock::new()
-    //     .with_name("EmptyTrucks".into())
-    //     .with_log_consumer(&truck_queue_logger);
-    // let empty_trucks_mbox: Mailbox<TruckStock> = Mailbox::new();
-    // let empty_trucks_addr = empty_trucks_mbox.address();
-
-    // let mut empty_truck_movement_process = TruckMovementProcess::default()
-    //     .with_name("EmptyTruckMovementProcess".into())
-    //     .with_log_consumer(&process_logger);
-    // empty_truck_movement_process.travel_time_dist_secs = Some(
-    //     df.create(DistributionConfig::Triangular {
-    //         min: 50.,
-    //         max: 100.,
-    //         mode: 60.,
-    //     })
-    //     .unwrap(),
-    // );
-    // let empty_truck_movement_mbox: Mailbox<TruckMovementProcess> = Mailbox::new();
-    // let empty_truck_movement_addr = empty_truck_movement_mbox.address();
-
-    // loading_process.req_upstreams.0.connect(ArrayStock::get_state, &source_stockpile_addr);
-    // loading_process.req_upstreams.1.connect(TruckStock::get_state, &truck_stock_addr);
-    // loading_process.withdraw_upstreams.0.connect(ArrayStock::remove, &source_stockpile_addr);
-    // loading_process.withdraw_upstreams.1.connect(TruckStock::remove_any, &truck_stock_addr);
-    // loading_process.push_downstream.connect(TruckStock::add, &loaded_trucks_addr);
-    // source_stockpile.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
-    // ready_to_load_trucks.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
-
-    // loaded_truck_movement_process.req_upstream.connect(TruckStock::get_state, &loaded_trucks_addr);
-    // loaded_truck_movement_process.withdraw_upstream.connect(TruckStock::remove, &loaded_trucks_addr);
-    // loaded_trucks.state_emitter.connect(TruckMovementProcess::check_update_state,&loaded_truck_movement_addr);
-    // loaded_truck_movement_process.req_downstream.connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
-    // loaded_truck_movement_process.push_downstream.connect(TruckStock::add, &ready_to_dump_trucks_addr);
-
-    // dumping_process.req_upstream.connect(TruckStock::get_state, &ready_to_dump_trucks_addr);
-    // dumping_process.withdraw_upstream.connect(TruckStock::remove_any, &ready_to_dump_trucks_addr);
-    // dumping_process.req_downstreams.0.connect(ArrayStock::get_state, &dumped_stockpile_addr);
-    // dumping_process.push_downstreams.0.connect(ArrayStock::add, &dumped_stockpile_addr);
-    // dumping_process.push_downstreams.1.connect(TruckStock::add, &empty_trucks_addr);
-    // ready_to_dump_trucks.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
-    // dumped_stockpile.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
-
-    // empty_truck_movement_process.req_upstream.connect(TruckStock::get_state, &empty_trucks_addr);
-    // empty_truck_movement_process.withdraw_upstream.connect(TruckStock::remove, &empty_trucks_addr);
-    // empty_truck_movement_process.req_downstream.connect(TruckStock::get_state, &truck_stock_addr);
-    // empty_truck_movement_process.push_downstream.connect(TruckStock::add, &truck_stock_addr);
-    // empty_trucks.state_emitter.connect(TruckMovementProcess::check_update_state, &empty_truck_movement_addr);
-
-
-    println!("Init loc: {:?}", config.truck_init_location);
-    println!("Components: {:?}", components.keys());
-
     match components.get_mut(&config.truck_init_location) {
         Some(ComponentModel::TruckStock(comp, _, _)) => {
             (0..args.num_trucks).for_each(|i| {
                 comp.resource.add(Some(TruckAndOre {
                     truck: (100 + i) as i32,
-                    ore: ArrayResource { vec: [0.; 5] },
+                    ore: VectorResource { vec: [0.; 5] },
                 }));
             });
         },
@@ -1455,19 +1289,6 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         }
     }
 
-
-    // let sim_init = SimInit::new()
-    //     .add_model(source_stockpile, source_stockpile_mbox, "SourceStockpile")
-    //     .add_model(ready_to_load_trucks, truck_stock_mbox, "TruckStock")
-    //     .add_model(loading_process, loading_mbox, "LoadingProcess")
-    //     .add_model(loaded_trucks, loaded_trucks_mbox, "LoadedTrucks")
-    //     .add_model(loaded_truck_movement_process,loaded_truck_movement_mbox,"LoadedTruckMovementProcess")
-    //     .add_model(ready_to_dump_trucks,ready_to_dump_trucks_mbox,"ReadyToDumpTrucks")
-    //     .add_model(dumping_process, dumping_mbox, "DumpingProcess")
-    //     .add_model(dumped_stockpile, dumped_stockpile_mbox, "DumpedStockpile")
-    //     .add_model(empty_trucks, empty_trucks_mbox, "EmptyTrucks")
-    //     .add_model(empty_truck_movement_process,empty_truck_movement_mbox,"EmptyTruckMovementProcess");
-
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_init.init(start_time).unwrap().0;
 
@@ -1479,7 +1300,7 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         };
         match addr {
             ComponentModelAddress::ArrayStock(addr) =>  {
-                simu.process_event(ArrayStock::check_update_state, nm, addr).unwrap();
+                simu.process_event(VectorStock::check_update_state, nm, addr).unwrap();
             },
             ComponentModelAddress::TruckStock(addr) => {
                 simu.process_event(TruckStock::check_update_state, nm, addr).unwrap();
@@ -1496,16 +1317,6 @@ fn build_and_run_model(args: ParsedArgs, config: ModelConfig) {
         }
     });
 
-    // simu.process_event(
-    //     LoadingProcess::check_update_state,
-    //     NotificationMetadata {
-    //         time: start_time,
-    //         element_from: "Simulation".into(),
-    //         message: "Start".into(),
-    //     },
-    //     &loading_addr,
-    // )
-    // .unwrap();
     simu.step_until(start_time + Duration::from_secs_f64(args.sim_duration_secs)).unwrap();
 
     // Create dir if doesn't exist
@@ -1566,8 +1377,6 @@ fn main() {
     let reader = BufReader::new(file);
     let config: ModelConfig = serde_yaml::from_reader(reader).unwrap();
 
-    // println!("{:#?}", config);
-
     seeds.par_iter().for_each(|seed| {
         let args = ParsedArgs {
             seed: *seed,
@@ -1576,5 +1385,4 @@ fn main() {
         };
         build_and_run_model(args, config.clone());
     });
-
 }

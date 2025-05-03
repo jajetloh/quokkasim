@@ -2,7 +2,7 @@ use std::time::Duration;
 use indexmap::IndexMap;
 use log::warn;
 use nexosim::{ports::Output, time::MonotonicTime};
-use quokkasim::{core::{Distribution, NotificationMetadata}, define_combiner_process, define_process, define_splitter_process, prelude::{ArrayResource, ArrayStockState}};
+use quokkasim::{core::{Distribution, NotificationMetadata}, define_combiner_process, define_process, define_splitter_process, prelude::{VectorResource, VectorStockState}};
 use serde::{ser::SerializeStruct, Serialize};
 
 use super::{stock::{TruckAndOreStockLog, TruckAndOreStockLogDetails, TruckStockState}, TruckAndOre};
@@ -116,10 +116,10 @@ impl Default for LoadingProcessState {
 }
 
 define_combiner_process!(
-    /// Loading process for trucks. Draws from a truck stock and array stock, pushes out Vec<TruckAndOre>
+    /// Loading process for trucks. Draws from a truck stock and vector stock, pushes out Vec<TruckAndOre>
     name = LoadingProcess,
-    inflow_stock_state_types = (ArrayStockState, TruckStockState),
-    resource_in_types = (ArrayResource, Option<TruckAndOre>),
+    inflow_stock_state_types = (VectorStockState, TruckStockState),
+    resource_in_types = (VectorResource, Option<TruckAndOre>),
     resource_in_parameter_types = (f64, ()),
     outflow_stock_state_type = TruckStockState,
     resource_out_type = Option<TruckAndOre>,
@@ -152,11 +152,11 @@ define_combiner_process!(
             }
 
             // Then execute new load
-            let us_material_state: ArrayStockState = x.req_upstreams.0.send(()).await.next().unwrap();
+            let us_material_state: VectorStockState = x.req_upstreams.0.send(()).await.next().unwrap();
             let us_truck_state: TruckStockState = x.req_upstreams.1.send(()).await.next().unwrap();
 
             match (&us_material_state, &us_truck_state) {
-                (ArrayStockState::Normal { .. } | ArrayStockState::Full { .. }, TruckStockState::Normal { .. }) => {
+                (VectorStockState::Normal { .. } | VectorStockState::Full { .. }, TruckStockState::Normal { .. }) => {
                     let mut truck = x.withdraw_upstreams.1.send(((), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
@@ -184,7 +184,7 @@ define_combiner_process!(
                         }
                     }
                 },
-                (ArrayStockState::Empty { .. }, _) => {
+                (VectorStockState::Empty { .. }, _) => {
                     x.log(time, TruckingProcessLogType::LoadStartFailed { reason: "No material available" }).await;
                     x.time_to_next_event_counter = None;
                 },
@@ -259,9 +259,9 @@ define_splitter_process!(
     inflow_stock_state_type = TruckStockState,
     resource_in_type = Option<TruckAndOre>,
     resource_in_parameter_type = (),
-    outflow_stock_state_types = (ArrayStockState, TruckStockState),
+    outflow_stock_state_types = (VectorStockState, TruckStockState),
     resource_out_types = (ArrayResource, Option<TruckAndOre>),
-    resource_out_parameter_types = (ArrayResource, Option<TruckAndOre>),
+    resource_out_parameter_types = (VectorResource, Option<TruckAndOre>),
     check_update_method = |mut x: Self, time: MonotonicTime| {
         async move {
             // Resolve Dumping state, if applicable
@@ -295,9 +295,9 @@ define_splitter_process!(
             }
 
             let us_state: TruckStockState = x.req_upstream.send(()).await.next().unwrap();
-            let ds_material_state: ArrayStockState = x.req_downstreams.0.send(()).await.next().unwrap();
+            let ds_material_state: VectorStockState = x.req_downstreams.0.send(()).await.next().unwrap();
             match (us_state, ds_material_state) {
-                (TruckStockState::Normal { .. }, ArrayStockState::Normal { .. } | ArrayStockState::Empty { .. }) => {
+                (TruckStockState::Normal { .. }, VectorStockState::Normal { .. } | VectorStockState::Empty { .. }) => {
                     let truck_and_ore: Option<TruckAndOre> = x.withdraw_upstream.send(((), NotificationMetadata {
                         time,
                         element_from: x.element_name.clone(),
@@ -327,7 +327,7 @@ define_splitter_process!(
                     x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "No trucks available" }).await;
                     x.time_to_next_event_counter = None;
                 },
-                (_, ArrayStockState::Full { .. }) => {
+                (_, VectorStockState::Full { .. }) => {
                     x.log(time, TruckingProcessLogType::DumpStartFailed { reason: "Downstream material stock is full" }).await;
                     x.time_to_next_event_counter = None;
                 },

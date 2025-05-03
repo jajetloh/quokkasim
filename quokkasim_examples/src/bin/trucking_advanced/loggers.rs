@@ -2,7 +2,7 @@ use std::{error::Error, fs::File};
 
 use csv::WriterBuilder;
 use nexosim::ports::EventBuffer;
-use quokkasim::prelude::{ArrayStockLog, QueueStockLog};
+use quokkasim::prelude::{VectorStockLog, QueueStockLog};
 use serde::{Deserialize, Serialize};
 
 use crate::components::process::TruckingProcessLog;
@@ -96,11 +96,11 @@ impl QueueStockLogger {
 
 pub struct ArrayStockLogger {
     name: String,
-    buffer: EventBuffer<ArrayStockLog>,
+    buffer: EventBuffer<VectorStockLog>,
 }
 
 impl Logger for ArrayStockLogger {
-    type RecordType = ArrayStockLog;
+    type RecordType = VectorStockLog;
     fn get_name(&self) -> &String {
         &self.name
     }

@@ -1,5 +1,5 @@
 pub use crate::components::{
-    array::{ArrayProcessLog, ArrayResource, ArrayStock, ArrayStockLog, ArrayStockState},
+    vector::{VectorProcessLog, VectorResource, VectorStock, VectorStockLog, VectorStockState},
     queue::{MyQueueStock, QueueProcessLog, QueueState, QueueStockLog},
 };
 pub use crate::core::{

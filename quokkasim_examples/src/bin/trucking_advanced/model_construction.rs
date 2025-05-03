@@ -2,7 +2,7 @@ use std::error::Error;
 use indexmap::IndexMap;
 use log::warn;
 use nexosim::simulation::Address;
-use quokkasim::{core::{DistributionConfig, DistributionFactory, Mailbox, Process, ResourceAdd, Stock}, prelude::{ArrayResource, ArrayStock}};
+use quokkasim::{core::{DistributionConfig, DistributionFactory, Mailbox, Process, ResourceAdd, Stock}, prelude::{VectorResource, VectorStock}};
 use serde::Deserialize;
 
 use crate::{components::{process::{DumpingProcess, LoadingProcess, TruckMovementProcess}, stock::TruckStock, ComponentModel}, loggers::{EventLogger, Logger, LoggerConfig}};
@@ -19,9 +19,9 @@ pub struct ArrayStockConfig {
 
 impl ArrayStockConfig {
     fn create_component(&self, df: &mut DistributionFactory, loggers: &mut IndexMap<String, EventLogger>) -> Result<ComponentModel, Box<dyn Error>> {
-        let mut stock = ArrayStock::new()
+        let mut stock = VectorStock::new()
             .with_name(self.name.clone());
-        stock.resource.add(ArrayResource { vec: self.vec });
+        stock.resource.add(VectorResource { vec: self.vec });
         stock.low_capacity = self.low_capacity;
         stock.max_capacity = self.max_capacity;
         self.loggers.iter().for_each(|logger_name| {
@@ -35,7 +35,7 @@ impl ArrayStockConfig {
         });
         let mbox = Mailbox::new();
         let addr = mbox.address();
-        Ok(ComponentModel::ArrayStock(stock, mbox, addr))
+        Ok(ComponentModel::VectorStock(stock, mbox, addr))
     }
 }
 
@@ -158,11 +158,11 @@ pub fn connect_components(
             Ok((ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr)))
         },
-        (ComponentModel::ArrayStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
-            loading.req_upstreams.0.connect(ArrayStock::get_state, &stock_addr);
-            loading.withdraw_upstreams.0.connect(ArrayStock::remove, &stock_addr);
+        (ComponentModel::VectorStock(mut stock_model, stock_mbox, stock_addr), ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr)) => {
+            loading.req_upstreams.0.connect(VectorStock::get_state, &stock_addr);
+            loading.withdraw_upstreams.0.connect(VectorStock::remove, &stock_addr);
             stock_model.state_emitter.connect(LoadingProcess::check_update_state, &loading_addr);
-            Ok((ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr),
+            Ok((ComponentModel::VectorStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::LoadingProcess(loading, loading_mbox, loading_addr)))
         },
         (ComponentModel::LoadingProcess(mut loading, loading_mbox, loading_addr), ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr)) => {
@@ -193,12 +193,12 @@ pub fn connect_components(
             Ok((ComponentModel::TruckStock(stock_model, stock_mbox, stock_addr),
             ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr)))
         },
-        (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::ArrayStock(mut stock_model, stock_mbox, stock_addr)) => {
-            dumping.req_downstreams.0.connect(ArrayStock::get_state, &stock_addr);
-            dumping.push_downstreams.0.connect(ArrayStock::add, &stock_addr);
+        (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::VectorStock(mut stock_model, stock_mbox, stock_addr)) => {
+            dumping.req_downstreams.0.connect(VectorStock::get_state, &stock_addr);
+            dumping.push_downstreams.0.connect(VectorStock::add, &stock_addr);
             stock_model.state_emitter.connect(DumpingProcess::check_update_state, &dumping_addr);
             Ok((ComponentModel::DumpingProcess(dumping, dumping_mbox, dumping_addr),
-            ComponentModel::ArrayStock(stock_model, stock_mbox, stock_addr)))
+            ComponentModel::VectorStock(stock_model, stock_mbox, stock_addr)))
         },
         (ComponentModel::DumpingProcess(mut dumping, dumping_mbox, dumping_addr), ComponentModel::TruckStock(mut stock_model, stock_mbox, stock_addr)) => {
             dumping.req_downstreams.1.connect(TruckStock::get_state, &stock_addr);
@@ -234,7 +234,7 @@ pub enum ComponentConfig {
 }
 
 pub enum ComponentModelAddress {
-    ArrayStock(Address<ArrayStock>),
+    ArrayStock(Address<VectorStock>),
     TruckStock(Address<TruckStock>),
     LoadingProcess(Address<LoadingProcess>),
     DumpingProcess(Address<DumpingProcess>),

@@ -3,11 +3,11 @@ pub mod stock;
 
 use process::{DumpingProcess, LoadingProcess, TruckMovementProcess};
 use nexosim::simulation::Address;
-use quokkasim::{core::Mailbox, prelude::{ArrayResource, ArrayStock}};
+use quokkasim::{core::Mailbox, prelude::{VectorResource, VectorStock}};
 use stock::TruckStock;
 
 pub enum ComponentModel {
-    ArrayStock(ArrayStock, Mailbox<ArrayStock>, Address<ArrayStock>),
+    VectorStock(VectorStock, Mailbox<VectorStock>, Address<VectorStock>),
     TruckStock(TruckStock, Mailbox<TruckStock>, Address<TruckStock>),
     LoadingProcess(LoadingProcess, Mailbox<LoadingProcess>, Address<LoadingProcess>),
     DumpingProcess(DumpingProcess, Mailbox<DumpingProcess>, Address<DumpingProcess>),
@@ -17,7 +17,7 @@ pub enum ComponentModel {
 impl ComponentModel {
     pub fn get_name(&self) -> &String {
         match self {
-            ComponentModel::ArrayStock(x, _, _) => &x.element_name,
+            ComponentModel::VectorStock(x, _, _) => &x.element_name,
             ComponentModel::TruckStock(x, _, _) => &x.element_name,
             ComponentModel::LoadingProcess(x, _, _) => &x.element_name,
             ComponentModel::DumpingProcess(x, _, _) => &x.element_name,
@@ -29,5 +29,5 @@ impl ComponentModel {
 #[derive(Debug, Clone)]
 pub struct TruckAndOre {
     pub truck: i32,
-    pub ore: ArrayResource,
+    pub ore: VectorResource,
 }
