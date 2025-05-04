@@ -711,6 +711,7 @@ dependencies = [
  "clap",
  "csv",
  "futures",
+ "indexmap",
  "nexosim",
  "paste",
  "rand",
