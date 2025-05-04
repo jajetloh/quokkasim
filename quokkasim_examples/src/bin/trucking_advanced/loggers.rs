@@ -27,7 +27,7 @@ pub struct TruckingProcessLogger {
     pub name: String,
     pub buffer: EventBuffer<<Self as Logger>::RecordType>,
 }
-
+// impl Logger for TruckingProcessLogger {}
 impl Logger for TruckingProcessLogger {
 
     type RecordType = TruckingProcessLog;
@@ -36,17 +36,6 @@ impl Logger for TruckingProcessLogger {
     }
     fn get_buffer(&self) -> &EventBuffer<Self::RecordType> {
         &self.buffer
-    }
-    fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>> {
-        let file = File::create(format!("{}/{}.csv", dir, self.name))?;
-        let mut writer = WriterBuilder::new()
-            .has_headers(true)
-            .from_writer(file);
-        self.buffer.for_each(|log| {
-            writer.serialize(log).expect("Failed to write log record to CSV file");
-        });
-        writer.flush()?;
-        Ok(())
     }
 }
 

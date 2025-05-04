@@ -7,6 +7,7 @@ pub use crate::core::{
     NotificationMetadata, Process, Requestor, ResourceAdd, ResourceMultiply, ResourceRemove, Sink,
     Source, Stock,
 };
+pub use crate::new_core::*;
 pub use crate::common::{EventLogger};
 pub use crate::{
     define_combiner_process, define_process, define_sink, define_source, define_splitter_process,
