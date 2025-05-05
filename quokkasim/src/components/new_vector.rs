@@ -3,8 +3,12 @@ use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{core::{Distribution, NotificationMetadata}, new_core::Process, prelude::{Vector3, VectorArithmetic}};
+use crate::{core::{Distribution, NotificationMetadata}, new_core::Process, prelude::{SubtractParts, Vector3, VectorArithmetic}};
 use crate::new_core::Logger;
+
+/**
+ * Stock
+ */
 
 #[derive(Debug, Clone)]
 pub enum NewVectorStockState {
@@ -28,9 +32,10 @@ pub struct NewVectorStock<T: VectorArithmetic + Clone + Debug + Send + 'static> 
     pub element_type: String,
     pub vector: T,
     pub log_emitter: Output<NewVectorStockLog<T>>,
-    pub state_emitter: Output<NewVectorStockState>,
+    pub state_emitter: Output<NotificationMetadata>,
     pub low_capacity: f64,
-    pub max_capacity: f64
+    pub max_capacity: f64,
+    pub prev_state: Option<NewVectorStockState>,
 }
 impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVectorStock<T> {
     fn default() -> Self {
@@ -42,10 +47,17 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
             max_capacity: 0.0,
             log_emitter: Output::default(),
             state_emitter: Output::default(),
+            prev_state: None,
         }
     }
 }
 impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorStock<T> {
+    pub fn get_state_async(&mut self) -> impl Future<Output=NewVectorStockState> + Send {
+        async move {
+            self.get_state()
+        }
+    }
+
     pub fn get_state(&self) -> NewVectorStockState {
         if self.vector.total() <= self.low_capacity {
             NewVectorStockState::Empty {
@@ -64,7 +76,35 @@ impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorStock<T> {
             }
         }
     }
+
+    pub fn add(
+        &mut self,
+        data: (T, NotificationMetadata),
+        cx: &mut ::nexosim::model::Context<Self>
+    ) -> impl Future<Output=()> where NewVectorStock<T>: Model {
+        async move {
+            self.prev_state = Some(self.get_state());
+            let added = self.vector.add(&data.0);
+            self.vector = added.clone();
+        }
+    }
+
+    pub fn remove(
+        &mut self,
+        data: (f64, NotificationMetadata),
+        cx: &mut ::nexosim::model::Context<Self>
+    ) -> impl Future<Output=T> where NewVectorStock<T>: Model {
+        async move {
+            self.prev_state = Some(self.get_state());
+            let SubtractParts { subtracted, remaining } = self.vector.subtract_parts(data.0.clone());
+            self.vector = remaining;
+            subtracted
+        }
+    }
 }
+
+impl Model for NewVectorStock<f64> {}
+impl Model for NewVectorStock<Vector3> {}
 
 pub struct NewVectorStockLogger<T> {
     pub name: String,
@@ -137,6 +177,10 @@ impl Logger for NewVectorStockLogger<Vector3> {
         self.buffer
     }
 }
+
+/**
+ * Process
+ */
 
 pub struct NewVectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static> {
     pub element_name: String,

@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, ops::Sub};
 
 use nexosim::model::Model;
 use quokkasim::{components::new_vector::{NewVectorProcess, NewVectorStock}, core::Distribution, define_model_enums, new_core::*};
@@ -19,27 +19,20 @@ impl VectorArithmetic for Ore {
         }
     }
 
-    fn subtract(&self, other: &Self) -> Self {
-        Ore {
-            cu: self.cu - other.cu,
-            s: self.s - other.s,
-            other: self.other - other.other,
-        }
-    }
-
-    fn multiply(&self, scalar: f64) -> Self {
-        Ore {
-            cu: self.cu * scalar,
-            s: self.s * scalar,
-            other: self.other * scalar,
-        }
-    }
-
-    fn divide(&self, scalar: f64) -> Self {
-        Ore {
-            cu: self.cu / scalar,
-            s: self.s / scalar,
-            other: self.other / scalar,
+    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Ore> {
+        let proportion_removed = quantity / self.total();
+        let proportion_remaining = 1.0 - proportion_removed;
+        SubtractParts {
+            remaining: Ore {
+                cu: self.cu * proportion_remaining,
+                s: self.s * proportion_remaining,
+                other: self.other * proportion_remaining,
+            },
+            subtracted: Ore {
+                cu: self.cu * proportion_removed,
+                s: self.s * proportion_removed,
+                other: self.other * proportion_removed,
+            },
         }
     }
 
