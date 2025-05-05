@@ -48,13 +48,7 @@ impl VectorArithmetic for Ore {
     }
 }
 
-struct MyCustomStock {}
 
-impl Model for MyCustomStock {}
-
-struct MyCustomProcess {}
-
-impl Model for MyCustomProcess {}
 
 define_model_enums! {
     pub enum ComponentModel {
