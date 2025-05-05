@@ -52,8 +52,8 @@ impl VectorArithmetic for Ore {
 
 define_model_enums! {
     pub enum ComponentModel {
-        MyCustomStock(MyCustomStock),
-        MyCustomProcess(MyCustomProcess),
+        // MyCustomStock(MyCustomStock),
+        // MyCustomProcess(MyCustomProcess),
     }
     pub enum ComponentLogger {
     }
@@ -62,9 +62,9 @@ define_model_enums! {
 impl CustomComponentConnection for ComponentModel {
     fn connect_components(a: Self, b: Self) -> Result<(), Box<dyn Error>> {
         match (a, b) {
-            (ComponentModel::MyCustomStock(_), ComponentModel::MyCustomStock(_)) => Ok(()),
-            (ComponentModel::MyCustomProcess(_), ComponentModel::MyCustomStock(_)) => Ok(()),
-            (ComponentModel::NewVectorStockF64(_), ComponentModel::MyCustomStock(_)) => Ok(()),
+            // (ComponentModel::MyCustomStock(_), ComponentModel::MyCustomStock(_)) => Ok(()),
+            // (ComponentModel::MyCustomProcess(_), ComponentModel::MyCustomStock(_)) => Ok(()),
+            // (ComponentModel::NewVectorStockF64(_), ComponentModel::MyCustomStock(_)) => Ok(()),
             _ => Err("Invalid connection".into()),
         }
     }
@@ -81,19 +81,19 @@ impl CustomLoggerConnection for ComponentLogger {
 
 fn main() {
 
-    let stock1 = NewVectorStock::<Ore> {
-        vector: Ore { cu: 1.0, s: 2.0, other: 3.0 },
-        element_name: "Stock1".into(),
-        element_type: "NewVectorStock".into(),
-        low_capacity: 1.,
-        max_capacity: 100.,
-    };
+    // let stock1 = NewVectorStock::<Ore> {
+    //     vector: Ore { cu: 1.0, s: 2.0, other: 3.0 },
+    //     element_name: "Stock1".into(),
+    //     element_type: "NewVectorStock".into(),
+    //     low_capacity: 1.,
+    //     max_capacity: 100.,
+    // };
 
-    let process1: NewVectorProcess::<Ore> = NewVectorProcess {
-        vector: Ore { cu: 1.0, s: 2.0, other: 3.0 },
-        process_quantity_distr: Distribution::Constant(12.5),
-        process_time_distr: Distribution::Constant(2.4),
-    };
+    // let process1: NewVectorProcess::<Ore> = NewVectorProcess {
+    //     vector: Ore { cu: 1.0, s: 2.0, other: 3.0 },
+    //     process_quantity_distr: Distribution::Constant(12.5),
+    //     process_time_distr: Distribution::Constant(2.4),
+    // };
 
     println!("Hello, world!");
 }

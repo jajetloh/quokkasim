@@ -28,6 +28,7 @@ pub struct NewVectorStock<T: VectorArithmetic + Clone + Debug + Send + 'static> 
     pub element_type: String,
     pub vector: T,
     pub log_emitter: Output<NewVectorStockLog<T>>,
+    pub state_emitter: Output<NewVectorStockState>,
     pub low_capacity: f64,
     pub max_capacity: f64
 }
@@ -40,6 +41,7 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
             low_capacity: 0.0,
             max_capacity: 0.0,
             log_emitter: Output::default(),
+            state_emitter: Output::default(),
         }
     }
 }

@@ -195,7 +195,7 @@ macro_rules! define_model_enums {
                 use $crate::new_core::CustomComponentConnection;
                 match (a,b) {
                     ($ComponentsName::NewVectorStockF64(a), $ComponentsName::NewVectorProcessF64(b)) => {
-                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state);
+                        // a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, );
                         Ok(())
                     }
                 // ($ComponentsName::NewVectorStockF64(a), $ComponentsName::NewVectorStockF64(_)) => Ok(()),
