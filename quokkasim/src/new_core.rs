@@ -155,7 +155,7 @@ pub trait CustomComponentConnection {
     fn connect_components(a: Self, b: Self) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
-pub trait CustomLoggerConnection {
+pub trait CustomLoggerConnection<'a> {
     type ComponentType;
     fn connect_logger(a: Self, b: Self::ComponentType) -> Result<(), Box<dyn ::std::error::Error>>;
 }
@@ -200,50 +200,56 @@ macro_rules! define_model_enums {
     ) => {
 
         $(#[$components_enum_meta])*
-        pub enum $ComponentsName {
-            NewVectorStockF64($crate::components::new_vector::NewVectorStock<f64>, ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorStock<f64>>),
-            NewVectorProcessF64($crate::components::new_vector::NewVectorProcess<f64>, ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<f64>>),
-            NewVectorStockVector3($crate::components::new_vector::NewVectorStock<Vector3>, ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorStock<Vector3>>),
-            NewVectorProcessVector3($crate::components::new_vector::NewVectorProcess<Vector3>, ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<Vector3>>),
+        pub enum $ComponentsName<'a> {
+            NewVectorStockF64(&'a mut $crate::components::new_vector::NewVectorStock<f64>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorStock<f64>>),
+            NewVectorProcessF64(&'a mut $crate::components::new_vector::NewVectorProcess<f64>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<f64>>),
+            NewVectorStockVector3(&'a mut $crate::components::new_vector::NewVectorStock<Vector3>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorStock<Vector3>>),
+            NewVectorProcessVector3(&'a mut $crate::components::new_vector::NewVectorProcess<Vector3>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<Vector3>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT ) )?
             ),*
         }
   
-        impl $ComponentsName {
+        impl<'a> $ComponentsName<'a> {
             pub fn connect_components(
                 mut a: $ComponentsName,
                 mut b: $ComponentsName
             ) -> Result<(), Box<dyn ::std::error::Error>>{
                 use $crate::new_core::CustomComponentConnection;
-                match (a,b) {
+                match (a, b) {
                     ($ComponentsName::NewVectorStockF64(mut a, ad), $ComponentsName::NewVectorProcessF64(mut b, bd)) => {
-                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, &bd);
-                        b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, &ad);
-                        b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, &ad);
+                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, bd.clone());
+                        b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
+                        b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
                         Ok(())
                     },
                     ($ComponentsName::NewVectorProcessF64(mut a, ad), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
-                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, &ad);
-                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, &bd);
-                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, &bd);
+                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, ad.clone());
+                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
+                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
                         Ok(())
                     },
                     ($ComponentsName::NewVectorStockVector3(mut a, ad), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
-                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, &bd);
-                        b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, &ad);
-                        b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, &ad);
+                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, bd.clone());
+                        b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
+                        b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
                         Ok(())
                     },
                     ($ComponentsName::NewVectorProcessVector3(mut a, ad), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
-                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, &ad);
-                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, &bd);
-                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, &bd);
+                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, ad.clone());
+                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
+                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
                         Ok(())
                     },
                 // ($ComponentsName::NewVectorStockF64(a), $ComponentsName::NewVectorStockF64(_)) => Ok(()),
-                (a,b) => <$ComponentsName as CustomComponentConnection>::connect_components(a,b),
+                // (&a, b) => <$ComponentsName as CustomComponentConnection>::connect_components(a,b),
+                _ => {
+                    Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Cannot connect components"),
+                    )))
+                }
                 }
             }
         }
