@@ -215,23 +215,60 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
 
 impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Model for NewVectorProcess<T> {}
 
-impl Process<f64> for NewVectorProcess<f64> {}
-// impl Process<f64> for NewVectorProcess<f64> {
-//     fn update_state<'a>(
-//         &'a mut self,
-//         notif_meta: NotificationMetadata,
-//         cx: &'a mut ::nexosim::model::Context<Self>,
-//     ) -> impl Future<Output = ()> + 'a {
-//         async move {
-//             self.check_update_state(notif_meta, cx).await;
-//         }
-//     }
-// }
+impl Process<f64> for NewVectorProcess<f64> {
+    fn update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {
+            let time = cx.time();
+            let us_state = self.req_upstream.send(()).await.next();
+            let ds_state = self.req_downstream.send(()).await.next();
+            match (&us_state, &ds_state) {
+                (
+                    Some(NewVectorStockState::Normal {..}) | Some(NewVectorStockState::Full {..}),
+                    Some(NewVectorStockState::Empty {..}) | Some(NewVectorStockState::Normal {..}),
+                ) => {
+                    let process_quantity = self.process_quantity_distr.sample();
+                    let moved = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
+                        time,
+                        element_from: self.element_name.clone(),
+                        message: format!("Withdrawing quantity {:?}", process_quantity),
+                    })).await.next().unwrap();
 
+                    self.push_downstream.send((moved.clone(), NotificationMetadata {
+                        time,
+                        element_from: self.element_name.clone(),
+                        message: format!("Depositing quantity {:?} ({:?})", process_quantity, moved),
+                    })).await;
+
+                    self.log(time, NewVectorProcessLogType::ProcessSuccess { quantity: process_quantity, vector: moved }).await;
+                },
+                (Some(NewVectorStockState::Empty {..} ), _) => {
+                    self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                },
+                (None, _) => {
+                    self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                },
+                (_, None) => {
+                    self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                },
+                (_, Some(NewVectorStockState::Full {..} )) => {
+                    self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                },
+            }
+            self.time_to_next_event_counter = Some(Duration::from_secs_f64(self.process_time_distr.sample()));
+            cx.schedule_event(MonotonicTime::EPOCH, Self::check_update_state, notif_meta).unwrap();
+        }
+    }
+
+    fn post_update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {
+            cx.schedule_event(MonotonicTime::EPOCH, <Self as Process<f64>>::update_state, notif_meta.clone()).unwrap();
+        }
+    }
+}
 impl Process<Vector3> for NewVectorProcess<Vector3> {}
 
 // impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self: Model {
-impl NewVectorProcess<f64> where Self: Model {
+impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self: Model {
     pub fn check_update_state<'a>(
         &'a mut self,
         notif_meta: NotificationMetadata,
@@ -279,7 +316,7 @@ impl NewVectorProcess<f64> where Self: Model {
         }
     }
 
-    pub fn log<'a>(&'a mut self, time: MonotonicTime, details: NewVectorProcessLogType<f64>) -> impl Future<Output = ()> + Send {
+    pub fn log<'a>(&'a mut self, time: MonotonicTime, details: NewVectorProcessLogType<T>) -> impl Future<Output = ()> + Send {
         async move {
             let log = NewVectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),

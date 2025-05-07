@@ -134,9 +134,10 @@ pub trait Process<T: VectorArithmetic + Clone + Debug> {
     //     self.post_update_state(item);
     // }
 
-    // fn post_update_state(&mut self, item: &T) {
-    //     // self.set_next_event_time(time);
-    // }
+    fn post_update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        // self.set_next_event_time(time);
+        async move {}
+    }
 }
 
 pub trait Logger {
