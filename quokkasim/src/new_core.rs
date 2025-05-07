@@ -115,6 +115,8 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug> {
 
 pub trait Process<T: VectorArithmetic + Clone + Debug> {
 
+    type LogType;
+
     fn set_previous_check_time(&mut self, time: MonotonicTime);
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration>;
@@ -133,9 +135,9 @@ pub trait Process<T: VectorArithmetic + Clone + Debug> {
     fn update_state<'a>(&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         // async move {}
         async move {
-            self.pre_update_state(&notif_meta, cx);
-            self.update_state_impl(&notif_meta, cx);
-            self.post_update_state(&notif_meta, cx);
+            self.pre_update_state(&notif_meta, cx).await;
+            self.update_state_impl(&notif_meta, cx).await;
+            self.post_update_state(&notif_meta, cx).await;
         }
     }
     // {
@@ -146,6 +148,8 @@ pub trait Process<T: VectorArithmetic + Clone + Debug> {
     fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
         async move {}
     }
+
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogType) -> impl Future<Output = ()> + Send;
     // fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model,  {
     //     // self.set_next_event_time(time);
     //     async move {
@@ -255,25 +259,25 @@ macro_rules! define_model_enums {
                 use $crate::new_core::CustomComponentConnection;
                 match (a, b) {
                     ($ComponentsName::NewVectorStockF64(mut a, ad), $ComponentsName::NewVectorProcessF64(mut b, bd)) => {
-                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, bd.clone());
+                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, bd.clone());
                         b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
                         b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
                         Ok(())
                     },
                     ($ComponentsName::NewVectorProcessF64(mut a, ad), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
-                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, ad.clone());
+                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
                         Ok(())
                     },
                     ($ComponentsName::NewVectorStockVector3(mut a, ad), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
-                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, bd.clone());
+                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, bd.clone());
                         b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
                         b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
                         Ok(())
                     },
                     ($ComponentsName::NewVectorProcessVector3(mut a, ad), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
-                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::check_update_state, ad.clone());
+                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
                         Ok(())

@@ -109,7 +109,7 @@ fn main() {
         .add_model(stock2, stock2_mbox, "Stock2");
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
     simu.process_event(
-        NewVectorProcess::check_update_state,
+        NewVectorProcess::update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
             element_from: "Process1".into(),
