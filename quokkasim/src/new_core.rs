@@ -1,8 +1,9 @@
-use std::{error::Error, fmt::Debug, fs::File};
+use std::{error::Error, fmt::Debug, fs::File, time::Duration};
 
 use csv::WriterBuilder;
 use nexosim::{model::{Context, Model}, ports::EventBuffer};
 use serde::Serialize;
+use tai_time::MonotonicTime;
 
 use crate::core::NotificationMetadata;
 
@@ -113,31 +114,57 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug> {
 // }
 
 pub trait Process<T: VectorArithmetic + Clone + Debug> {
-    // fn pre_update_state(&mut self, item: &T) {
-    //     // println!("Pre-update item: {:?}", item.clone());
-    // }
 
-    // fn update_state_impl(&mut self, item: &T) {
-    //     // For overriding in the concrete implementation
-    //     unimplemented!();
-    // }
+    fn set_previous_check_time(&mut self, time: MonotonicTime);
 
-    fn update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn get_time_to_next_event(&mut self) -> &Option<Duration>;
+
+    fn set_time_to_next_event(&mut self, time: Option<Duration>);
+
+    fn pre_update_state<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {}
-        // self.pre_update_state(item);
-        // self.update_state_impl(item);
-        // self.post_update_state(item);
+    }
+
+    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
+    }
+
+
+    fn update_state<'a>(&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        // async move {}
+        async move {
+            self.pre_update_state(&notif_meta, cx);
+            self.update_state_impl(&notif_meta, cx);
+            self.post_update_state(&notif_meta, cx);
+        }
     }
     // {
     //     self.pre_update_state(item);
     //     self.update_state_impl(item);
     //     self.post_update_state(item);
     // }
-
-    fn post_update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
-        // self.set_next_event_time(time);
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
         async move {}
     }
+    // fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model,  {
+    //     // self.set_next_event_time(time);
+    //     async move {
+            
+    //         self.set_previous_check_time(cx.time());
+    //         match self.get_time_to_next_event() {
+    //             None => {},
+    //             Some(time_until_next) => {
+    //                 if time_until_next.is_zero() {
+    //                     panic!("Time until next event is zero!");
+    //                 } else {
+    //                     let next_time = cx.time() + *time_until_next;
+    //                     cx.schedule_event(MonotonicTime::EPOCH, <Self as Process<T>>::update_state, notif_meta.clone()).unwrap();
+    //                     // cx.schedule_event(next_time, <Self as Process<T>>::post_update_state, notif_meta.clone())
+    //                 };
+    //             }
+    //         };
+    //     }
+    // }
 }
 
 pub trait Logger {

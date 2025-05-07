@@ -194,6 +194,7 @@ pub struct NewVectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static
     pub time_to_next_event_counter: Option<Duration>,
     next_event_id: u64,
     pub log_emitter: Output<NewVectorProcessLog<T>>,
+    pub previous_check_time: MonotonicTime,
 }
 impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVectorProcess<T> {
     fn default() -> Self {
@@ -209,13 +210,23 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
             time_to_next_event_counter: None,
             next_event_id: 0,
             log_emitter: Output::default(),
+            previous_check_time: MonotonicTime::EPOCH,
         }
     }
 }
 
 impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Model for NewVectorProcess<T> {}
 
-impl Process<f64> for NewVectorProcess<f64> {
+impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVectorProcess<T> where Self: Model {
+    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
+        &self.time_to_next_event_counter
+    }
+    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
+        self.time_to_next_event_counter = time;
+    }
+    fn set_previous_check_time(&mut self, time: MonotonicTime) {
+        self.previous_check_time = time;
+    }
     fn update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {
             let time = cx.time();
@@ -259,13 +270,30 @@ impl Process<f64> for NewVectorProcess<f64> {
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+        // async move {
+        //     cx.schedule_event(MonotonicTime::EPOCH, <Self as Process<f64>>::update_state, notif_meta.clone()).unwrap();
+        //     // cx.schedule_event(next_time, <Self as Process<f64>>::post_update_state, notif_meta.clone()).unwrap();
+        // }
         async move {
-            cx.schedule_event(MonotonicTime::EPOCH, <Self as Process<f64>>::update_state, notif_meta.clone()).unwrap();
+            
+            self.set_previous_check_time(cx.time());
+            match self.get_time_to_next_event() {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + *time_until_next;
+                        cx.schedule_event(next_time, <Self as Process<T>>::update_state, notif_meta.clone()).unwrap();
+                    };
+                }
+            };
         }
     }
 }
-impl Process<Vector3> for NewVectorProcess<Vector3> {}
+
+// impl Process<Vector3> for NewVectorProcess<Vector3> {}
 
 // impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self: Model {
 impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self: Model {
