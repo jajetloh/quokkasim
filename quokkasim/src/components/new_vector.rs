@@ -216,14 +216,27 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
 impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Model for NewVectorProcess<T> {}
 
 impl Process<f64> for NewVectorProcess<f64> {}
+// impl Process<f64> for NewVectorProcess<f64> {
+//     fn update_state<'a>(
+//         &'a mut self,
+//         notif_meta: NotificationMetadata,
+//         cx: &'a mut ::nexosim::model::Context<Self>,
+//     ) -> impl Future<Output = ()> + 'a {
+//         async move {
+//             self.check_update_state(notif_meta, cx).await;
+//         }
+//     }
+// }
+
 impl Process<Vector3> for NewVectorProcess<Vector3> {}
 
-impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self: Model {
+// impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self: Model {
+impl NewVectorProcess<f64> where Self: Model {
     pub fn check_update_state<'a>(
         &'a mut self,
         notif_meta: NotificationMetadata,
         cx: &'a mut ::nexosim::model::Context<Self>,
-    ) -> impl Future<Output = ()> + 'a {
+    ) -> impl Future<Output = ()> + Send {
         async move {
             let time = cx.time();
             let us_state = self.req_upstream.send(()).await.next();
@@ -262,10 +275,11 @@ impl<T: VectorArithmetic + Clone + Debug + Send> NewVectorProcess<T> where Self:
                 },
             }
             self.time_to_next_event_counter = Some(Duration::from_secs_f64(self.process_time_distr.sample()));
+            cx.schedule_event(MonotonicTime::EPOCH, Self::check_update_state, notif_meta).unwrap();
         }
     }
 
-    pub fn log<'a>(&'a mut self, time: MonotonicTime, details: NewVectorProcessLogType<T>) -> impl Future<Output = ()> + Send {
+    pub fn log<'a>(&'a mut self, time: MonotonicTime, details: NewVectorProcessLogType<f64>) -> impl Future<Output = ()> + Send {
         async move {
             let log = NewVectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),

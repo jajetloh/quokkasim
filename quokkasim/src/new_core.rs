@@ -1,8 +1,10 @@
 use std::{error::Error, fmt::Debug, fs::File};
 
 use csv::WriterBuilder;
-use nexosim::ports::EventBuffer;
+use nexosim::{model::{Context, Model}, ports::EventBuffer};
 use serde::Serialize;
+
+use crate::core::NotificationMetadata;
 
 pub struct SubtractParts<T> {
     pub remaining: T,
@@ -111,24 +113,30 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug> {
 // }
 
 pub trait Process<T: VectorArithmetic + Clone + Debug> {
-    fn pre_update_state(&mut self, item: &T) {
-        // println!("Pre-update item: {:?}", item.clone());
-    }
+    // fn pre_update_state(&mut self, item: &T) {
+    //     // println!("Pre-update item: {:?}", item.clone());
+    // }
 
-    fn update_state_impl(&mut self, item: &T) {
-        // For overriding in the concrete implementation
-        unimplemented!();
-    }
+    // fn update_state_impl(&mut self, item: &T) {
+    //     // For overriding in the concrete implementation
+    //     unimplemented!();
+    // }
 
-    fn update_state(&mut self, item: &T) {
-        self.pre_update_state(item);
-        self.update_state_impl(item);
-        self.post_update_state(item);
+    fn update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
+        // self.pre_update_state(item);
+        // self.update_state_impl(item);
+        // self.post_update_state(item);
     }
+    // {
+    //     self.pre_update_state(item);
+    //     self.update_state_impl(item);
+    //     self.post_update_state(item);
+    // }
 
-    fn post_update_state(&mut self, item: &T) {
-        // self.set_next_event_time(time);
-    }
+    // fn post_update_state(&mut self, item: &T) {
+    //     // self.set_next_event_time(time);
+    // }
 }
 
 pub trait Logger {
