@@ -86,10 +86,10 @@ pub trait VectorArithmetic where Self: Sized {
 }
 
 /**
- * U: Parameter type when calling add
- * V: Parameter type when calling remove
+ * U: Parameter type when calling add (i.e. passed from Process when withdrawing)
+ * V: Parameter type when calling remove (i.e. passed from Process when pushing)
  */
-pub trait Stock<T: VectorArithmetic + Clone + Debug, U, V> {
+pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send> {
 
     type StockState;
 
@@ -123,11 +123,12 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U, V> {
         async move {}
     }
 
-    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model, V: 'a {
+    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where Self: Model, V: 'static {
         async move {
             self.pre_remove(&payload, cx).await;
-            self.remove_impl(&payload, cx).await;
+            let  result = self.remove_impl(&payload, cx).await;
             self.post_remove(&payload, cx).await;
+            result
         }
     }
 
@@ -264,9 +265,9 @@ macro_rules! define_model_enums {
         $(#[$components_enum_meta])*
         pub enum $ComponentsName<'a> {
             NewVectorStockF64(&'a mut $crate::components::new_vector::NewVectorStock<f64>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorStock<f64>>),
-            NewVectorProcessF64(&'a mut $crate::components::new_vector::NewVectorProcess<f64>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<f64>>),
+            NewVectorProcessF64(&'a mut $crate::components::new_vector::NewVectorProcess<f64, f64, f64>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<f64, f64, f64>>),
             NewVectorStockVector3(&'a mut $crate::components::new_vector::NewVectorStock<Vector3>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorStock<Vector3>>),
-            NewVectorProcessVector3(&'a mut $crate::components::new_vector::NewVectorProcess<Vector3>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<Vector3>>),
+            NewVectorProcessVector3(&'a mut $crate::components::new_vector::NewVectorProcess<Vector3, Vector3, f64>, &'a mut ::nexosim::simulation::Address<$crate::components::new_vector::NewVectorProcess<Vector3, Vector3, f64>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT ) )?
@@ -286,26 +287,24 @@ macro_rules! define_model_enums {
                         b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
                         Ok(())
                     },
-                    ($ComponentsName::NewVectorProcessF64(mut a, ad), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
-                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
-                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
-                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
-                        Ok(())
-                    },
-                    ($ComponentsName::NewVectorStockVector3(mut a, ad), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
-                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, bd.clone());
-                        b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
-                        b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
-                        Ok(())
-                    },
-                    ($ComponentsName::NewVectorProcessVector3(mut a, ad), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
-                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
-                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
-                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
-                        Ok(())
-                    },
-                // ($ComponentsName::NewVectorStockF64(a), $ComponentsName::NewVectorStockF64(_)) => Ok(()),
-                // (&a, b) => <$ComponentsName as CustomComponentConnection>::connect_components(a,b),
+                    // ($ComponentsName::NewVectorProcessF64(mut a, ad), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
+                    //     b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
+                    //     a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
+                    //     a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
+                    //     Ok(())
+                    // },
+                    // ($ComponentsName::NewVectorStockVector3(mut a, ad), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
+                    //     a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, bd.clone());
+                    //     b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
+                    //     b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
+                    //     Ok(())
+                    // },
+                    // ($ComponentsName::NewVectorProcessVector3(mut a, ad), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
+                    //     b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
+                    //     a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
+                    //     a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
+                    //     Ok(())
+                    // },
                 _ => {
                     Err(Box::new(std::io::Error::new(
                         std::io::ErrorKind::Other,

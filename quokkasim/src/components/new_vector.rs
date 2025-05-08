@@ -200,13 +200,17 @@ impl Logger for NewVectorStockLogger<Vector3> {
  * Process
  */
 
-pub struct NewVectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static> {
+ /**
+  * U: add param
+  * V: remove param
+  */
+pub struct NewVectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static, U: Clone + Send + 'static, V: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), NewVectorStockState>,
     pub req_downstream: Requestor<(), NewVectorStockState>,
-    pub withdraw_upstream: Requestor<(f64, NotificationMetadata), T>,
-    pub push_downstream: Output<(T, NotificationMetadata)>,
+    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
+    pub push_downstream: Output<(U, NotificationMetadata)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event_counter: Option<Duration>,
@@ -214,7 +218,7 @@ pub struct NewVectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static
     pub log_emitter: Output<NewVectorProcessLog<T>>,
     pub previous_check_time: MonotonicTime,
 }
-impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVectorProcess<T> {
+impl<T: VectorArithmetic + Clone + Debug + Default + Send, U: Clone + Send, V: Clone + Send> Default for NewVectorProcess<T, U, V> {
     fn default() -> Self {
         NewVectorProcess {
             element_name: String::new(),
@@ -233,9 +237,9 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
     }
 }
 
-impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Model for NewVectorProcess<T> {}
+impl<T: VectorArithmetic + Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send> Model for NewVectorProcess<T, U, V> {}
 
-impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVectorProcess<T> where Self: Model {
+impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVectorProcess<T, T, f64> where Self: Model {
 
     type LogType = NewVectorProcessLogType<T>;
 
