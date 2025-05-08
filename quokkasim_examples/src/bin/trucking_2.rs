@@ -1,4 +1,4 @@
-use std::{error::Error, ops::Sub, time::Duration};
+use std::{error::Error, fs::{create_dir, create_dir_all}, ops::Sub, time::Duration};
 
 use nexosim::{model::Model, time::MonotonicTime};
 use quokkasim::{components::new_vector::{NewVectorProcess, NewVectorProcessLogger, NewVectorStock, NewVectorStockLogger}, core::{Distribution, Mailbox, NotificationMetadata, SimInit}, define_model_enums, new_core::*};
@@ -134,6 +134,7 @@ fn main() {
     ).unwrap();
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 
+    create_dir_all("outputs/trucking_2").unwrap();
     process_logger.write_csv("outputs/trucking_2".into()).unwrap();
     stock_logger.write_csv("outputs/trucking_2".into()).unwrap();
 

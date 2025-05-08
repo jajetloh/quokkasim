@@ -315,18 +315,18 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    // ($LoggersName::NewVectorProcessLoggerF64(mut a), $ComponentsName::NewVectorProcessF64(mut b, bd)) => {
-                    //     b.log_emitter.connect_sink(&mut a.get_buffer());
-                    //     Ok(())
-                    // },
-                    // ($LoggersName::NewVectorStockLoggerVector3(mut a), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
-                    //     b.log_emitter.connect_sink(&mut a.get_buffer());
-                    //     Ok(())
-                    // },
-                    // ($LoggersName::NewVectorProcessLoggerVector3(mut a), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
-                    //     b.log_emitter.connect_sink(&a.get_buffer());
-                    //     Ok(())
-                    // },
+                    ($LoggersName::NewVectorProcessLoggerF64(mut a), $ComponentsName::NewVectorProcessF64(mut b, bd)) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::NewVectorStockLoggerVector3(mut a), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::NewVectorProcessLoggerVector3(mut a), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
                     (a,b) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b),
                 }
             }
