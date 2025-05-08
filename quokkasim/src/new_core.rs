@@ -82,36 +82,57 @@ impl VectorArithmetic for Vector3 {
 pub trait VectorArithmetic where Self: Sized {
     fn add(&self, other: &Self) -> Self;
     fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self>;
-    // fn subtract(&self, other: &Self) -> Self;
-    // fn multiply(&self, scalar: f64) -> Self;
-    // fn divide(&self, scalar: f64) -> Self;
     fn total(&self) -> f64;
 }
 
-pub trait Stock<T: VectorArithmetic + Clone + Debug> {
-    fn pre_add(&mut self, item: &T) {
-        println!("Pre-adding item: {:?}", item.clone());
+/**
+ * U: Parameter type when calling add
+ * V: Parameter type when calling remove
+ */
+pub trait Stock<T: VectorArithmetic + Clone + Debug, U, V> {
+
+    type StockState;
+
+    fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
     }
 
-    fn add_impl(&mut self, item: &T) {
-        // For overriding in the concrete implementation
-        unimplemented!();
+    fn add_impl<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
     }
 
-    fn add(&mut self, item: &T) {
-        self.pre_add(item);
-        self.add_impl(item);
-        self.post_add(item);
+    fn post_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
     }
 
-    fn post_add(&mut self, item: &T) {
-        println!("Post-adding item: {:?}", item.clone());
+    fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model, U: 'a {
+        async move {
+            self.pre_add(&payload, cx).await;
+            self.add_impl(&payload, cx).await;
+            self.post_add(&payload, cx).await;
+        }
     }
+
+    fn pre_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
+    }
+
+    fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where Self: Model;
+
+    fn post_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {}
+    }
+
+    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model, V: 'a {
+        async move {
+            self.pre_remove(&payload, cx).await;
+            self.remove_impl(&payload, cx).await;
+            self.post_remove(&payload, cx).await;
+        }
+    }
+
+    fn get_state_async<'a>(&'a mut self) -> impl Future<Output = Self::StockState> + 'a where Self: Model;
 }
-
-// pub trait WithNextEventTime {
-//     fn set_next_event_time(&mut self, time: f64);
-// }
 
 pub trait Process<T: VectorArithmetic + Clone + Debug> {
 
