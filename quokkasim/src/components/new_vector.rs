@@ -166,6 +166,12 @@ impl Logger for NewVectorStockLogger<f64> {
     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
         self.buffer
     }
+    fn new(name: String, buffer_size: usize) -> Self {
+        NewVectorStockLogger {
+            name,
+            buffer: EventBuffer::with_capacity(buffer_size),
+        }
+    }
 }
 
 impl Logger for NewVectorStockLogger<Vector3> {
@@ -175,6 +181,12 @@ impl Logger for NewVectorStockLogger<Vector3> {
     }
     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
         self.buffer
+    }
+    fn new(name: String, capacity: usize) -> Self {
+        NewVectorStockLogger {
+            name,
+            buffer: EventBuffer::with_capacity(capacity),
+        }
     }
 }
 
@@ -230,9 +242,10 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVec
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
-    fn update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl<'a> (&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {
             let time = cx.time();
+            println!("Update state: {:?}", time);
             let us_state = self.req_upstream.send(()).await.next();
             let ds_state = self.req_downstream.send(()).await.next();
             match (&us_state, &ds_state) {
@@ -254,21 +267,25 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVec
                     })).await;
 
                     self.log(time, NewVectorProcessLogType::ProcessSuccess { quantity: process_quantity, vector: moved }).await;
+                    self.time_to_next_event_counter = Some(Duration::from_secs_f64(self.process_time_distr.sample()));
                 },
                 (Some(NewVectorStockState::Empty {..} ), _) => {
                     self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                    self.time_to_next_event_counter = None;
                 },
                 (None, _) => {
                     self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                    self.time_to_next_event_counter = None;
                 },
                 (_, None) => {
                     self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                    self.time_to_next_event_counter = None;
                 },
                 (_, Some(NewVectorStockState::Full {..} )) => {
                     self.log(time, NewVectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                    self.time_to_next_event_counter = None;
                 },
             }
-            self.time_to_next_event_counter = Some(Duration::from_secs_f64(self.process_time_distr.sample()));
         }
     }
 
@@ -278,15 +295,14 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVec
         //     // cx.schedule_event(next_time, <Self as Process<f64>>::post_update_state, notif_meta.clone()).unwrap();
         // }
         async move {
-            
             self.set_previous_check_time(cx.time());
-            match self.get_time_to_next_event() {
+            match self.time_to_next_event_counter {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
                         panic!("Time until next event is zero!");
                     } else {
-                        let next_time = cx.time() + *time_until_next;
+                        let next_time = cx.time() + time_until_next;
                         cx.schedule_event(next_time, <Self as Process<T>>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
@@ -388,6 +404,12 @@ impl Logger for NewVectorProcessLogger<f64> {
     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
         self.buffer
     }
+    fn new(name: String, capacity: usize) -> Self {
+        NewVectorProcessLogger {
+            name,
+            buffer: EventBuffer::with_capacity(capacity),
+        }
+    }
 }
 
 impl Logger for NewVectorProcessLogger<Vector3> {
@@ -397,6 +419,12 @@ impl Logger for NewVectorProcessLogger<Vector3> {
     }
     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
         self.buffer
+    }
+    fn new(name: String, capacity: usize) -> Self {
+        NewVectorProcessLogger {
+            name,
+            buffer: EventBuffer::with_capacity(capacity),
+        }
     }
 }
 

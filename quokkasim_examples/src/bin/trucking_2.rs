@@ -1,7 +1,7 @@
 use std::{error::Error, ops::Sub, time::Duration};
 
 use nexosim::{model::Model, time::MonotonicTime};
-use quokkasim::{components::new_vector::{NewVectorProcess, NewVectorStock}, core::{Distribution, Mailbox, NotificationMetadata, SimInit}, define_model_enums, new_core::*};
+use quokkasim::{components::new_vector::{NewVectorProcess, NewVectorProcessLogger, NewVectorStock, NewVectorStockLogger}, core::{Distribution, Mailbox, NotificationMetadata, SimInit}, define_model_enums, new_core::*};
 
 #[derive(Debug, Clone)]
 struct Ore {
@@ -63,7 +63,7 @@ impl<'a> CustomComponentConnection for ComponentModel<'a> {
     }
 }
 
-impl<'a> CustomLoggerConnection<'a> for ComponentLogger {
+impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
     type ComponentType = ComponentModel<'a>;
     fn connect_logger(a: Self, b: Self::ComponentType) -> Result<(), Box<dyn Error>> {
         match (a, b) {
@@ -103,6 +103,22 @@ fn main() {
         ComponentModel::NewVectorStockF64(&mut stock2, &mut stock2_addr),
     ).unwrap();
 
+    let mut process_logger = NewVectorProcessLogger::new("ProcessLogger".into(), 100_000);
+    let mut stock_logger = NewVectorStockLogger::new("StockLogger".into(), 100_000);
+
+    ComponentLogger::connect_logger(
+        ComponentLogger::NewVectorProcessLoggerF64(&mut process_logger),
+        ComponentModel::NewVectorProcessF64(&mut process1, &mut process1_addr),
+    ).unwrap();
+    ComponentLogger::connect_logger(
+        ComponentLogger::NewVectorStockLoggerF64(&mut stock_logger),
+        ComponentModel::NewVectorStockF64(&mut stock1, &mut stock1_addr),
+    ).unwrap();
+    ComponentLogger::connect_logger(
+        ComponentLogger::NewVectorStockLoggerF64(&mut stock_logger),
+        ComponentModel::NewVectorStockF64(&mut stock2, &mut stock2_addr),
+    ).unwrap();
+
     let sim_builder = SimInit::new()
         .add_model(stock1, stock1_mbox, "Stock1")
         .add_model(process1, process1_mbox, "Process1")
@@ -116,7 +132,9 @@ fn main() {
             message: "Start".into(),
         }, &process1_addr
     ).unwrap();
-    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(3600.)).unwrap();
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 
-    println!("Hello, world!");
+    process_logger.write_csv("outputs/trucking_2".into()).unwrap();
+    stock_logger.write_csv("outputs/trucking_2".into()).unwrap();
+
 }

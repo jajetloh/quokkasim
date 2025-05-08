@@ -189,6 +189,7 @@ pub trait Logger {
         writer.flush()?;
         Ok(())
     }
+    fn new(name: String, buffer_size: usize) -> Self;
 }
 
 pub trait CustomComponentConnection {
@@ -295,24 +296,38 @@ macro_rules! define_model_enums {
         }
 
         $(#[$logger_enum_meta])*
-        pub enum $LoggersName {
-            NewVectorStockLoggerF64($crate::components::new_vector::NewVectorStockLogger<f64>),
-            NewVectorStockLoggerVector3($crate::components::new_vector::NewVectorStockLogger<Vector3>),
-            NewVectorProcessLoggerF64($crate::components::new_vector::NewVectorProcessLogger<f64>),
-            NewVectorProcessLoggerVector3($crate::components::new_vector::NewVectorProcessLogger<Vector3>),
+        pub enum $LoggersName<'a> {
+            NewVectorStockLoggerF64(&'a mut $crate::components::new_vector::NewVectorStockLogger<f64>),
+            NewVectorStockLoggerVector3(&'a mut $crate::components::new_vector::NewVectorStockLogger<Vector3>),
+            NewVectorProcessLoggerF64(&'a mut $crate::components::new_vector::NewVectorProcessLogger<f64>),
+            NewVectorProcessLoggerVector3(&'a mut $crate::components::new_vector::NewVectorProcessLogger<Vector3>),
             $(
                 $(#[$var_meta])*
                 $U $( ( $UT ) )?
             ),*
         }
 
-        impl $LoggersName {
-            pub fn connect_logger(a: $LoggersName, b: $ComponentsName) -> Result<(), Box<dyn ::std::error::Error>> {
+        impl<'a> $LoggersName<'a> {
+            pub fn connect_logger(mut a: $LoggersName, mut b: $ComponentsName) -> Result<(), Box<dyn ::std::error::Error>> {
                 use $crate::new_core::CustomLoggerConnection;
-                match (a,b) {
-                    ($LoggersName::NewVectorStockLoggerF64(a), $ComponentsName::NewVectorStockF64(_, _)) => Ok(()),
-
-                    (a,b) => <$LoggersName as CustomLoggerConnection>::connect_logger(a,b),
+                match (a, b) {
+                    ($LoggersName::NewVectorStockLoggerF64(mut a), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    // ($LoggersName::NewVectorProcessLoggerF64(mut a), $ComponentsName::NewVectorProcessF64(mut b, bd)) => {
+                    //     b.log_emitter.connect_sink(&mut a.get_buffer());
+                    //     Ok(())
+                    // },
+                    // ($LoggersName::NewVectorStockLoggerVector3(mut a), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
+                    //     b.log_emitter.connect_sink(&mut a.get_buffer());
+                    //     Ok(())
+                    // },
+                    // ($LoggersName::NewVectorProcessLoggerVector3(mut a), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
+                    //     b.log_emitter.connect_sink(&a.get_buffer());
+                    //     Ok(())
+                    // },
+                    (a,b) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b),
                 }
             }
         }
