@@ -190,7 +190,7 @@ macro_rules! define_stock {
                 result
             }
 
-            async fn notify_change(&mut self, notif_meta: NotificationMetadata, cx: &mut ::nexosim::model::Context<Self>) {
+            async fn notify_change(&mut self, notif_meta: NotificationMetadata, cx: &mut Context<Self>) {
                 self.state_emitter.send(NotificationMetadata {
                     time: cx.time(),
                     element_from: self.element_name.clone(),

@@ -5,7 +5,7 @@ use nexosim::{model::{Context, Model}, ports::EventBuffer};
 use serde::Serialize;
 use tai_time::MonotonicTime;
 
-use crate::core::NotificationMetadata;
+use crate::core::{NotificationMetadata, StateEq};
 
 pub struct SubtractParts<T> {
     pub remaining: T,
@@ -91,21 +91,44 @@ pub trait VectorArithmetic where Self: Sized {
  */
 pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send> {
 
-    type StockState;
+    type StockState: StateEq;
+    type LogDetailsType;
 
     fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
-        async move {}
+        async move {
+            self.set_previous_state();
+        }
     }
 
-    fn add_impl<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
-        async move {}
-    }
+    fn add_impl<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model;
 
     fn post_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
-        async move {}
+        async move {
+            let current_state = self.get_state();
+            let previous_state = self.get_previous_state();
+            match previous_state {
+                None => {},
+                Some(ps) => {
+                    let ps = *ps.clone();
+                    if !ps.is_same_state(&current_state) {
+                        self.log(cx.time(), self.get_resource().clone()).await;
+                        cx.schedule_event(
+                            cx.time() + ::std::time::Duration::from_nanos(1), Self::notify_change, NotificationMetadata {
+                                time: cx.time(),
+                                element_from: "X".into(),
+                                message: "X".into(),
+                            }
+                        ).unwrap();
+                    } else {
+                    }
+                }
+            }
+        }
     }
 
-    fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model, U: 'a {
+    fn notify_change(&mut self, payload: NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> where Self: Model, NotificationMetadata: Send + 'static;
+
+    fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model, U: 'static {
         async move {
             self.pre_add(&payload, cx).await;
             self.add_impl(&payload, cx).await;
@@ -114,7 +137,9 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
     }
 
     fn pre_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
-        async move {}
+        async move {
+            self.set_previous_state();
+        }
     }
 
     fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where Self: Model;
@@ -132,7 +157,16 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn get_state_async<'a>(&'a mut self) -> impl Future<Output = Self::StockState> + 'a where Self: Model;
+    fn get_state_async<'a>(&'a mut self) -> impl Future<Output = Self::StockState> + 'a where Self: Model {
+        async move {
+            self.get_state()
+        }
+    }
+    fn get_state(&mut self) -> Self::StockState;
+    fn get_resource(&self) -> &T;
+    fn get_previous_state(&mut self) -> &Option<Self::StockState>;
+    fn set_previous_state(&mut self);
+    fn log(&mut self, time: MonotonicTime, details: T) -> impl Future<Output = ()> + Send;
 }
 
 pub trait Process<T: VectorArithmetic + Clone + Debug> {
@@ -287,24 +321,24 @@ macro_rules! define_model_enums {
                         b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
                         Ok(())
                     },
-                    // ($ComponentsName::NewVectorProcessF64(mut a, ad), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
-                    //     b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
-                    //     a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
-                    //     a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
-                    //     Ok(())
-                    // },
-                    // ($ComponentsName::NewVectorStockVector3(mut a, ad), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
-                    //     a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, bd.clone());
-                    //     b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
-                    //     b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
-                    //     Ok(())
-                    // },
-                    // ($ComponentsName::NewVectorProcessVector3(mut a, ad), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
-                    //     b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
-                    //     a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
-                    //     a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
-                    //     Ok(())
-                    // },
+                    ($ComponentsName::NewVectorProcessF64(mut a, ad), $ComponentsName::NewVectorStockF64(mut b, bd)) => {
+                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
+                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
+                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
+                        Ok(())
+                    },
+                    ($ComponentsName::NewVectorStockVector3(mut a, ad), $ComponentsName::NewVectorProcessVector3(mut b, bd)) => {
+                        a.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, bd.clone());
+                        b.req_upstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, ad.clone());
+                        b.withdraw_upstream.connect($crate::components::new_vector::NewVectorStock::remove, ad.clone());
+                        Ok(())
+                    },
+                    ($ComponentsName::NewVectorProcessVector3(mut a, ad), $ComponentsName::NewVectorStockVector3(mut b, bd)) => {
+                        b.state_emitter.connect($crate::components::new_vector::NewVectorProcess::update_state, ad.clone());
+                        a.req_downstream.connect($crate::components::new_vector::NewVectorStock::get_state_async, bd.clone());
+                        a.push_downstream.connect($crate::components::new_vector::NewVectorStock::add, bd.clone());
+                        Ok(())
+                    },
                 _ => {
                     Err(Box::new(std::io::Error::new(
                         std::io::ErrorKind::Other,

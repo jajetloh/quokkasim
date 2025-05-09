@@ -81,10 +81,10 @@ fn main() {
     let stock1_mbox: Mailbox<NewVectorStock<f64>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
     
-    let mut process1 = NewVectorProcess::<f64>::default();
+    let mut process1 = NewVectorProcess::<f64, f64, f64>::default();
     process1.process_quantity_distr = Distribution::Constant(4.);
     process1.process_time_distr = Distribution::Constant(10.);
-    let process1_mbox: Mailbox<NewVectorProcess<f64>> = Mailbox::new();
+    let process1_mbox: Mailbox<NewVectorProcess<f64, f64, f64>> = Mailbox::new();
     let mut process1_addr = process1_mbox.address();
 
     let mut stock2 = NewVectorStock::<f64>::default();

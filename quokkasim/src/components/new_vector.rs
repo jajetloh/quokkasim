@@ -3,7 +3,7 @@ use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{core::{Distribution, NotificationMetadata}, new_core::{Process, Stock}, prelude::{SubtractParts, Vector3, VectorArithmetic}};
+use crate::{core::{Distribution, NotificationMetadata, StateEq}, new_core::{Process, Stock}, prelude::{SubtractParts, Vector3, VectorArithmetic}};
 use crate::new_core::Logger;
 
 /**
@@ -23,6 +23,17 @@ impl NewVectorStockState {
             NewVectorStockState::Empty { .. } => "Empty".to_string(),
             NewVectorStockState::Normal { .. } => "Normal".to_string(),
             NewVectorStockState::Full { .. } => "Full".to_string(),
+        }
+    }
+}
+
+impl StateEq for NewVectorStockState {
+    fn is_same_state(&self, other: &Self) -> bool {
+        match (self, other) {
+            (NewVectorStockState::Empty { .. }, NewVectorStockState::Empty { .. }) => true,
+            (NewVectorStockState::Normal { .. }, NewVectorStockState::Normal { .. }) => true,
+            (NewVectorStockState::Full { .. }, NewVectorStockState::Full { .. }) => true,
+            _ => false,
         }
     }
 }
@@ -54,19 +65,28 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
 impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorStock<T> {
 
     type StockState = NewVectorStockState;
+    type LogDetailsType = NewVectorStockLog<T>;
 
-    fn get_state_async(&mut self) -> impl Future<Output=Self::StockState> {
-        async move {
-            let occupied = self.vector.total();
-            let empty = self.max_capacity - occupied;
-            if empty <= 0.0 {
-                NewVectorStockState::Full { occupied, empty }
-            } else if occupied < self.low_capacity {
-                NewVectorStockState::Empty { occupied, empty }
-            } else {
-                NewVectorStockState::Normal { occupied, empty }
-            }
+    fn get_state(&mut self) -> Self::StockState {
+        let occupied = self.vector.total();
+        let empty = self.max_capacity - occupied;
+        if empty <= 0.0 {
+            NewVectorStockState::Full { occupied, empty }
+        } else if occupied < self.low_capacity {
+            NewVectorStockState::Empty { occupied, empty }
+        } else {
+            NewVectorStockState::Normal { occupied, empty }
         }
+    }
+
+    fn get_previous_state(&mut self) -> &Option<Self::StockState> {
+        &self.prev_state
+    }
+    fn set_previous_state(&mut self) {
+        self.prev_state = Some(self.get_state());
+    }
+    fn get_resource(&self) -> &T {
+        &self.vector
     }
 
     fn add_impl<'a>(
@@ -91,6 +111,21 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorS
             let SubtractParts { subtracted, remaining } = self.vector.subtract_parts(data.0.clone());
             self.vector = remaining;
             subtracted
+        }
+    }
+
+    fn log(&mut self, time: MonotonicTime, details: NewVectorStockLog<T>) -> impl Future<Output=()> + Send {
+        async move {
+            let log = NewVectorStockLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                event_id: details.event_id,
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                log_type: details.log_type,
+                state: self.get_state(),
+                vector: self.vector.clone(),
+            };
+            self.log_emitter.send(log).await;
         }
     }
 }
