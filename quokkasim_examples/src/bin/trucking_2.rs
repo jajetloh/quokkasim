@@ -1,8 +1,11 @@
 use std::{error::Error, fs::{create_dir, create_dir_all}, ops::Sub, time::Duration};
 
-use nexosim::{model::Model, time::MonotonicTime};
-use quokkasim::{components::new_vector::{NewVectorProcess, NewVectorProcessLogger, NewVectorStock, NewVectorStockLogger}, core::{Distribution, Mailbox, NotificationMetadata, SimInit}, define_model_enums, new_core::*};
-
+use quokkasim::nexosim::Mailbox;
+// use quokkasim::core::Logger;
+// use quokkasim::{model::Model, time::MonotonicTime};
+// use quokkasim::{components::vector::{VectorProcess, VectorProcessLogger, VectorStock, VectorStockLogger}, core::{Distribution, Mailbox, NotificationMetadata, SimInit}, define_model_enums};
+use quokkasim::prelude::*;
+use quokkasim::define_model_enums;
 #[derive(Debug, Clone)]
 struct Ore {
     cu: f64,
@@ -57,7 +60,7 @@ impl<'a> CustomComponentConnection for ComponentModel<'a> {
         match (a, b) {
             // (ComponentModel::MyCustomStock(_), ComponentModel::MyCustomStock(_)) => Ok(()),
             // (ComponentModel::MyCustomProcess(_), ComponentModel::MyCustomStock(_)) => Ok(()),
-            // (ComponentModel::NewVectorStockF64(_), ComponentModel::MyCustomStock(_)) => Ok(()),
+            // (ComponentModel::VectorStockF64(_), ComponentModel::MyCustomStock(_)) => Ok(()),
             _ => Err("Invalid connection".into()),
         }
     }
@@ -74,49 +77,49 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
 
 fn main() {
 
-    let mut stock1 = NewVectorStock::<f64>::default();
+    let mut stock1 = VectorStock::<f64>::default();
     stock1.vector = 100.;
     stock1.low_capacity = 10.;
     stock1.max_capacity = 100.;
-    let stock1_mbox: Mailbox<NewVectorStock<f64>> = Mailbox::new();
+    let stock1_mbox: Mailbox<VectorStock<f64>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
     
-    let mut process1 = NewVectorProcess::<f64, f64, f64>::default();
+    let mut process1 = VectorProcess::<f64, f64, f64>::default();
     process1.process_quantity_distr = Distribution::Constant(4.);
     process1.process_time_distr = Distribution::Constant(10.);
-    let process1_mbox: Mailbox<NewVectorProcess<f64, f64, f64>> = Mailbox::new();
+    let process1_mbox: Mailbox<VectorProcess<f64, f64, f64>> = Mailbox::new();
     let mut process1_addr = process1_mbox.address();
 
-    let mut stock2 = NewVectorStock::<f64>::default();
+    let mut stock2 = VectorStock::<f64>::default();
     stock2.vector = 5.;
     stock2.low_capacity = 10.;
     stock2.max_capacity = 100.;
-    let stock2_mbox: Mailbox<NewVectorStock<f64>> = Mailbox::new();
+    let stock2_mbox: Mailbox<VectorStock<f64>> = Mailbox::new();
     let mut stock2_addr = stock2_mbox.address();
 
     ComponentModel::connect_components(
-        ComponentModel::NewVectorStockF64(&mut stock1, &mut stock1_addr),
-        ComponentModel::NewVectorProcessF64(&mut process1, &mut process1_addr),
+        ComponentModel::VectorStockF64(&mut stock1, &mut stock1_addr),
+        ComponentModel::VectorProcessF64(&mut process1, &mut process1_addr),
     ).unwrap();
     ComponentModel::connect_components(
-        ComponentModel::NewVectorProcessF64(&mut process1, &mut process1_addr),
-        ComponentModel::NewVectorStockF64(&mut stock2, &mut stock2_addr),
+        ComponentModel::VectorProcessF64(&mut process1, &mut process1_addr),
+        ComponentModel::VectorStockF64(&mut stock2, &mut stock2_addr),
     ).unwrap();
 
-    let mut process_logger = NewVectorProcessLogger::new("ProcessLogger".into(), 100_000);
-    let mut stock_logger = NewVectorStockLogger::new("StockLogger".into(), 100_000);
+    let mut process_logger = VectorProcessLogger::new("ProcessLogger".into(), 100_000);
+    let mut stock_logger = VectorStockLogger::new("StockLogger".into(), 100_000);
 
     ComponentLogger::connect_logger(
-        ComponentLogger::NewVectorProcessLoggerF64(&mut process_logger),
-        ComponentModel::NewVectorProcessF64(&mut process1, &mut process1_addr),
+        ComponentLogger::VectorProcessLoggerF64(&mut process_logger),
+        ComponentModel::VectorProcessF64(&mut process1, &mut process1_addr),
     ).unwrap();
     ComponentLogger::connect_logger(
-        ComponentLogger::NewVectorStockLoggerF64(&mut stock_logger),
-        ComponentModel::NewVectorStockF64(&mut stock1, &mut stock1_addr),
+        ComponentLogger::VectorStockLoggerF64(&mut stock_logger),
+        ComponentModel::VectorStockF64(&mut stock1, &mut stock1_addr),
     ).unwrap();
     ComponentLogger::connect_logger(
-        ComponentLogger::NewVectorStockLoggerF64(&mut stock_logger),
-        ComponentModel::NewVectorStockF64(&mut stock2, &mut stock2_addr),
+        ComponentLogger::VectorStockLoggerF64(&mut stock_logger),
+        ComponentModel::VectorStockF64(&mut stock2, &mut stock2_addr),
     ).unwrap();
 
     let sim_builder = SimInit::new()
@@ -125,7 +128,7 @@ fn main() {
         .add_model(stock2, stock2_mbox, "Stock2");
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
     simu.process_event(
-        NewVectorProcess::update_state,
+        VectorProcess::update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
             element_from: "Process1".into(),
