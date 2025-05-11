@@ -89,31 +89,33 @@ pub trait VectorArithmetic where Self: Sized {
  * U: Parameter type when calling add (i.e. passed from Process when withdrawing)
  * V: Parameter type when calling remove (i.e. passed from Process when pushing)
  */
-pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send> {
+pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send> where Self: Model {
 
     type StockState: StateEq;
     type LogDetailsType;
 
-    fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn add_impl<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model;
+    fn add_impl<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a ;
 
-    fn post_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn post_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             let current_state = self.get_state();
             let previous_state = self.get_previous_state();
             match previous_state {
                 None => {},
                 Some(ps) => {
-                    let ps = *ps.clone();
+                    let ps = ps.clone();
                     if !ps.is_same_state(&current_state) {
                         self.log(cx.time(), self.get_resource().clone()).await;
                         cx.schedule_event(
-                            cx.time() + ::std::time::Duration::from_nanos(1), Self::notify_change, NotificationMetadata {
+                            cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x, cx: &mut Context<Self>| {    
+                                model.emit_change(x, cx);
+                            }, NotificationMetadata {
                                 time: cx.time(),
                                 element_from: "X".into(),
                                 message: "X".into(),
@@ -126,9 +128,9 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn notify_change(&mut self, payload: NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> where Self: Model, NotificationMetadata: Send + 'static;
+    fn emit_change(&self, payload: NotificationMetadata, cx: &mut Context<Self>);
 
-    fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model, U: 'static {
+    fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where U: 'static {
         async move {
             self.pre_add(&payload, cx).await;
             self.add_impl(&payload, cx).await;
@@ -136,19 +138,19 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn pre_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn pre_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where Self: Model;
+    fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a;
 
-    fn post_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn post_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {}
     }
 
-    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where Self: Model, V: 'static {
+    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where V: 'static {
         async move {
             self.pre_remove(&payload, cx).await;
             let  result = self.remove_impl(&payload, cx).await;
@@ -157,7 +159,7 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn get_state_async<'a>(&'a mut self) -> impl Future<Output = Self::StockState> + 'a where Self: Model {
+    fn get_state_async<'a>(&'a mut self) -> impl Future<Output = Self::StockState> + 'a {
         async move {
             self.get_state()
         }
