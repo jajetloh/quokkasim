@@ -4,6 +4,8 @@ use csv::WriterBuilder;
 use nexosim::{model::{Context, Model}, ports::EventBuffer};
 use serde::Serialize;
 use tai_time::MonotonicTime;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 
 pub struct SubtractParts<T> {
     pub remaining: T,
@@ -116,8 +118,8 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
                     if !ps.is_same_state(&current_state) {
                         self.log(cx.time(), "StateChange".into()).await;
                         cx.schedule_event(
-                            cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x, cx: &mut Context<Self>| {    
-                                model.emit_change(x, cx);
+                            cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x: NotificationMetadata, cx: &mut Context<Self>| async move {    
+                                // model.emit_change(x.clone(), cx);
                             }, NotificationMetadata {
                                 time: cx.time(),
                                 element_from: "X".into(),
@@ -131,7 +133,10 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut Context<Self>);
+    // TODO: Should be async. Haven't figured out a way to do this yet as it seemingly requires use
+    // of Self::emit_change in Self::post_add, but such a call in Self::post_add requires it being a
+    // concrete implementation instead of this... And trying to avoid that runs into lifetime issues.
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>);
 
     fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where U: 'static {
         async move {

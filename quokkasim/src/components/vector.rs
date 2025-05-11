@@ -116,7 +116,9 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for VectorStoc
     }
 
     fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) {
-        self.state_emitter.send(payload);
+        // async move {
+        //     self.state_emitter.send(payload).await;
+        // }
     }
 
     fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output=()> + Send {
@@ -145,6 +147,20 @@ impl<T: VectorArithmetic + Clone + Debug + Send> VectorStock<T> where Self: Mode
             VectorStockState::Empty { occupied, empty }
         } else {
             VectorStockState::Normal { occupied, empty }
+        }
+    }
+
+    pub fn with_name(self, name: String) -> Self {
+        VectorStock {
+            element_name: name,
+            ..self
+        }
+    }
+
+    pub fn with_type(self, element_type: String) -> Self {
+        VectorStock {
+            element_type,
+            ..self
         }
     }
 }
@@ -371,6 +387,22 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for Vector
             };
             self.next_event_id += 1;
             self.log_emitter.send(log).await;
+        }
+    }
+}
+
+impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic + Clone + Debug + Send + 'static, Self: Model {
+    pub fn with_name(self, name: String) -> Self {
+        VectorProcess {
+            element_name: name,
+            ..self
+        }
+    }
+
+    pub fn with_type(self, element_type: String) -> Self {
+        VectorProcess {
+            element_type,
+            ..self
         }
     }
 }

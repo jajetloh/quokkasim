@@ -116,13 +116,13 @@ impl Serialize for IronOreProcessLog {
         state.end()
     }
 }
-
 impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     fn from(log: VectorProcessLog<IronOre>) -> Self {
         IronOreProcessLog {
             time: log.time,
             element_name: log.element_name,
             element_type: log.element_type,
+            // TODO: treat log_type and truck_id properly
             log_type: "LOGTYPE".into(),
             truck_id: 0,
             event: log.event,
@@ -180,6 +180,39 @@ impl Serialize for IronOreStockLog {
         state.end()
     }
 }
+impl From<VectorStockLog<IronOre>> for IronOreStockLog {
+    fn from(log: VectorStockLog<IronOre>) -> Self {
+        IronOreStockLog {
+            time: log.time,
+            element_name: log.element_name,
+            element_type: log.element_type,
+            // TODO: treat log_type and truck_id properly
+            log_type: "LOGTYPE".into(),
+            truck_id: 0,
+            resource: log.vector
+        }
+    }
+}
+
+struct IronOreStockLogger {
+    name: String,
+    buffer: EventBuffer<IronOreStockLog>
+}
+impl Logger for IronOreStockLogger {
+    type RecordType = IronOreStockLog;
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+        self.buffer
+    }
+    fn new(name: String, buffer_size: usize) -> Self {
+        IronOreStockLogger {
+            name,
+            buffer: EventBuffer::with_capacity(buffer_size),
+        }
+    }
+}
 
 define_model_enums! {
     pub enum ComponentModel<'a> {
@@ -188,7 +221,7 @@ define_model_enums! {
     }
     pub enum ComponentLogger<'a> {
         IronOreProcessLogger(&'a mut IronOreProcessLogger),
-        IronOreStockLogger(&'a mut VectorStockLogger<IronOre>),
+        IronOreStockLogger(&'a mut IronOreStockLogger),
     }
 }
 
@@ -220,6 +253,10 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
                 b.log_emitter.map_connect_sink(|c| <VectorProcessLog<IronOre>>::into(c.clone()), &a.buffer);
                 Ok(())
             },
+            (ComponentLogger::IronOreStockLogger(a), ComponentModel::IronOreStock(b, _)) => {
+                b.log_emitter.map_connect_sink(|c| <VectorStockLog<IronOre>>::into(c.clone()), &a.buffer);
+                Ok(())
+            },
             _ => Err("Invalid connection".into()),
         }
     }
@@ -227,20 +264,20 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
 
 fn main() {
 
-    let mut stock1 = VectorStock::<IronOre>::default();
+    let mut stock1 = VectorStock::<IronOre>::default().with_name("Stock1".into()).with_type("IronOreStock".into());
     stock1.vector = IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. };
     stock1.low_capacity = 10.;
     stock1.max_capacity = 100.;
     let stock1_mbox: Mailbox<VectorStock<IronOre>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
     
-    let mut process1 = VectorProcess::<IronOre, IronOre, f64>::default();
+    let mut process1 = VectorProcess::<IronOre, IronOre, f64>::default().with_name("Process1".into()).with_type("IronOreProcess".into());
     process1.process_quantity_distr = Distribution::Constant(4.);
     process1.process_time_distr = Distribution::Constant(10.);
     let process1_mbox: Mailbox<VectorProcess<IronOre, IronOre, f64>> = Mailbox::new();
     let mut process1_addr: Address<VectorProcess<IronOre, IronOre, f64>> = process1_mbox.address();
 
-    let mut stock2 = VectorStock::<IronOre>::default();
+    let mut stock2 = VectorStock::<IronOre>::default().with_name("Stock2".into()).with_type("IronOreStock".into());
     stock2.vector = IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 };
     stock2.low_capacity = 10.;
     stock2.max_capacity = 100.;
@@ -257,10 +294,19 @@ fn main() {
     ).unwrap();
 
     let mut process_logger = IronOreProcessLogger::new("IronOreProcessLogger".into(), 100_000);
+    let mut stock_logger = IronOreStockLogger::new("IronOreStockLogger".into(), 100_000);
 
     ComponentLogger::connect_logger(
         ComponentLogger::IronOreProcessLogger(&mut process_logger),
         ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
+    ).unwrap();
+    ComponentLogger::connect_logger(
+        ComponentLogger::IronOreStockLogger(&mut stock_logger),
+        ComponentModel::IronOreStock(&mut stock1, &mut stock1_addr),
+    ).unwrap();
+    ComponentLogger::connect_logger(
+        ComponentLogger::IronOreStockLogger(&mut stock_logger),
+        ComponentModel::IronOreStock(&mut stock2, &mut stock2_addr),
     ).unwrap();
 
     let sim_builder = SimInit::new()
@@ -280,6 +326,6 @@ fn main() {
 
     create_dir_all("outputs/trucking_2").unwrap();
     process_logger.write_csv("outputs/trucking_2".into()).unwrap();
-    // stock_logger.write_csv("outputs/trucking_2".into()).unwrap();
+    stock_logger.write_csv("outputs/trucking_2".into()).unwrap();
 
 }
