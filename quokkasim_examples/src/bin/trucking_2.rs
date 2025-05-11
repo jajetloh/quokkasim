@@ -1,4 +1,4 @@
-use std::{error::Error, fs::{create_dir, create_dir_all}, ops::Sub, time::Duration};
+use std::{error::Error, fs::create_dir_all, time::Duration};
 
 use quokkasim::nexosim::Mailbox;
 use quokkasim::prelude::*;
@@ -75,6 +75,7 @@ impl VectorArithmetic for IronOre {
 
 struct IronOreProcessLog {
     time: String,
+    event_id: u64,
     element_name: String,
     element_type: String,
     log_type: String,
@@ -86,8 +87,9 @@ impl Serialize for IronOreProcessLog {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreProcessLog", 12)?;
+        let mut state = serializer.serialize_struct("IronOreProcessLog", 15)?;
         state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
@@ -104,7 +106,7 @@ impl Serialize for IronOreProcessLog {
                 ("ProcessFailure", None, None, None, None, None, None, None, Some(reason))
             },
         };
-        state.serialize_field("event_type", event_type)?;
+        state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
         state.serialize_field("fe", &fe)?;
         state.serialize_field("other_elements", &other_elements)?;
@@ -120,6 +122,7 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     fn from(log: VectorProcessLog<IronOre>) -> Self {
         IronOreProcessLog {
             time: log.time,
+            event_id: log.event_id,
             element_name: log.element_name,
             element_type: log.element_type,
             // TODO: treat log_type and truck_id properly
@@ -153,6 +156,7 @@ impl Logger for IronOreProcessLogger {
 
 struct IronOreStockLog {
     time: String,
+    event_id: u64,
     element_name: String,
     element_type: String,
     log_type: String,
@@ -165,7 +169,8 @@ impl Serialize for IronOreStockLog {
         S: serde::Serializer,
     {
         let mut state = serializer.serialize_struct("IronOreStockLog", 12)?;
-        state.serialize_field("time", &self.time)?;
+        state.serialize_field("time", &self.time)?; 
+        state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
@@ -184,6 +189,7 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
     fn from(log: VectorStockLog<IronOre>) -> Self {
         IronOreStockLog {
             time: log.time,
+            event_id: log.event_id,
             element_name: log.element_name,
             element_type: log.element_type,
             // TODO: treat log_type and truck_id properly

@@ -48,6 +48,7 @@ pub struct VectorStock<T: VectorArithmetic + Clone + Debug + Send + 'static> {
     pub low_capacity: f64,
     pub max_capacity: f64,
     pub prev_state: Option<VectorStockState>,
+    next_event_id: u64,
 }
 impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
@@ -60,6 +61,7 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for VectorSto
             log_emitter: Output::default(),
             state_emitter: Output::default(),
             prev_state: None,
+            next_event_id: 0,
         }
     }
 }
@@ -125,13 +127,14 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for VectorStoc
         async move {
             let log = VectorStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: "01234".into(),
+                event_id: self.next_event_id,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 log_type,
                 state: self.get_state(),
                 vector: self.vector.clone(),
             };
+            self.next_event_id += 1;
             self.log_emitter.send(log).await;
         }
     }
@@ -175,7 +178,7 @@ pub struct VectorStockLogger<T> {
 #[derive(Debug, Clone)]
 pub struct VectorStockLog<T> {
     pub time: String,
-    pub event_id: String,
+    pub event_id: u64,
     pub element_name: String,
     pub element_type: String,
     pub log_type: String,
