@@ -149,8 +149,7 @@ impl<T: VectorArithmetic + Clone + Debug + Send> VectorStock<T> where Self: Mode
     }
 }
 
-impl Model for VectorStock<f64> {}
-impl Model for VectorStock<Vector3> {}
+impl<T: Debug + Clone + Send + VectorArithmetic> Model for VectorStock<T> {}
 
 pub struct VectorStockLogger<T> {
     pub name: String,
@@ -381,37 +380,53 @@ pub struct VectorProcessLogger<T> {
     pub buffer: EventBuffer<VectorProcessLog<T>>,
 }
 
-impl Logger for VectorProcessLogger<f64> {
-    type RecordType = VectorProcessLog<f64>;
+impl<T> Logger for VectorProcessLogger<T> where VectorProcessLog<T>: Serialize {
+    type RecordType = VectorProcessLog<T>;
     fn get_name(&self) -> &String {
         &self.name
     }
     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String, capacity: usize) -> Self {
+    fn new(name: String, buffer_size: usize) -> Self {
         VectorProcessLogger {
             name,
-            buffer: EventBuffer::with_capacity(capacity),
+            buffer: EventBuffer::with_capacity(buffer_size),
         }
     }
 }
 
-impl Logger for VectorProcessLogger<Vector3> {
-    type RecordType = VectorProcessLog<Vector3>;
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
-        self.buffer
-    }
-    fn new(name: String, capacity: usize) -> Self {
-        VectorProcessLogger {
-            name,
-            buffer: EventBuffer::with_capacity(capacity),
-        }
-    }
-}
+// impl Logger for VectorProcessLogger<f64> {
+//     type RecordType = VectorProcessLog<f64>;
+//     fn get_name(&self) -> &String {
+//         &self.name
+//     }
+//     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+//         self.buffer
+//     }
+//     fn new(name: String, capacity: usize) -> Self {
+//         VectorProcessLogger {
+//             name,
+//             buffer: EventBuffer::with_capacity(capacity),
+//         }
+//     }
+// }
+
+// impl Logger for VectorProcessLogger<Vector3> {
+//     type RecordType = VectorProcessLog<Vector3>;
+//     fn get_name(&self) -> &String {
+//         &self.name
+//     }
+//     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+//         self.buffer
+//     }
+//     fn new(name: String, capacity: usize) -> Self {
+//         VectorProcessLogger {
+//             name,
+//             buffer: EventBuffer::with_capacity(capacity),
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub enum VectorProcessLogType<T> {

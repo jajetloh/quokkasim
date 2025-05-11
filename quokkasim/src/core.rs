@@ -308,15 +308,15 @@ pub trait CustomLoggerConnection<'a> {
 macro_rules! define_model_enums {
     (
         $(#[$components_enum_meta:meta])*
-        pub enum $ComponentsName:ident {
+        pub enum $ComponentsName:ident<'a> {
           $(
             $(#[$components_var_meta:meta])*
-            $R:ident $( ( $RT:ty ) )?
+            $R:ident $( ( $RT:ty, $RT2:ty ) )?
           ),* $(,)?
         }
 
         $(#[$logger_enum_meta:meta])*
-        pub enum $LoggersName:ident {
+        pub enum $LoggersName:ident<'a> {
             $(
                 $(#[$logger_var_meta:meta])*
                 $U:ident $( ( $UT:ty ) )?
@@ -332,7 +332,7 @@ macro_rules! define_model_enums {
             VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut ::nexosim::simulation::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
             $(
                 $(#[$components_var_meta])*
-                $R $( ( $RT ) )?
+                $R $( ( $RT, $RT2 ) )?
             ),*
         }
   
@@ -367,12 +367,9 @@ macro_rules! define_model_enums {
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
                         Ok(())
                     },
-                _ => {
-                    Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Cannot connect components"),
-                    )))
-                }
+                    (a,b) => {
+                        <$ComponentsName as CustomComponentConnection>::connect_components(a, b)
+                    }
                 }
             }
         }
@@ -384,7 +381,7 @@ macro_rules! define_model_enums {
             VectorProcessLoggerF64(&'a mut $crate::components::vector::VectorProcessLogger<f64>),
             VectorProcessLoggerVector3(&'a mut $crate::components::vector::VectorProcessLogger<Vector3>),
             $(
-                $(#[$var_meta])*
+                $(#[$logger_var_meta])*
                 $U $( ( $UT ) )?
             ),*
         }
