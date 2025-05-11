@@ -62,10 +62,11 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for NewVector
         }
     }
 }
-impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorStock<T> {
+
+impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorStock<T> where Self: Model {
 
     type StockState = NewVectorStockState;
-    type LogDetailsType = NewVectorStockLog<T>;
+    // type LogDetailsType = NewVectorStockLog<T>;
 
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.vector.total();
@@ -93,7 +94,7 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorS
         &'a mut self,
         payload: &'a (T, NotificationMetadata),
         cx: &'a mut ::nexosim::model::Context<Self>
-    ) -> impl Future<Output=()> + 'a where Self: Model {
+    ) -> impl Future<Output=()> + 'a {
         async move {
             self.prev_state = Some(self.get_state().clone());
             let added = self.vector.add(&payload.0);
@@ -105,7 +106,7 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorS
         &'a mut self,
         data: &'a (f64, NotificationMetadata),
         cx: &'a mut ::nexosim::model::Context<Self>
-    ) -> impl Future<Output=T> + 'a where NewVectorStock<T>: Model {
+    ) -> impl Future<Output=T> + 'a {
         async move {
             self.prev_state = Some(self.get_state());
             let SubtractParts { subtracted, remaining } = self.vector.subtract_parts(data.0.clone());
@@ -114,14 +115,18 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for NewVectorS
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: NewVectorStockLog<T>) -> impl Future<Output=()> + Send {
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) {
+        self.state_emitter.send(payload);
+    }
+
+    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output=()> + Send {
         async move {
             let log = NewVectorStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: details.event_id,
+                event_id: "01234".into(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
-                log_type: details.log_type,
+                log_type,
                 state: self.get_state(),
                 vector: self.vector.clone(),
             };
@@ -236,8 +241,9 @@ impl Logger for NewVectorStockLogger<Vector3> {
  */
 
  /**
-  * U: add param
-  * V: remove param
+  * T: Resource type of upstream stock
+  * U: Message type for pushing to downstream stock
+  * V: Message type for withdrawing from upstream stock
   */
 pub struct NewVectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static, U: Clone + Send + 'static, V: Clone + Send + 'static> {
     pub element_name: String,
@@ -276,7 +282,7 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug, U: Clone + Send, V: C
 
 impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for NewVectorProcess<T, T, f64> where Self: Model {
 
-    type LogType = NewVectorProcessLogType<T>;
+    type LogDetailsType = NewVectorProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event_counter

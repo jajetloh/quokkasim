@@ -91,8 +91,8 @@ pub trait VectorArithmetic where Self: Sized {
  */
 pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send> where Self: Model {
 
-    type StockState: StateEq;
-    type LogDetailsType;
+    type StockState: StateEq + Clone;
+    // type LogDetailsType;
 
     fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
@@ -105,13 +105,14 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
     fn post_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             let current_state = self.get_state();
-            let previous_state = self.get_previous_state();
+            let previous_state: &Option<Self::StockState> = self.get_previous_state();
             match previous_state {
                 None => {},
                 Some(ps) => {
                     let ps = ps.clone();
+                    self.log(cx.time(), "StockAdd".into()).await;
                     if !ps.is_same_state(&current_state) {
-                        self.log(cx.time(), self.get_resource().clone()).await;
+                        self.log(cx.time(), "StateChange".into()).await;
                         cx.schedule_event(
                             cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x, cx: &mut Context<Self>| {    
                                 model.emit_change(x, cx);
@@ -128,7 +129,7 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn emit_change(&self, payload: NotificationMetadata, cx: &mut Context<Self>);
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut Context<Self>);
 
     fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where U: 'static {
         async move {
@@ -147,7 +148,30 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
     fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a;
 
     fn post_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
-        async move {}
+        async move {
+            let current_state = self.get_state();
+            let previous_state: &Option<Self::StockState> = self.get_previous_state();
+            match previous_state {
+                None => {},
+                Some(ps) => {
+                    let ps = ps.clone();
+                    self.log(cx.time(), "StockRemove".into()).await;
+                    if !ps.is_same_state(&current_state) {
+                        self.log(cx.time(), "StateChange".into()).await;
+                        cx.schedule_event(
+                            cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x, cx: &mut Context<Self>| {    
+                                model.emit_change(x, cx);
+                            }, NotificationMetadata {
+                                time: cx.time(),
+                                element_from: "X".into(),
+                                message: "X".into(),
+                            }
+                        ).unwrap();
+                    } else {
+                    }
+                }
+            }
+        }
     }
 
     fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where V: 'static {
@@ -168,12 +192,12 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
     fn get_resource(&self) -> &T;
     fn get_previous_state(&mut self) -> &Option<Self::StockState>;
     fn set_previous_state(&mut self);
-    fn log(&mut self, time: MonotonicTime, details: T) -> impl Future<Output = ()> + Send;
+    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send;
 }
 
 pub trait Process<T: VectorArithmetic + Clone + Debug> {
 
-    type LogType;
+    type LogDetailsType;
 
     fn set_previous_check_time(&mut self, time: MonotonicTime);
 
@@ -207,7 +231,7 @@ pub trait Process<T: VectorArithmetic + Clone + Debug> {
         async move {}
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogType) -> impl Future<Output = ()> + Send;
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send;
     // fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model,  {
     //     // self.set_next_event_time(time);
     //     async move {
