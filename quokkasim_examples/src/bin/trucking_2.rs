@@ -79,25 +79,44 @@ struct IronOreProcessLog {
     element_type: String,
     log_type: String,
     truck_id: u32,
-    tonnes: f64,
-    components: Vec<f64>,
+    event: VectorProcessLogType<IronOre>,
 }
 impl Serialize for IronOreProcessLog {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreProcessLog", 7)?;
+        let mut state = serializer.serialize_struct("IronOreProcessLog", 12)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("truck_id", &self.truck_id)?;
-        state.serialize_field("tonnes", &self.tonnes)?;
-        state.serialize_field("components", &self.components)?;
+
+        let (event_type, total, fe, other_elements, fe_pc, magnetite, hematite, limonite, message) = match &self.event {
+            VectorProcessLogType::ProcessStart { quantity, vector } => {
+                ("ProcessStart", Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
+            },
+            VectorProcessLogType::ProcessSuccess { quantity, vector } => {
+                ("ProcessSuccess", Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
+            },
+            VectorProcessLogType::ProcessFailure { reason, .. } => {
+                ("ProcessFailure", None, None, None, None, None, None, None, Some(reason))
+            },
+        };
+        state.serialize_field("event_type", event_type)?;
+        state.serialize_field("total", &total)?;
+        state.serialize_field("fe", &fe)?;
+        state.serialize_field("other_elements", &other_elements)?;
+        state.serialize_field("fe_%", &fe_pc)?;
+        state.serialize_field("magnetite", &magnetite)?;
+        state.serialize_field("hematite", &hematite)?;
+        state.serialize_field("limonite", &limonite)?;
+        state.serialize_field("message", &message)?;
         state.end()
     }
 }
+
 impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     fn from(log: VectorProcessLog<IronOre>) -> Self {
         IronOreProcessLog {
@@ -106,8 +125,7 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
             element_type: log.element_type,
             log_type: "LOGTYPE".into(),
             truck_id: 0,
-            tonnes: 1234.,
-            components: vec![1.,2.,3.,4.],
+            event: log.event,
         }
     }
 }
@@ -116,31 +134,6 @@ struct IronOreProcessLogger {
     name: String,
     buffer: EventBuffer<IronOreProcessLog>
 }
-
-// impl Logger for IronOreProcessLogger {
-//     type RecordType = IronOreProcessLog;
-//     fn get_name(&self) -> &String {
-//         &self.name
-//     }
-//     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
-//         self.buffer
-//     }
-//     fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>> {
-//         let file = std::fs::File::create(format!("{}/{}.csv", dir, self.name))?;
-//         let mut writer = csv::Writer::from_writer(file);
-//         self.buffer.for_each(|log: IronOreProcessLog| {
-//             writer.serialize(log).expect("Failed to write record");
-//         });
-//         writer.flush().expect("Failed to flush writer");
-//         Ok(())
-//     }
-//     fn new(name: String, capacity: usize) -> Self {
-//         IronOreProcessLogger {
-//             name,
-//             buffer: EventBuffer::with_capacity(capacity),
-//         }
-//     }
-// }
 
 impl Logger for IronOreProcessLogger {
     type RecordType = IronOreProcessLog;
@@ -164,22 +157,26 @@ struct IronOreStockLog {
     element_type: String,
     log_type: String,
     truck_id: u32,
-    tonnes: f64,
-    components: Vec<f64>,
+    resource: IronOre,
 }
 impl Serialize for IronOreStockLog {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreStockLog", 7)?;
+        let mut state = serializer.serialize_struct("IronOreStockLog", 12)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("truck_id", &self.truck_id)?;
-        state.serialize_field("tonnes", &self.tonnes)?;
-        state.serialize_field("components", &self.components)?;
+        state.serialize_field("total", &self.resource.total())?;
+        state.serialize_field("fe", &self.resource.fe)?;
+        state.serialize_field("other_elements", &self.resource.other_elements)?;
+        state.serialize_field("fe_%", &(self.resource.fe / self.resource.total()))?;
+        state.serialize_field("magnetite", &self.resource.magnetite)?;
+        state.serialize_field("hematite", &self.resource.hematite)?;
+        state.serialize_field("limonite", &self.resource.limonite)?;
         state.end()
     }
 }
