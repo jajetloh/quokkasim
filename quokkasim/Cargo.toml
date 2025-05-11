@@ -2,6 +2,8 @@
 name = "quokkasim"
 version = "0.0.0"
 edition = "2024"
+repository = "https://github.com/jajetloh/quokkasim"
+license = "MIT"
 
 [lib]
 name = "quokkasim"
