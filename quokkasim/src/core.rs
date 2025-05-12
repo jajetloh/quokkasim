@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Debug, fs::File, time::Duration};
 use crate::common::{NotificationMetadata};
 use csv::WriterBuilder;
-use nexosim::{model::{Context, Model}, ports::EventBuffer};
+use nexosim::{model::{Context, Model}, ports::EventQueue};
 use serde::Serialize;
 use tai_time::MonotonicTime;
 
@@ -259,16 +259,16 @@ pub trait Process<T: VectorArithmetic + Clone + Debug> {
 }
 
 pub trait Logger {
-    type RecordType: Serialize;
+    type RecordType: Serialize + Send + 'static;
     fn get_name(&self) -> &String;
-    fn get_buffer(self) -> EventBuffer<Self::RecordType>;
+    fn get_buffer(self) -> EventQueue<Self::RecordType>;
     fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>>
     where
         Self: Sized,
     {
         let file = File::create(format!("{}/{}.csv", dir, self.get_name()))?;
         let mut writer = WriterBuilder::new().has_headers(true).from_writer(file);
-        self.get_buffer().for_each(|log| {
+        self.get_buffer().into_reader().for_each(|log| {
             writer
                 .serialize(log)
                 .expect("Failed to write log record to CSV file");
@@ -276,7 +276,7 @@ pub trait Logger {
         writer.flush()?;
         Ok(())
     }
-    fn new(name: String, buffer_size: usize) -> Self;
+    fn new(name: String) -> Self;
 }
 
 pub trait CustomComponentConnection {

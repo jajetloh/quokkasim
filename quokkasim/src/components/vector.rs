@@ -1,5 +1,5 @@
 use futures::lock;
-use nexosim::{model::Model, ports::{EventBuffer, Output, Requestor}};
+use nexosim::{model::Model, ports::{EventQueue, Output, Requestor}};
 use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 use std::{default, fmt::Debug, time::Duration};
@@ -196,9 +196,9 @@ impl<T: VectorArithmetic + Clone + Debug + Send> VectorStock<T> where Self: Mode
 
 impl<T: Debug + Clone + Send + VectorArithmetic> Model for VectorStock<T> {}
 
-pub struct VectorStockLogger<T> {
+pub struct VectorStockLogger<T> where T: Send {
     pub name: String,
-    pub buffer: EventBuffer<VectorStockLog<T>>,
+    pub buffer: EventQueue<VectorStockLog<T>>,
 }
 
 #[derive(Debug, Clone)]
@@ -253,13 +253,13 @@ impl Logger for VectorStockLogger<f64> {
     fn get_name(&self) -> &String {
         &self.name
     }
-    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String, buffer_size: usize) -> Self {
+    fn new(name: String) -> Self {
         VectorStockLogger {
             name,
-            buffer: EventBuffer::with_capacity(buffer_size),
+            buffer: EventQueue::new(),
         }
     }
 }
@@ -269,13 +269,13 @@ impl Logger for VectorStockLogger<Vector3> {
     fn get_name(&self) -> &String {
         &self.name
     }
-    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String, capacity: usize) -> Self {
+    fn new(name: String) -> Self {
         VectorStockLogger {
             name,
-            buffer: EventBuffer::with_capacity(capacity),
+            buffer: EventQueue::new(),
         }
     }
 }
@@ -454,23 +454,23 @@ impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic + Clon
     }
 }
 
-pub struct VectorProcessLogger<T> {
+pub struct VectorProcessLogger<T> where T: Send {
     pub name: String,
-    pub buffer: EventBuffer<VectorProcessLog<T>>,
+    pub buffer: EventQueue<VectorProcessLog<T>>,
 }
 
-impl<T> Logger for VectorProcessLogger<T> where VectorProcessLog<T>: Serialize {
+impl<T> Logger for VectorProcessLogger<T> where VectorProcessLog<T>: Serialize, T: Send + 'static {
     type RecordType = VectorProcessLog<T>;
     fn get_name(&self) -> &String {
         &self.name
     }
-    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String, buffer_size: usize) -> Self {
+    fn new(name: String) -> Self {
         VectorProcessLogger {
             name,
-            buffer: EventBuffer::with_capacity(buffer_size),
+            buffer: EventQueue::new(),
         }
     }
 }
@@ -480,13 +480,13 @@ impl<T> Logger for VectorProcessLogger<T> where VectorProcessLog<T>: Serialize {
 //     fn get_name(&self) -> &String {
 //         &self.name
 //     }
-//     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+//     fn get_buffer(self) -> EventQueue<Self::RecordType> {
 //         self.buffer
 //     }
 //     fn new(name: String, capacity: usize) -> Self {
 //         VectorProcessLogger {
 //             name,
-//             buffer: EventBuffer::with_capacity(capacity),
+//             buffer: EventQueue::with_capacity(capacity),
 //         }
 //     }
 // }
@@ -496,13 +496,13 @@ impl<T> Logger for VectorProcessLogger<T> where VectorProcessLog<T>: Serialize {
 //     fn get_name(&self) -> &String {
 //         &self.name
 //     }
-//     fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+//     fn get_buffer(self) -> EventQueue<Self::RecordType> {
 //         self.buffer
 //     }
 //     fn new(name: String, capacity: usize) -> Self {
 //         VectorProcessLogger {
 //             name,
-//             buffer: EventBuffer::with_capacity(capacity),
+//             buffer: EventQueue::with_capacity(capacity),
 //         }
 //     }
 // }

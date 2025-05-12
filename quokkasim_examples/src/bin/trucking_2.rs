@@ -135,7 +135,7 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
 
 struct IronOreProcessLogger {
     name: String,
-    buffer: EventBuffer<IronOreProcessLog>
+    buffer: EventQueue<IronOreProcessLog>
 }
 
 impl Logger for IronOreProcessLogger {
@@ -143,13 +143,13 @@ impl Logger for IronOreProcessLogger {
     fn get_name(&self) -> &String {
         &self.name
     }
-    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String, buffer_size: usize) -> Self {
+    fn new(name: String) -> Self {
         IronOreProcessLogger {
             name,
-            buffer: EventBuffer::with_capacity(buffer_size),
+            buffer: EventQueue::new(),
         }
     }
 }
@@ -202,20 +202,20 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
 
 struct IronOreStockLogger {
     name: String,
-    buffer: EventBuffer<IronOreStockLog>
+    buffer: EventQueue<IronOreStockLog>
 }
 impl Logger for IronOreStockLogger {
     type RecordType = IronOreStockLog;
     fn get_name(&self) -> &String {
         &self.name
     }
-    fn get_buffer(self) -> EventBuffer<Self::RecordType> {
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String, buffer_size: usize) -> Self {
+    fn new(name: String) -> Self {
         IronOreStockLogger {
             name,
-            buffer: EventBuffer::with_capacity(buffer_size),
+            buffer: EventQueue::new(),
         }
     }
 }
@@ -299,8 +299,8 @@ fn main() {
         ComponentModel::IronOreStock(&mut stock2, &mut stock2_addr),
     ).unwrap();
 
-    let mut process_logger = IronOreProcessLogger::new("IronOreProcessLogger".into(), 100_000);
-    let mut stock_logger = IronOreStockLogger::new("IronOreStockLogger".into(), 100_000);
+    let mut process_logger = IronOreProcessLogger::new("IronOreProcessLogger".into());
+    let mut stock_logger = IronOreStockLogger::new("IronOreStockLogger".into());
 
     ComponentLogger::connect_logger(
         ComponentLogger::IronOreProcessLogger(&mut process_logger),
