@@ -284,6 +284,8 @@ impl Logger for VectorStockLogger<Vector3> {
  * Process
  */
 
+
+
  /**
   * T: Resource type of upstream stock
   * U: Message type for pushing to downstream stock
@@ -296,9 +298,10 @@ pub struct VectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static, U
     pub req_downstream: Requestor<(), VectorStockState>,
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
+    pub process_state: Option<(Duration, T)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub time_to_next_event_counter: Option<Duration>,
+    pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub log_emitter: Output<VectorProcessLog<T>>,
     pub previous_check_time: MonotonicTime,
@@ -308,15 +311,18 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send, U: Clone + Send, V: C
         VectorProcess {
             element_name: String::new(),
             element_type: String::new(),
+            process_quantity_distr: Distribution::default(),
+            process_time_distr: Distribution::default(),
+
             req_upstream: Requestor::default(),
             req_downstream: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             push_downstream: Output::default(),
-            process_quantity_distr: Distribution::default(),
-            process_time_distr: Distribution::default(),
-            time_to_next_event_counter: None,
-            next_event_id: 0,
             log_emitter: Output::default(),
+            
+            process_state: None,
+            time_to_next_event: None,
+            next_event_id: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -329,10 +335,10 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for Vector
     type LogDetailsType = VectorProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event_counter
+        &self.time_to_next_event
     }
     fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event_counter = time;
+        self.time_to_next_event = time;
     }
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
@@ -340,46 +346,65 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for Vector
     fn update_state_impl<'a> (&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {
             let time = cx.time();
-            println!("Update state: {:?}", time);
-            let us_state = self.req_upstream.send(()).await.next();
-            let ds_state = self.req_downstream.send(()).await.next();
-            match (&us_state, &ds_state) {
-                (
-                    Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
-                    Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
-                ) => {
-                    let process_quantity = self.process_quantity_distr.sample();
-                    let moved = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
-                        time,
-                        element_from: self.element_name.clone(),
-                        message: format!("Withdrawing quantity {:?}", process_quantity),
-                    })).await.next().unwrap();
 
-                    self.push_downstream.send((moved.clone(), NotificationMetadata {
-                        time,
-                        element_from: self.element_name.clone(),
-                        message: format!("Depositing quantity {:?} ({:?})", process_quantity, moved),
-                    })).await;
-
-                    self.log(time, VectorProcessLogType::ProcessSuccess { quantity: process_quantity, vector: moved }).await;
-                    self.time_to_next_event_counter = Some(Duration::from_secs_f64(self.process_time_distr.sample()));
+            match self.process_state.take() {
+                Some((mut process_time_left, resource)) => {
+                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                    if process_time_left.is_zero() {
+                        self.log(time, VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                        self.push_downstream.send((resource.clone(), NotificationMetadata {
+                            time,
+                            element_from: self.element_name.clone(),
+                            message: format!("Pushing quantity {:?}", resource),
+                        })).await;
+                    } else {
+                        self.process_state = Some((process_time_left, resource));
+                    }
                 },
-                (Some(VectorStockState::Empty {..} ), _) => {
-                    self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
-                    self.time_to_next_event_counter = None;
+                None => {}
+            }
+            match self.process_state {
+                None => {
+                    let us_state = self.req_upstream.send(()).await.next();
+                    let ds_state = self.req_downstream.send(()).await.next();
+                    match (&us_state, &ds_state) {
+                        (
+                            Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
+                            Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
+                        ) => {
+                            let process_quantity = self.process_quantity_distr.sample();
+                            let moved = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
+                                time,
+                                element_from: self.element_name.clone(),
+                                message: format!("Withdrawing quantity {:?}", process_quantity),
+                            })).await.next().unwrap();
+                            let process_duration_secs = self.process_time_distr.sample();
+                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
+                            self.log(time, VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
+                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                        },
+                        (Some(VectorStockState::Empty {..} ), _) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        (None, _) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        (_, None) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        (_, Some(VectorStockState::Full {..} )) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            self.time_to_next_event = None;
+                        },
+                    }
                 },
-                (None, _) => {
-                    self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-                    self.time_to_next_event_counter = None;
-                },
-                (_, None) => {
-                    self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
-                    self.time_to_next_event_counter = None;
-                },
-                (_, Some(VectorStockState::Full {..} )) => {
-                    self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
-                    self.time_to_next_event_counter = None;
-                },
+                Some((time, _)) => {
+                    self.time_to_next_event = Some(time);
+                }
             }
         }
     }
@@ -391,7 +416,7 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for Vector
         // }
         async move {
             self.set_previous_check_time(cx.time());
-            match self.time_to_next_event_counter {
+            match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
