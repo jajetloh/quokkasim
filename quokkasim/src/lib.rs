@@ -2,6 +2,8 @@ pub mod prelude;
 pub mod common;
 pub mod core;
 pub mod components;
+pub use strum;
+pub use strum_macros;
 pub mod nexosim {
     extern crate nexosim;
     pub use nexosim::model::*;
