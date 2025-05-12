@@ -38,7 +38,7 @@ impl StateEq for SequenceStockState {
     }
 }
 
-pub struct SequenceStock<T> {
+pub struct SequenceStock<T> where T: Clone + Default + Send + 'static {
     pub element_name: String,
     pub element_type: String,
     pub sequence: SeqDeque<T>,
@@ -49,7 +49,7 @@ pub struct SequenceStock<T> {
     pub prev_state: Option<SequenceStockState>,
     next_event_id: u64,
 }
-impl<T: Clone + Default + Send> Default for SequenceStock<T> {
+impl<T: Clone + Default + Send + 'static> Default for SequenceStock<T> {
     fn default() -> Self {
         SequenceStock {
             element_name: "SequenceStock".to_string(),
@@ -66,8 +66,8 @@ impl<T: Clone + Default + Send> Default for SequenceStock<T> {
 }
 
 #[derive(Debug, Clone)]
-struct SeqDeque<T> {
-    deque: VecDeque<T>,
+pub struct SeqDeque<T> {
+    pub deque: VecDeque<T>,
 }
 
 impl<T> VectorArithmetic for SeqDeque<T> {
@@ -90,7 +90,7 @@ impl<T: Default> Default for SeqDeque<T> {
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, ()> for SequenceStock<T> where Self: Model {
+impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option<T>> for SequenceStock<T> where Self: Model {
     type StockState = SequenceStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.sequence.total() as u32;
@@ -112,24 +112,50 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, ()> for SequenceSt
     fn get_resource(&self) -> &SeqDeque<T> {
         &self.sequence
     }
-    fn add_impl<'a>(&'a mut self, payload: &'a (T, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn add_impl<'a>(&'a mut self, payload: &'a (Option<T>, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.prev_state = Some(self.get_state());
-            self.sequence.deque.push_back(payload.0.clone());
-        }
-    }
-    fn remove_impl<'a>(&'a mut self, payload: &'a ((), NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = SeqDeque<T>> + 'a {
-        async move {
-            self.prev_state = Some(self.get_state());
-            let mut deque = VecDeque::<T>::new();
-            deque.push_front(self.sequence.deque.pop_front());
-            SeqDeque {
-                deque: VecDeque::<T>::from(&[self.sequence.deque.pop_front()])
+            match payload.0 {
+                Some(ref item) => {
+                    self.sequence.deque.push_back(item.clone());
+                }
+                None => {}
             }
         }
     }
+    fn remove_impl<'a>(&'a mut self, payload: &'a ((), NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = Option<T>> + 'a {
+        async move {
+            self.prev_state = Some(self.get_state());
+            self.sequence.deque.pop_front()
+        }
+    }
 
+    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
+        async move {
+            let log = SequenceStockLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                event_id: self.next_event_id,
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                log_type,
+                state: self.get_state(),
+                sequence: self.sequence.clone(),
+            };
+            self.log_emitter.send(log).await;
+            self.next_event_id += 1;
+        }
+    }
+}
 
+#[derive(Debug, Clone)]
+pub struct SequenceStockLog<T> {
+    pub time: String,
+    pub event_id: u64,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub state: SequenceStockState,
+    pub sequence: SeqDeque<T>,
 }
 
 impl<'a> CustomComponentConnection for ComponentModel<'a> {

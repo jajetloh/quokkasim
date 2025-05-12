@@ -88,10 +88,12 @@ pub trait StateEq {
 }
 
 /**
- * U: Parameter type when calling add (i.e. passed from Process when withdrawing)
- * V: Parameter type when calling remove (i.e. passed from Process when pushing)
+ * T: Resource type
+ * U: Received type from process when adding stock
+ * V: Received type from process when removing stock
+ * W: Returned type to process when removing stock
  */
-pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send> where Self: Model {
+pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send, W: Clone + Send> where Self: Model {
 
     type StockState: StateEq + Clone;
     // type LogDetailsType;
@@ -134,7 +136,7 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
     // TODO: Should be async. Haven't figured out a way to do this yet as it seemingly requires use
     // of Self::emit_change in Self::post_add, but such a call in Self::post_add requires it being a
     // concrete implementation instead of this... And trying to avoid that runs into lifetime issues.
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>);
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) {}
 
     fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where U: 'static {
         async move {
@@ -150,7 +152,7 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a;
+    fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = W> + 'a;
 
     fn post_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
@@ -179,7 +181,7 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
         }
     }
 
-    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = T> + 'a where V: 'static {
+    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = W> + 'a where V: 'static {
         async move {
             self.pre_remove(&payload, cx).await;
             let  result = self.remove_impl(&payload, cx).await;

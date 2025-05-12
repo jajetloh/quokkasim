@@ -67,7 +67,7 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for VectorSto
     }
 }
 
-impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64> for VectorStock<T> where Self: Model {
+impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64, T> for VectorStock<T> where Self: Model {
 
     type StockState = VectorStockState;
 
