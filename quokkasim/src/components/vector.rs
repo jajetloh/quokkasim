@@ -1,7 +1,8 @@
+use futures::lock;
 use nexosim::{model::Model, ports::{EventBuffer, Output, Requestor}};
 use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
-use std::{fmt::Debug, time::Duration};
+use std::{default, fmt::Debug, time::Duration};
 
 use crate::{core::{StateEq, Process, Stock}, prelude::{SubtractParts, Vector3, VectorArithmetic}};
 use crate::core::Logger;
@@ -163,6 +164,31 @@ impl<T: VectorArithmetic + Clone + Debug + Send> VectorStock<T> where Self: Mode
     pub fn with_type(self, element_type: String) -> Self {
         VectorStock {
             element_type,
+            ..self
+        }
+    }
+
+    pub fn new() -> Self where T: Default {
+        Self::default()
+    }
+
+    pub fn with_low_capacity(self, low_capacity: f64) -> Self {
+        VectorStock {
+            low_capacity,
+            ..self
+        }
+    }
+
+    pub fn with_max_capacity(self, max_capacity: f64) -> Self {
+        VectorStock {
+            max_capacity,
+            ..self
+        }
+    }
+
+    pub fn with_initial_vector(self, vector: T) -> Self {
+        VectorStock {
+            vector,
             ..self
         }
     }
@@ -405,6 +431,24 @@ impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic + Clon
     pub fn with_type(self, element_type: String) -> Self {
         VectorProcess {
             element_type,
+            ..self
+        }
+    }
+
+    pub fn new() -> Self where T: Default {
+        Self::default()
+    }
+
+    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
+        VectorProcess {
+            process_quantity_distr,
+            ..self
+        }
+    }
+
+    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
+        VectorProcess {
+            process_time_distr,
             ..self
         }
     }

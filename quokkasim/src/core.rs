@@ -4,8 +4,6 @@ use csv::WriterBuilder;
 use nexosim::{model::{Context, Model}, ports::EventBuffer};
 use serde::Serialize;
 use tai_time::MonotonicTime;
-use futures::future::BoxFuture;
-use futures::FutureExt;
 
 pub struct SubtractParts<T> {
     pub remaining: T,
@@ -330,11 +328,12 @@ macro_rules! define_model_enums {
     ) => {
 
         $(#[$components_enum_meta])*
+        #[derive(::strum_macros::Display)]
         pub enum $ComponentsName<'a> {
-            VectorStockF64(&'a mut $crate::components::vector::VectorStock<f64>, &'a mut ::nexosim::simulation::Address<$crate::components::vector::VectorStock<f64>>),
-            VectorProcessF64(&'a mut $crate::components::vector::VectorProcess<f64, f64, f64>, &'a mut ::nexosim::simulation::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
-            VectorStockVector3(&'a mut $crate::components::vector::VectorStock<Vector3>, &'a mut ::nexosim::simulation::Address<$crate::components::vector::VectorStock<Vector3>>),
-            VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut ::nexosim::simulation::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
+            VectorStockF64(&'a mut $crate::components::vector::VectorStock<f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
+            VectorProcessF64(&'a mut $crate::components::vector::VectorProcess<f64, f64, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
+            VectorStockVector3(&'a mut $crate::components::vector::VectorStock<Vector3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
+            VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
@@ -380,6 +379,7 @@ macro_rules! define_model_enums {
         }
 
         $(#[$logger_enum_meta])*
+        #[derive(::strum_macros::Display)]
         pub enum $LoggersName<'a> {
             VectorStockLoggerF64(&'a mut $crate::components::vector::VectorStockLogger<f64>),
             VectorStockLoggerVector3(&'a mut $crate::components::vector::VectorStockLogger<Vector3>),
