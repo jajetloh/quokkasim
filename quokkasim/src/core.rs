@@ -5,9 +5,9 @@ use nexosim::{model::{Context, Model}, ports::EventQueue};
 use serde::Serialize;
 use tai_time::MonotonicTime;
 
-pub struct SubtractParts<T> {
+pub struct SubtractParts<T, U> {
     pub remaining: T,
-    pub subtracted: T,
+    pub subtracted: U,
 }
 
 impl VectorArithmetic<f64, f64, f64> for f64 {
@@ -19,7 +19,7 @@ impl VectorArithmetic<f64, f64, f64> for f64 {
     //     self - other
     // }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self> {
+    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, f64> {
         SubtractParts { remaining: self - quantity, subtracted: quantity }
     }
 
@@ -48,7 +48,7 @@ impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
         self.values[2] += other.values[2];
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self> {
+    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, Vector3> {
         let proportion_subtracted = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_subtracted;
         let remaining = Vector3 {
@@ -80,7 +80,7 @@ impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
  */
 pub trait VectorArithmetic<A, B, C> where Self: Sized {
     fn add(&mut self, other: A);
-    fn subtract_parts(&self, quantity: B) -> SubtractParts<Self>;
+    fn subtract_parts(&self, quantity: B) -> SubtractParts<Self, A>;
     fn total(&self) -> C;
 }
 
@@ -346,6 +346,8 @@ macro_rules! define_model_enums {
             VectorProcessF64(&'a mut $crate::components::vector::VectorProcess<f64, f64, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorStockVector3(&'a mut $crate::components::vector::VectorStock<Vector3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
             VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
+            SequenceStockString(&'a mut $crate::components::sequence::SequenceStock<String>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
+            SequenceProcessString(&'a mut $crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
@@ -381,6 +383,18 @@ macro_rules! define_model_enums {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
+                        Ok(())
+                    },
+                    ($ComponentsName::SequenceStockString(mut a, ad), $ComponentsName::SequenceProcessString(mut b, bd)) => {
+                        // a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.clone());
+                        b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.clone());
+                        b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.clone());
+                        Ok(())
+                    },
+                    ($ComponentsName::SequenceProcessString(mut a, ad), $ComponentsName::SequenceStockString(mut b, bd)) => {
+                        // b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.clone());
+                        a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.clone());
+                        a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.clone());
                         Ok(())
                     },
                     (a,b) => {

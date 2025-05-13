@@ -72,7 +72,7 @@ impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
             _ => {}
         };
     }
-    fn subtract_parts(&self, _: ()) -> SubtractParts<Self> {
+    fn subtract_parts(&self, _: ()) -> SubtractParts<Self, Option<TT>> {
         todo!()
     }
     fn total(&self) -> u32 {
@@ -244,7 +244,7 @@ impl<T: VectorArithmetic<U, (), u32> + Clone + Debug + Send + 'static, U: Clone 
         self.previous_check_time = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {
             let time = cx.time();
 
