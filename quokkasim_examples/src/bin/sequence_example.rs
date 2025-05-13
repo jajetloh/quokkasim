@@ -166,6 +166,11 @@ impl<T: Clone + Default + Debug + Send> SequenceStock<T> {
         self.element_type = type_;
         self
     }
+
+    pub fn with_initial_contents(mut self, contents: Vec<T>) -> Self {
+        self.sequence.deque = contents.into_iter().collect();
+        self
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -213,6 +218,21 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
         }
     }
 }
+
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> SequenceProcess<U, V, W> {
+    pub fn new() -> Self {
+        SequenceProcess::default()
+    }
+    pub fn with_name(mut self, name: String) -> Self {
+        self.element_name = name;
+        self
+    }
+    pub fn with_type(mut self, type_: String) -> Self {
+        self.element_type = type_;
+        self
+    }
+}
+
 
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for SequenceProcess<U, V, W> {}
 
@@ -362,14 +382,22 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
 }
 
 fn main() {
-    let mut stock1: SequenceStock<u32> = SequenceStock::<u32>::new().with_name("Stock1".into()).with_type("SequenceStockU32".into());
-    stock1.sequence = SeqDeque::default();
-    for i in 0..10 {
-        stock1.sequence.deque.push_back(i);
-    }
+    let mut stock1: SequenceStock<u32> = SequenceStock::<u32>::new()
+        .with_name("Stock1".into())
+        .with_type("SequenceStockU32".into())
+        .with_initial_contents((0..10).collect());
     let stock1_mbox: Mailbox<SequenceStock<u32>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
 
-    // let mut process1 = SequenceProcess;
+    let mut process1: SequenceProcess<Option<u32>, (), Option<u32>> = SequenceProcess::new()
+        .with_name("Process1".into())
+        .with_type("SequenceProcess".into());
+    let process1_mbox: Mailbox<SequenceProcess<Option<u32>, (), Option<u32>>> = Mailbox::new();
+    let mut process1_addr = process1_mbox.address();
 
+    let mut stock2: SequenceStock<u32> = SequenceStock::<u32>::new()
+        .with_name("Stock2".into())
+        .with_type("SequenceStockU32".into());
+    let stock2_mbox: Mailbox<SequenceStock<u32>> = Mailbox::new();
+    let mut stock2_addr = stock2_mbox.address();
 }
