@@ -10,8 +10,8 @@ pub struct SubtractParts<T> {
     pub subtracted: T,
 }
 
-impl VectorArithmetic for f64 {
-    fn add(&self, other: &Self) -> Self {
+impl VectorArithmetic<f64, f64, f64> for f64 {
+    fn add(&self, other: Self) -> Self {
         self + other
     }
 
@@ -41,8 +41,8 @@ pub struct Vector3 {
     pub values: [f64; 3],
 }
 
-impl VectorArithmetic for Vector3 {
-    fn add(&self, other: &Self) -> Self {
+impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
+    fn add(&self, other: Vector3) -> Self {
         Vector3 {
             values: [
                 self.values[0] + other.values[0],
@@ -77,10 +77,15 @@ impl VectorArithmetic for Vector3 {
     }
 }
 
-pub trait VectorArithmetic where Self: Sized {
-    fn add(&self, other: &Self) -> Self;
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self>;
-    fn total(&self) -> f64;
+/**
+ * A: Added/removed parameter type
+ * B: Subtract parameter type
+ * C: Metric type for total
+ */
+pub trait VectorArithmetic<A, B, C> where Self: Sized {
+    fn add(&mut self, other: A);
+    fn subtract_parts(&self, quantity: B) -> SubtractParts<Self>;
+    fn total(&self) -> C;
 }
 
 pub trait StateEq {
@@ -92,8 +97,9 @@ pub trait StateEq {
  * U: Received type from process when adding stock
  * V: Received type from process when removing stock
  * W: Returned type to process when removing stock
+ * C: Metric type for resource total
  */
-pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone + Send, W: Clone + Send> where Self: Model {
+pub trait Stock<T: VectorArithmetic<U, V, C> + Clone + Debug, U: Clone + Send, V: Clone + Send, W: Clone + Send, C> where Self: Model {
 
     type StockState: StateEq + Clone;
     // type LogDetailsType;
@@ -202,7 +208,13 @@ pub trait Stock<T: VectorArithmetic + Clone + Debug, U: Clone + Send, V: Clone +
     fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send;
 }
 
-pub trait Process<T: VectorArithmetic + Clone + Debug> {
+/**
+ * T: Resource type
+ * U: Added/removed parameter type
+ * V: Parameter type to subtract
+ * C: Metric type for resource total
+ */
+pub trait Process<T: VectorArithmetic<U, V, C> + Clone + Debug, U, V, C> {
 
     type LogDetailsType;
 

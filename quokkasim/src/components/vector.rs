@@ -40,7 +40,7 @@ impl StateEq for VectorStockState {
     }
 }
 
-pub struct VectorStock<T: VectorArithmetic + Clone + Debug + Send + 'static> {
+pub struct VectorStock<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
     pub vector: T,
@@ -51,7 +51,7 @@ pub struct VectorStock<T: VectorArithmetic + Clone + Debug + Send + 'static> {
     pub prev_state: Option<VectorStockState>,
     next_event_id: u64,
 }
-impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for VectorStock<T> {
+impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
             element_name: String::new(),
@@ -67,7 +67,7 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send> Default for VectorSto
     }
 }
 
-impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64, T> for VectorStock<T> where Self: Model {
+impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> Stock<T, T, f64, T, f64> for VectorStock<T> where Self: Model {
 
     type StockState = VectorStockState;
 
@@ -100,8 +100,7 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64, T> for VectorS
     ) -> impl Future<Output=()> + 'a {
         async move {
             self.prev_state = Some(self.get_state().clone());
-            let added = self.vector.add(&payload.0);
-            self.vector = added.clone();
+            self.vector.add(payload.0.clone());
         }
     }
 
@@ -141,7 +140,7 @@ impl<T: VectorArithmetic + Clone + Debug + Send> Stock<T, T, f64, T> for VectorS
     }
 }
 
-impl<T: VectorArithmetic + Clone + Debug + Send> VectorStock<T> where Self: Model {
+impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> VectorStock<T> where Self: Model {
     pub fn get_state(&mut self) -> VectorStockState {
         let occupied = self.vector.total();
         let empty = self.max_capacity - occupied;
@@ -194,7 +193,7 @@ impl<T: VectorArithmetic + Clone + Debug + Send> VectorStock<T> where Self: Mode
     }
 }
 
-impl<T: Debug + Clone + Send + VectorArithmetic> Model for VectorStock<T> {}
+impl<T: Debug + Clone + Send + VectorArithmetic<T, f64, f64>> Model for VectorStock<T> {}
 
 pub struct VectorStockLogger<T> where T: Send {
     pub name: String,
@@ -290,8 +289,9 @@ impl Logger for VectorStockLogger<Vector3> {
   * T: Resource type of upstream stock
   * U: Message type for pushing to downstream stock
   * V: Message type for withdrawing from upstream stock
+  * W: Message type returned from upstream stock
   */
-pub struct VectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static, U: Clone + Send + 'static, V: Clone + Send + 'static> {
+pub struct VectorProcess<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static, U: Clone + Send + 'static, V: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
@@ -306,7 +306,7 @@ pub struct VectorProcess<T: VectorArithmetic + Clone + Debug + Send + 'static, U
     pub log_emitter: Output<VectorProcessLog<T>>,
     pub previous_check_time: MonotonicTime,
 }
-impl<T: VectorArithmetic + Clone + Debug + Default + Send, U: Clone + Send, V: Clone + Send> Default for VectorProcess<T, U, V> {
+impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Default + Send, U: Clone + Send, V: Clone + Send> Default for VectorProcess<T, U, V> {
     fn default() -> Self {
         VectorProcess {
             element_name: String::new(),
@@ -328,9 +328,9 @@ impl<T: VectorArithmetic + Clone + Debug + Default + Send, U: Clone + Send, V: C
     }
 }
 
-impl<T: VectorArithmetic + Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send> Model for VectorProcess<T, U, V> {}
+impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send> Model for VectorProcess<T, U, V> {}
 
-impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for VectorProcess<T, T, f64> where Self: Model {
+impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<T, T, f64, f64> for VectorProcess<T, T, f64> where Self: Model {
 
     type LogDetailsType = VectorProcessLogType<T>;
 
@@ -423,7 +423,7 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for Vector
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<T>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -445,7 +445,7 @@ impl<T: VectorArithmetic + Send + 'static + Clone + Debug> Process<T> for Vector
     }
 }
 
-impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic + Clone + Debug + Send + 'static, Self: Model {
+impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static, Self: Model {
     pub fn with_name(self, name: String) -> Self {
         VectorProcess {
             element_name: name,
