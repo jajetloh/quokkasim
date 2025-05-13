@@ -287,24 +287,24 @@ impl<T: VectorArithmetic<U, (), u32> + Clone + Debug + Send + 'static, U: Clone 
                                 message: "Withdraw request".into(),
                             })).await.next().unwrap();
                             let process_duration_secs = self.process_time_distr.as_mut().unwrap().sample();
-                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved));
-                            // self.log(time, SequenceProcessLogType::ProcessStart { resource: moved.clone() }).await;
+                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
+                            <Self as Process<T, U, (), u32>>::log(self, time, SequenceProcessLogType::ProcessStart { resource: moved }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(SequenceStockState::Empty { .. }), _ ) => {
-                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            <Self as Process<T, U, (), u32>>::log(self, time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            <Self as Process<T, U, (), u32>>::log(self, time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, Some(SequenceStockState::Full { .. })) => {
-                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            <Self as Process<T, U, (), u32>>::log(self, time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            <Self as Process<T, U, (), u32>>::log(self, time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         }
                     }
