@@ -1,6 +1,7 @@
 pub use crate::nexosim::*;
 pub use crate::components::{
     vector::*,
+    sequence::*,
     // queue::{MyQueueStock, QueueProcessLog, QueueState, QueueStockLog},
 };
 // pub use crate::core::{
