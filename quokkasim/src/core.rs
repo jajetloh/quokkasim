@@ -386,13 +386,13 @@ macro_rules! define_model_enums {
                         Ok(())
                     },
                     ($ComponentsName::SequenceStockString(mut a, ad), $ComponentsName::SequenceProcessString(mut b, bd)) => {
-                        // a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.clone());
+                        a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.clone());
                         b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.clone());
                         b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.clone());
                         Ok(())
                     },
                     ($ComponentsName::SequenceProcessString(mut a, ad), $ComponentsName::SequenceStockString(mut b, bd)) => {
-                        // b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.clone());
+                        b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.clone());
                         Ok(())

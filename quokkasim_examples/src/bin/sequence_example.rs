@@ -41,5 +41,9 @@ fn main() {
     let stock2_mbox: Mailbox<SequenceStock<String>> = Mailbox::new();
     let mut stock2_addr = stock2_mbox.address();
 
-    stock1.state_emitter.connect(<SeqDeque<String> as  Process<SeqDeque<String>, Option<String>, (), u32>>::update_state, &process1_addr);
+    stock1.state_emitter.connect(
+        <
+            SequenceProcess< Option<String>, (), Option<String> >
+            as Process< SeqDeque<String>, Option<String>, (), u32 >
+        >::update_state, &process1_addr);
 }
