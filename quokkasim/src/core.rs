@@ -11,8 +11,8 @@ pub struct SubtractParts<T> {
 }
 
 impl VectorArithmetic<f64, f64, f64> for f64 {
-    fn add(&self, other: Self) -> Self {
-        self + other
+    fn add(&mut self, other: Self) {
+        *self += other;
     }
 
     // fn subtract(&self, other: &Self) -> Self {
@@ -42,14 +42,10 @@ pub struct Vector3 {
 }
 
 impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
-    fn add(&self, other: Vector3) -> Self {
-        Vector3 {
-            values: [
-                self.values[0] + other.values[0],
-                self.values[1] + other.values[1],
-                self.values[2] + other.values[2],
-            ],
-        }
+    fn add(&mut self, other: Vector3) {
+        self.values[0] += other.values[0];
+        self.values[1] += other.values[1];
+        self.values[2] += other.values[2];
     }
 
     fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self> {

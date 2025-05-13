@@ -57,8 +57,8 @@ impl<T: Clone + Default + Send + 'static> Default for SequenceStock<T> {
             sequence: SeqDeque::default(),
             log_emitter: Output::new(),
             state_emitter: Output::new(),
-            low_capacity: 0.0,
-            max_capacity: 100.0,
+            low_capacity: 0,
+            max_capacity: 1,
             prev_state: None,
             next_event_id: 0,
         }
@@ -98,9 +98,9 @@ impl<TT: Default> Default for SeqDeque<TT> {
 impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option<T>, u32> for SequenceStock<T> where Self: Model {
     type StockState = SequenceStockState;
     fn get_state(&mut self) -> Self::StockState {
-        let occupied = self.sequence.total() as u32;
-        let empty = self.max_capacity as u32;
-        if self.sequence.total() == 0.0 { // TODO: fix
+        let occupied = self.sequence.total();
+        let empty = self.max_capacity.saturating_sub(occupied); // If occupied beyond capacity, just say no empty space
+        if self.sequence.total() <= self.low_capacity {
             SequenceStockState::Empty { occupied, empty }
         } else if self.sequence.total() >= self.max_capacity {
             SequenceStockState::Full { occupied, empty }
@@ -174,7 +174,11 @@ pub enum SequenceProcessLogType<T> {
     ProcessSuccess { resource: T },
     ProcessFailure { reason: &'static str },
 }
-
+/**
+ * U: Parameter type pushed to downstream stock
+ * V: Parameter type requested from upstream stock
+ * W: Parameter type received from upstream stock
+ */
 pub struct SequenceProcess<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
@@ -212,8 +216,8 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for SequenceProcess<U, V, W> {}
 
-impl<T: VectorArithmetic<Option<A>, (), u32> + Clone + Debug + Send, U: Clone + Debug + Send + 'static, A> Process<T, Option<A>, (), u32> for SequenceProcess<U, (), U> where Self: Model {
-    type LogDetailsType = SequenceProcessLogType<U>;
+impl<T: VectorArithmetic<U, (), u32> + Clone + Debug + Send + 'static, U: Clone + Debug + Send + 'static> Process<T, U, (), u32> for SequenceProcess<Option<U>, (), Option<U>> where Self: Model {
+    type LogDetailsType = SequenceProcessLogType<Option<U>>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event
@@ -236,7 +240,7 @@ impl<T: VectorArithmetic<Option<A>, (), u32> + Clone + Debug + Send, U: Clone + 
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, SequenceProcessLogType::ProcessStart { resource: resource.clone() }).await;
+                        <Self as Process<T, U, (), u32>>::log(self, time, SequenceProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
                         self.push_downstream.send((resource.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
@@ -262,25 +266,25 @@ impl<T: VectorArithmetic<Option<A>, (), u32> + Clone + Debug + Send, U: Clone + 
                                 element_from: self.element_name.clone(),
                                 message: "Withdraw request".into(),
                             })).await.next().unwrap();
-                            let process_duration_secs = self.process_time_distr.unwrap().sample();
+                            let process_duration_secs = self.process_time_distr.as_mut().unwrap().sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved));
-                            self.log(time, SequenceProcessLogType::ProcessStart { resource: moved.clone() }).await;
+                            // self.log(time, SequenceProcessLogType::ProcessStart { resource: moved.clone() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(SequenceStockState::Empty { .. }), _ ) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, Some(SequenceStockState::Full { .. })) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            // self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         }
                     }
@@ -294,7 +298,7 @@ impl<T: VectorArithmetic<Option<A>, (), u32> + Clone + Debug + Send, U: Clone + 
 
     fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
         async move {
-            self.set_previous_check_time(cx.time());
+            <Self as Process<T, U, (), u32>>::set_previous_check_time(self, cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -302,14 +306,14 @@ impl<T: VectorArithmetic<Option<A>, (), u32> + Clone + Debug + Send, U: Clone + 
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<T, Option<TT>, (), u32>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process<T, U, (), u32>>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: SequenceProcessLogType<U>) -> impl Future<Output = ()> + Send {
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: SequenceProcessLogType<Option<U>>) -> impl Future<Output = ()> + Send {
         async move {
             let log = SequenceProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -366,6 +370,6 @@ fn main() {
     let stock1_mbox: Mailbox<SequenceStock<u32>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
 
-    let mut process1 = SequenceProcess;
+    // let mut process1 = SequenceProcess;
 
 }
