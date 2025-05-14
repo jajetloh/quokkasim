@@ -553,7 +553,7 @@ impl Serialize for VectorProcessLog<f64> {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("VectorProcessLog", 6)?;
+        let mut state = serializer.serialize_struct("VectorProcessLog", 7)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;

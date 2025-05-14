@@ -35,18 +35,16 @@ impl Default for IronOre {
     }
 }
 
-impl VectorArithmetic for IronOre {
-    fn add(&self, other: &Self) -> Self {
-        IronOre {
-            fe: self.fe + other.fe,
-            other_elements: self.other_elements + other.other_elements,
-            magnetite: self.magnetite + other.magnetite,
-            hematite: self.hematite + other.hematite,
-            limonite: self.limonite + other.limonite,
-        }
+impl VectorArithmetic<IronOre, f64, f64> for IronOre {
+    fn add(&mut self, other: Self) {
+        self.fe += other.fe;
+        self.other_elements += other.other_elements;
+        self.magnetite += other.magnetite;
+        self.hematite += other.hematite;
+        self.limonite += other.limonite;
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<IronOre> {
+    fn subtract_parts(&self, quantity: f64) -> SubtractParts<IronOre, IronOre> {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
         SubtractParts {
@@ -324,7 +322,7 @@ fn main() {
         VectorProcess::<IronOre, IronOre, f64>::update_state,
         NotificationMetadata {
             time: MonotonicTime::EPOCH,
-            element_from: "Process1".into(),
+            element_from: "Init".into(),
             message: "Start".into(),
         }, &process1_addr
     ).unwrap();

@@ -411,6 +411,8 @@ macro_rules! define_model_enums {
             VectorStockLoggerVector3(&'a mut $crate::components::vector::VectorStockLogger<Vector3>),
             VectorProcessLoggerF64(&'a mut $crate::components::vector::VectorProcessLogger<f64>),
             VectorProcessLoggerVector3(&'a mut $crate::components::vector::VectorProcessLogger<Vector3>),
+            SequenceStockLoggerString(&'a mut $crate::components::sequence::SequenceStockLogger<String>),
+            SequenceProcessLoggerString(&'a mut $crate::components::sequence::SequenceProcessLogger<Option<String>>),
             $(
                 $(#[$logger_var_meta])*
                 $U $( ( $UT ) )?
@@ -434,6 +436,14 @@ macro_rules! define_model_enums {
                         Ok(())
                     },
                     ($LoggersName::VectorProcessLoggerVector3(mut a), $ComponentsName::VectorProcessVector3(mut b, bd)) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::SequenceStockLoggerString(mut a), $ComponentsName::SequenceStockString(mut b, bd)) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::SequenceProcessLoggerString(mut a), $ComponentsName::SequenceProcessString(mut b, bd)) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },

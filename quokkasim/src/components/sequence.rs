@@ -1,3 +1,6 @@
+use serde::ser::SerializeStruct;
+use serde::Serialize;
+
 use crate::prelude::*;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -164,14 +167,66 @@ impl<T: Clone + Default + Debug + Send> SequenceStock<T> {
         self.sequence.deque = contents.into_iter().collect();
         self
     }
+
+    pub fn with_low_capacity(mut self, low_capacity: u32) -> Self {
+        self.low_capacity = low_capacity;
+        self
+    }
+
+    pub fn with_max_capacity(mut self, max_capacity: u32) -> Self {
+        self.max_capacity = max_capacity;
+        self
+    }
+}
+
+pub struct SequenceStockLogger<T> where T: Send {
+    pub name: String,
+    pub buffer: EventQueue<SequenceStockLog<T>>,
+}
+
+impl<T> Logger for SequenceStockLogger<T> where SequenceStockLog<T>: Serialize, T: Send + 'static {
+    type RecordType = SequenceStockLog<T>;
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
+        self.buffer
+    }
+    fn new(name: String) -> Self {
+        SequenceStockLogger {
+            name,
+            buffer: EventQueue::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
-pub enum SequenceProcessLogType<T> {
-    ProcessStart { resource: T },
-    ProcessSuccess { resource: T },
-    ProcessFailure { reason: &'static str },
+pub struct SequenceStockLog<T> {
+    pub time: String,
+    pub event_id: u64,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub state: SequenceStockState,
+    pub sequence: SeqDeque<T>,
 }
+
+impl Serialize for SequenceStockLog<String> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        let mut state = serializer.serialize_struct("SequenceStockLog", 6)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        state.serialize_field("log_type", &self.log_type)?;
+        state.serialize_field("state", &self.state.get_name())?;
+        state.serialize_field("sequence", &format!("{:?}", self.sequence.deque))?;
+        state.end()
+    }
+}
+
 /**
  * U: Parameter type pushed to downstream stock
  * V: Parameter type requested from upstream stock
@@ -224,12 +279,16 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
         self.element_type = type_;
         self
     }
+
+    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
+        self.process_time_distr = Some(distr);
+        self
+    }
 }
 
 
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for SequenceProcess<U, V, W> {}
 
-// impl<T: VectorArithmetic<U, (), u32> + Clone + Debug + Send + 'static, U: Clone + Debug + Send + 'static> Process<T, U, (), u32> for SequenceProcess<Option<U>, (), Option<U>> where Self: Model {
 impl<U: Clone + Debug + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for SequenceProcess<Option<U>, (), Option<U>>
 where
     Self: Model,
@@ -284,7 +343,9 @@ where
                                 element_from: self.element_name.clone(),
                                 message: "Withdraw request".into(),
                             })).await.next().unwrap();
-                            let process_duration_secs = self.process_time_distr.as_mut().unwrap().sample();
+                            let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                panic!("Process time distribution not set for process {}", self.element_name);
+                            }).sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
                             self.log(time, SequenceProcessLogType::ProcessStart { resource: moved.clone() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
@@ -347,6 +408,14 @@ where
 }
 
 #[derive(Debug, Clone)]
+pub enum SequenceProcessLogType<T> {
+    ProcessStart { resource: T },
+    ProcessSuccess { resource: T },
+    ProcessFailure { reason: &'static str },
+}
+
+
+#[derive(Debug, Clone)]
 pub struct SequenceProcessLog<T> {
     pub time: String,
     pub event_id: u64,
@@ -355,13 +424,45 @@ pub struct SequenceProcessLog<T> {
     pub event: SequenceProcessLogType<T>,
 }
 
-#[derive(Debug, Clone)]
-pub struct SequenceStockLog<T> {
-    pub time: String,
-    pub event_id: u64,
-    pub element_name: String,
-    pub element_type: String,
-    pub log_type: String,
-    pub state: SequenceStockState,
-    pub sequence: SeqDeque<T>,
+impl Serialize for SequenceProcessLog<Option<String>> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        let mut state = serializer.serialize_struct("SequenceProcessLog", 7)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let (event_type, item, reason): (String, Option<&str>, Option<&str>) = match &self.event {
+            SequenceProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), resource.as_deref(), None),
+            SequenceProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), resource.as_deref(), None),
+            SequenceProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
+        };
+        state.serialize_field("event_type", &event_type)?;
+        state.serialize_field("item", &item)?;
+        state.serialize_field("reason", &reason)?;
+        state.end()
+    }
 }
+
+pub struct SequenceProcessLogger<T> where T: Send {
+    pub name: String,
+    pub buffer: EventQueue<SequenceProcessLog<T>>,
+}
+
+impl<T> Logger for SequenceProcessLogger<T> where SequenceProcessLog<T>: Serialize, T: Send + 'static {
+    type RecordType = SequenceProcessLog<T>;
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
+        self.buffer
+    }
+    fn new(name: String) -> Self {
+        SequenceProcessLogger {
+            name,
+            buffer: EventQueue::new(),
+        }
+    }
+}
+

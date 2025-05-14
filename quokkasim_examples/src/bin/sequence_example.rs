@@ -1,6 +1,9 @@
 use quokkasim::prelude::*;
 use quokkasim::define_model_enums;
+use serde_yaml::Sequence;
 use std::error::Error;
+use std::fs::create_dir_all;
+use std::time::Duration;
 
 define_model_enums! {
     pub enum ComponentModel<'a> {}
@@ -25,25 +28,63 @@ fn main() {
     let mut stock1: SequenceStock<String> = SequenceStock::<String>::new()
         .with_name("Stock1".into())
         .with_type("SequenceStockU32".into())
-        .with_initial_contents((0..10).map(|x| format!("Item_{:0>4}", x)).collect());
+        .with_initial_contents((0..10).map(|x| format!("Item_{:0>4}", x)).collect())
+        .with_low_capacity(0)
+        .with_max_capacity(10);
     let stock1_mbox: Mailbox<SequenceStock<String>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
 
     let mut process1: SequenceProcess<Option<String>, (), Option<String>> = SequenceProcess::new()
         .with_name("Process1".into())
-        .with_type("SequenceProcess".into());
+        .with_type("SequenceProcess".into())
+        .with_process_time_distr(Distribution::Constant(7.));
     let process1_mbox: Mailbox<SequenceProcess<Option<String>, (), Option<String>>> = Mailbox::new();
     let mut process1_addr = process1_mbox.address();
 
     let mut stock2: SequenceStock<String> = SequenceStock::<String>::new()
         .with_name("Stock2".into())
-        .with_type("SequenceStockU32".into());
+        .with_type("SequenceStockU32".into())
+        .with_low_capacity(0)
+        .with_max_capacity(10);
     let stock2_mbox: Mailbox<SequenceStock<String>> = Mailbox::new();
     let mut stock2_addr = stock2_mbox.address();
 
-    stock1.state_emitter.connect(
-        <
-            SequenceProcess< Option<String>, (), Option<String> >
-            as Process< SeqDeque<String>, Option<String>, (), u32 >
-        >::update_state, &process1_addr);
+    ComponentModel::connect_components(
+        ComponentModel::SequenceStockString(&mut stock1, &mut stock1_addr),
+        ComponentModel::SequenceProcessString(&mut process1, &mut process1_addr),
+    ).unwrap();
+    ComponentModel::connect_components(
+        ComponentModel::SequenceProcessString(&mut process1, &mut process1_addr),
+        ComponentModel::SequenceStockString(&mut stock2, &mut stock2_addr),
+    ).unwrap();
+
+    let mut process_logger: SequenceProcessLogger<Option<String>> = SequenceProcessLogger::new("ProcessLogger".into());
+    let mut stock_logger: SequenceStockLogger<String> = SequenceStockLogger::new("StockLogger".into());
+
+    ComponentLogger::connect_logger(
+        ComponentLogger::SequenceProcessLoggerString(&mut process_logger),
+        ComponentModel::SequenceProcessString(&mut process1, &mut process1_addr),
+    ).unwrap();
+    ComponentLogger::connect_logger(
+        ComponentLogger::SequenceStockLoggerString(&mut stock_logger),
+        ComponentModel::SequenceStockString(&mut stock1, &mut stock1_addr),
+    ).unwrap();
+    ComponentLogger::connect_logger(
+        ComponentLogger::SequenceStockLoggerString(&mut stock_logger),
+        ComponentModel::SequenceStockString(&mut stock2, &mut stock2_addr),
+    ).unwrap();
+
+    let sim_builder = SimInit::new()
+        .add_model(stock1, stock1_mbox, "Stock1")
+        .add_model(process1, process1_mbox, "Process1")
+        .add_model(stock2, stock2_mbox, "Stock2");
+    let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+    simu.process_event(SequenceProcess::<Option<String>, (), Option<String>>::update_state,
+        NotificationMetadata { time: MonotonicTime::EPOCH, element_from: "Init".into(), message: "Start".into() }, &process1_addr).unwrap();
+    
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(60)).unwrap();
+
+    create_dir_all("outputs/sequence_example").unwrap();
+    process_logger.write_csv("outputs/sequence_example".into()).unwrap();
+    stock_logger.write_csv("outputs/sequence_example".into()).unwrap();
 }
