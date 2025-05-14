@@ -27,7 +27,7 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
 fn main() {
     let mut stock1: SequenceStock<String> = SequenceStock::<String>::new()
         .with_name("Stock1".into())
-        .with_type("SequenceStockU32".into())
+        .with_type("SequenceStockString".into())
         .with_initial_contents((0..10).map(|x| format!("Item_{:0>4}", x)).collect())
         .with_low_capacity(0)
         .with_max_capacity(10);
@@ -43,7 +43,7 @@ fn main() {
 
     let mut stock2: SequenceStock<String> = SequenceStock::<String>::new()
         .with_name("Stock2".into())
-        .with_type("SequenceStockU32".into())
+        .with_type("SequenceStockString".into())
         .with_low_capacity(0)
         .with_max_capacity(10);
     let stock2_mbox: Mailbox<SequenceStock<String>> = Mailbox::new();
