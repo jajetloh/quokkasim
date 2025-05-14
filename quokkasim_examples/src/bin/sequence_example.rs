@@ -1,6 +1,5 @@
 use quokkasim::prelude::*;
 use quokkasim::define_model_enums;
-use serde_yaml::Sequence;
 use std::error::Error;
 use std::fs::create_dir_all;
 use std::time::Duration;
