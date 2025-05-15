@@ -103,6 +103,15 @@ impl Serialize for IronOreProcessLog {
             VectorProcessLogType::ProcessFailure { reason, .. } => {
                 ("ProcessFailure", None, None, None, None, None, None, None, Some(reason))
             },
+            VectorProcessLogType::CombineStart { quantity, vectors } => {
+                unimplemented!("Unknown event type");
+            },
+            VectorProcessLogType::CombineSuccess { quantity, vectors } => {
+                unimplemented!("Unknown event type");
+            },
+            VectorProcessLogType::CombineFailure { reason, .. } => {
+                unimplemented!("Unknown event type");
+            },
         };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
