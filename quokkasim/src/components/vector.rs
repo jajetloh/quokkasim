@@ -516,8 +516,11 @@ pub enum VectorProcessLogType<T> {
     ProcessSuccess { quantity: f64, vector: T },
     ProcessFailure { reason: &'static str },
     CombineStart { quantity: f64, vectors: Vec<T> },
-    CombineSuccess { quantity: f64, vectors: Vec<T> },
+    CombineSuccess { quantity: f64, vector: T},
     CombineFailure { reason: &'static str },
+    SplitStart { quantity: f64, vector: T },
+    SplitSuccess { quantity: f64, vectors: Vec<T> },
+    SplitFailure { reason: &'static str },
 }
 
 #[derive(Debug, Clone)]
@@ -544,8 +547,11 @@ impl Serialize for VectorProcessLog<f64> {
             VectorProcessLogType::ProcessSuccess { quantity, .. } => ("ProcessSuccess", Some(*quantity), None, None),
             VectorProcessLogType::ProcessFailure { reason, .. } => ("ProcessFailure", None, None, Some(*reason)),
             VectorProcessLogType::CombineStart { quantity, vectors, .. } => ("CombineStart", Some(*quantity), Some(vectors.clone()), None),
-            VectorProcessLogType::CombineSuccess { quantity, vectors, .. } => ("CombineSuccess", Some(*quantity), Some(vectors.clone()), None),
+            VectorProcessLogType::CombineSuccess { quantity, vector, .. } => ("CombineSuccess", Some(*quantity), None, None),
             VectorProcessLogType::CombineFailure { reason, .. } => ("CombineFailure", None, None, Some(*reason)),
+            VectorProcessLogType::SplitStart { quantity, vector } => ("SplitStart", Some(*quantity), None, None),
+            VectorProcessLogType::SplitSuccess { quantity, vectors } => ("SplitSuccess", Some(*quantity), Some(vectors.clone()), None),
+            VectorProcessLogType::SplitFailure { reason, .. } => ("SplitFailure", None, None, Some(*reason)),
         };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
@@ -570,8 +576,11 @@ impl Serialize for VectorProcessLog<Vector3> {
             VectorProcessLogType::ProcessSuccess { quantity, vector } => ("ProcessSuccess", Some(*quantity), Some(vector.values[0]), Some(vector.values[1]), Some(vector.values[2]), None, None),
             VectorProcessLogType::ProcessFailure { reason, .. } => ("ProcessFailure", None, None, None, None, None, Some(reason)),
             VectorProcessLogType::CombineStart { quantity, vectors, .. } => ("CombineStart", Some(*quantity), None, None, None, Some(vectors.iter().map(|x| x.values).collect()), None),
-            VectorProcessLogType::CombineSuccess { quantity, vectors, .. } => ("CombineSuccess", Some(*quantity), None, None, None, Some(vectors.iter().map(|x| x.values).collect()), None),
+            VectorProcessLogType::CombineSuccess { quantity, vector: vectors, .. } => ("CombineSuccess", Some(*quantity), Some(vectors.values[0]), Some(vectors.values[1]), Some(vectors.values[2]), None, None),
             VectorProcessLogType::CombineFailure { reason, .. } => ("CombineFailure", None, None, None, None, None, Some(reason)),
+            VectorProcessLogType::SplitStart { quantity, vector } => ("SplitStart", Some(*quantity), Some(vector.values[0]), Some(vector.values[1]), Some(vector.values[2]), None, None),
+            VectorProcessLogType::SplitSuccess { quantity, vectors } => ("SplitSuccess", Some(*quantity), None, None, None, Some(vectors.iter().map(|x| x.values).collect()), None),
+            VectorProcessLogType::SplitFailure { reason, .. } => ("SplitFailure", None, None, None, None, None, Some(reason)),
         };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
@@ -592,6 +601,7 @@ impl Serialize for VectorProcessLog<Vector3> {
   * T: Resource type of upstream stock
   * U: Message type for pushing to downstream stock
   * V: Message type for withdrawing from upstream stock
+  * M: Number of upstream stocks - number of stocks to combine from
   */
 pub struct VectorCombiner<
     T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
@@ -603,7 +613,7 @@ pub struct VectorCombiner<
     pub element_type: String,
     pub req_upstreams: [Requestor<(), VectorStockState>; M],
     pub req_downstream: Requestor<(), VectorStockState>,
-    pub withdraw_upstream: [Requestor<(V, NotificationMetadata), T>; M],
+    pub withdraw_upstreams: [Requestor<(V, NotificationMetadata), T>; M],
     pub push_downstream: Output<(U, NotificationMetadata)>,
     pub process_state: Option<(Duration, Vec<T>)>,
     pub process_quantity_distr: Distribution,
@@ -638,11 +648,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vectors: resources.clone() }).await;
                         let mut total: T = Default::default();
                         while let Some(resource) = resources.pop() {
                             total.add(resource);
                         }
+                        self.log(time, VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
                         self.push_downstream.send((total, NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
@@ -659,7 +669,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                     let iterators = join_all(self.req_upstreams.iter_mut().map(|req| req.send(()))).await;
                     let us_states: Vec<VectorStockState> = iterators.into_iter().flatten().collect();
                     let all_us_available: Option<bool>;
-                    if us_states.len() == 0 {
+                    if us_states.len() < M {
                         all_us_available = None;
                     } else {
                         all_us_available = Some(us_states.iter().all(|state| {
@@ -673,7 +683,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                             Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
                         ) => {
                             let process_quantity = self.process_quantity_distr.sample();
-                            let withdraw_iterators = join_all(self.withdraw_upstream.iter_mut().map(|req| {
+                            let withdraw_iterators = join_all(self.withdraw_upstreams.iter_mut().map(|req| {
                                 req.send((process_quantity, NotificationMetadata {
                                     time,
                                     element_from: self.element_name.clone(),
@@ -700,6 +710,158 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                         },
                         (_, Some(VectorStockState::Full {..} )) => {
                             self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            self.time_to_next_event = None;
+                        },
+                    }
+                },
+                Some((time, _)) => {
+                    self.time_to_next_event = Some(time);
+                }
+            }
+        }
+    }
+
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+        async move {
+            let log = VectorProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                event_id: self.next_event_id,
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                event: details,
+            };
+            self.next_event_id += 1;
+            self.log_emitter.send(log).await;
+        }
+    }
+}
+
+
+/**
+ * Splitter
+ */
+
+ /**
+  * T: Resource type of upstream stock
+  * U: Message type for pushing to downstream stock
+  * V: Message type for withdrawing from upstream stock
+  * N: Number of downstream stocks - number of stocks to split into
+  */
+
+pub struct VectorSplitter<
+    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
+    U: Clone + Send + 'static,
+    V: Clone + Send + 'static,
+    const N: usize
+> {
+    pub element_name: String,
+    pub element_type: String,
+    pub req_upstream: Requestor<(), VectorStockState>,
+    pub req_downstreams: [Requestor<(), VectorStockState>; N],
+    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
+    pub push_downstreams: [Output<(U, NotificationMetadata)>; N],
+    pub process_state: Option<(Duration, U)>,
+    pub process_quantity_distr: Distribution,
+    pub process_time_distr: Distribution,
+    pub time_to_next_event: Option<Duration>,
+    next_event_id: u64,
+    pub log_emitter: Output<VectorProcessLog<T>>,
+    pub previous_check_time: MonotonicTime,
+    pub split_ratios: [f64; N],
+}
+
+impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const N: usize> Process<T, T, f64, f64> for VectorSplitter<T, T, f64, N> where Self: Model {
+    type LogDetailsType = VectorProcessLogType<T>;
+    
+    fn set_previous_check_time(&mut self, time: MonotonicTime) {
+        self.previous_check_time = time;
+    }
+
+    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
+        &self.time_to_next_event
+    }
+
+    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
+        self.time_to_next_event = time;
+    }
+
+    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {
+            let time = cx.time();
+
+            match self.process_state.take() {
+                Some((mut process_time_left, resource)) => {
+                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+
+                    if process_time_left.is_zero() {
+    
+                        let split_resources = self.split_ratios.iter().map(|ratio| {
+                            let quantity = resource.total() * ratio;
+                            let parts = resource.clone().subtract_parts(quantity);
+                            parts.subtracted
+                        }).collect::<Vec<_>>();
+                        
+                        self.log(time, VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
+
+                        join_all(self.push_downstreams.iter_mut().zip(split_resources).map(|(push, resource)| {
+                            push.send((resource.clone(), NotificationMetadata {
+                                time,
+                                element_from: self.element_name.clone(),
+                                message: format!("Pushing quantity {:?}", resource),
+                            }))
+                        })).await;
+                    } else {
+                        self.process_state = Some((process_time_left, resource));
+                    }
+                },
+                None => {}
+            }
+            match self.process_state {
+                None => {
+                    let us_state = self.req_upstream.send(()).await.next();
+                    let ds_states = join_all(self.req_downstreams.iter_mut().map(|req| req.send(()))).await.iter_mut().map(|x| {
+                        x.next()
+                    }).collect::<Vec<Option<VectorStockState>>>();
+                    let all_ds_available: Option<bool>;
+                    if ds_states.len() < N {
+                        all_ds_available = None;
+                    } else {
+                        all_ds_available = Some(ds_states.iter().all(|state| {
+                            matches!(state, Some(VectorStockState::Normal {..}) | Some(VectorStockState::Empty {..}))
+                        }));
+                    }
+
+                    match (us_state, all_ds_available) {
+                        (
+                            Some(VectorStockState::Full {..}) | Some(VectorStockState::Normal {..}),
+                            Some(true),
+                        ) => {
+                            let process_quantity = self.process_quantity_distr.sample();
+                            let withdrawn = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
+                                time,
+                                element_from: self.element_name.clone(),
+                                message: format!("Withdrawing quantity {:?}", process_quantity),
+                            })).await.next().unwrap();
+                            let process_duration_secs = self.process_time_distr.sample();
+                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
+                            self.log(time, VectorProcessLogType::SplitStart { quantity: process_quantity, vector: withdrawn }).await;
+                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                        },
+                        (_, Some(false)) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "At least one downstream is full" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        (_, None) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "No downstreams are connected" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        (None, _) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        (Some(VectorStockState::Empty {..} ), _) => {
+                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                     }
