@@ -311,11 +311,20 @@ fn main() {
     connect_logger!(&mut process_logger, &mut process1).unwrap();
     connect_logger!(&mut stock_logger, &mut stock2).unwrap();
 
+    // let x: Vec<dyn InputFn<>> = vec![
+    //     VectorProcess::<IronOre, IronOre, f64>::update_state,
+    //     VectorProcess::<IronOre, IronOre, f64>::update_state,
+    //     VectorProcess::<f64, f64, f64>::update_state,
+    // ];
+
     let mut sim_builder = SimInit::new();
     sim_builder = register_component!(sim_builder, stock1);
     sim_builder = register_component!(sim_builder, process1);
     sim_builder = register_component!(sim_builder, stock2);
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+
+    // ComponentModel::initialise(&mut self, &mut simu)
+
     // simu.process_event(
     //     VectorProcess::<IronOre, IronOre, f64>::update_state,
     //     NotificationMetadata {
