@@ -624,6 +624,54 @@ pub struct VectorCombiner<
     pub previous_check_time: MonotonicTime,
 }
 
+impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static, const M: usize> Model for VectorCombiner<T, T, f64, M> {}
+
+impl<
+    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
+    U: Clone + Send,
+    V: Clone + Send,
+    const M: usize
+> VectorCombiner<T, U, V, M> {
+    pub fn new() -> Self {
+        VectorCombiner {
+            element_name: String::new(),
+            element_type: String::new(),
+            req_upstreams: std::array::from_fn(|_| Requestor::default()),
+            req_downstream: Requestor::default(),
+            withdraw_upstreams: std::array::from_fn(|_| Requestor::default()),
+            push_downstream: Output::default(),
+            process_state: None,
+            process_quantity_distr: Distribution::default(),
+            process_time_distr: Distribution::default(),
+            time_to_next_event: None,
+            next_event_id: 0,
+            log_emitter: Output::default(),
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+
+    pub fn with_name(self, name: String) -> Self {
+        VectorCombiner {
+            element_name: name,
+            ..self
+        }
+    }
+
+    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
+        VectorCombiner {
+            process_quantity_distr,
+            ..self
+        }
+    }
+
+    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
+        VectorCombiner {
+            process_time_distr,
+            ..self
+        }
+    }
+}
+
 impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const M: usize> Process<T, T, f64, f64> for VectorCombiner<T, T, f64, M> where Self: Model {
     type LogDetailsType = VectorProcessLogType<T>;
     
@@ -769,6 +817,56 @@ pub struct VectorSplitter<
     pub previous_check_time: MonotonicTime,
     pub split_ratios: [f64; N],
 }
+
+impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const N: usize> VectorSplitter<T, T, f64, N> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    
+    pub fn with_name(self, name: String) -> Self {
+        VectorSplitter {
+            element_name: name,
+            ..self
+        }
+    }
+
+    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
+        VectorSplitter {
+            process_quantity_distr,
+            ..self
+        }
+    }
+
+    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
+        VectorSplitter {
+            process_time_distr,
+            ..self
+        }
+    }
+}
+
+impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send, const N: usize> Default for VectorSplitter<T, U, V, N> {
+    fn default() -> Self {
+        VectorSplitter {
+            element_name: String::new(),
+            element_type: String::new(),
+            req_upstream: Requestor::default(),
+            req_downstreams: std::array::from_fn(|_| Requestor::default()),
+            withdraw_upstream: Requestor::default(),
+            push_downstreams: std::array::from_fn(|_| Output::default()),
+            process_state: None,
+            process_quantity_distr: Distribution::default(),
+            process_time_distr: Distribution::default(),
+            time_to_next_event: None,
+            next_event_id: 0,
+            log_emitter: Output::default(),
+            previous_check_time: MonotonicTime::EPOCH,
+            split_ratios: [1./(N as f64); N],
+        }
+    }
+}
+
+impl<T: VectorArithmetic<T, f64, f64> + Send + Clone + Debug, V: Clone + Debug + Send, const N: usize> Model for VectorSplitter<T, T, V, N> {}
 
 impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const N: usize> Process<T, T, f64, f64> for VectorSplitter<T, T, f64, N> where Self: Model {
     type LogDetailsType = VectorProcessLogType<T>;

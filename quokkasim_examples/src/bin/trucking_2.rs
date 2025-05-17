@@ -14,6 +14,7 @@ use serde::{ser::SerializeStruct, Serialize};
  * addition to be linear. Proportionate quantities (e.g. Mass % of ore comprised by Fe) can be calculated
  * using linear quantities (e.g. Fe % = Fe / (Fe + Other Elements) * 100). 
  */
+
 #[derive(Debug, Clone)]
 struct IronOre {
     fe: f64,

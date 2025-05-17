@@ -73,6 +73,18 @@ impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
     }
 }
 
+impl Into<Vector3> for [f64; 3] {
+    fn into(self) -> Vector3 {
+        Vector3 { values: self }
+    }
+}
+
+impl Default for Vector3 {
+    fn default() -> Self {
+        Vector3 { values: [0.0, 0.0, 0.0] }
+    }
+}
+
 /**
  * A: Added/removed parameter type
  * B: Subtract parameter type
@@ -344,8 +356,28 @@ macro_rules! define_model_enums {
         pub enum $ComponentsName<'a> {
             VectorStockF64(&'a mut $crate::components::vector::VectorStock<f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64(&'a mut $crate::components::vector::VectorProcess<f64, f64, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
+            VectorCombiner1F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
+            VectorCombiner2F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 2>>),
+            VectorCombiner3F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 3>>),
+            VectorCombiner4F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 4>>),
+            VectorCombiner5F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 5>>),
+            VectorSplitter1F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 1>>),
+            VectorSplitter2F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 2>>),
+            VectorSplitter3F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 3>>),
+            VectorSplitter4F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 4>>),
+            VectorSplitter5F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 5>>),
             VectorStockVector3(&'a mut $crate::components::vector::VectorStock<Vector3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
             VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
+            VectorCombiner1Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>>),
+            VectorCombiner2Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>>),
+            VectorCombiner3Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>>),
+            VectorCombiner4Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>>),
+            VectorCombiner5Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>>),
+            VectorSplitter1Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>>),
+            VectorSplitter2Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>>),
+            VectorSplitter3Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>>),
+            VectorSplitter4Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
+            VectorSplitter5Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             SequenceStockString(&'a mut $crate::components::sequence::SequenceStock<String>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
             SequenceProcessString(&'a mut $crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
             $(

@@ -1,130 +1,123 @@
-use std::time::Duration;
+use std::{error::Error, time::Duration};
 
-use nexosim::{ports::EventBuffer, time::MonotonicTime};
-use quokkasim::{
-    common::Logger,
-    components::vector::{VectorCombinerProcess, VectorProcess, VectorProcessLogger, VectorSplitterProcess, VectorStock, VectorStockLogger},
-    core::{
-        Distribution, DistributionConfig, DistributionFactory, Mailbox, NotificationMetadata, Process, SimInit, Stock
-    },
-};
+use nexosim::time::MonotonicTime;
+use quokkasim::{define_model_enums, prelude::*};
+
+define_model_enums! {
+    pub enum ComponentModel<'a> {}
+    pub enum ComponentLogger<'a> {}
+}
+
+impl<'a> CustomComponentConnection for ComponentModel<'a> {
+    fn connect_components(a: Self, b: Self) -> Result<(), Box<dyn Error>> {
+        match (a, b) {
+            _ => Err("Invalid connection".into()),
+        }
+    }
+}
+
+impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
+    type ComponentType = ComponentModel<'a>;
+    fn connect_logger(a: Self, b: Self::ComponentType) -> Result<(), Box<dyn Error>> {
+        match (a, b) {
+            _ => Err("Invalid connection".into()),
+        }
+    }
+}
+
 
 fn main() {
     // Declarations
 
-    let logger: VectorProcessLogger = VectorProcessLogger {
-        buffer: EventBuffer::with_capacity(100_000),
-        name: "ProcessLogger".into(),
-    };
-    let stock_logger: VectorStockLogger = VectorStockLogger { 
-        buffer: EventBuffer::with_capacity(100_000),
-        name: "StockLogger".into(),
-    };
+    let process_logger = VectorProcessLogger::<f64>::new("ProcessLogger".into());
+    let stock_logger = VectorStockLogger::<f64>::new("StockLogger".into());
     let mut df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
     };
 
-    let mut stockpile_1 = VectorStock::new()
+    let mut stockpile_1 = VectorStock::<Vector3>::new()
         .with_name("Stockpile 1".into())
-        .with_log_consumer(&stock_logger);
-    stockpile_1.low_capacity = 100.;
-    stockpile_1.max_capacity = 10000.;
-    stockpile_1.resource.vec = [8000., 2000., 0., 0., 0.];
+        .with_low_capacity(100.)
+        .with_max_capacity(10_000.)
+        .with_initial_vector([8000., 2000., 0.].into());
 
-    let stockpile_1_mbox: Mailbox<VectorStock> = Mailbox::new();
+    let stockpile_1_mbox: Mailbox<VectorStock<Vector3>> = Mailbox::new();
     let stockpile_1_addr = stockpile_1_mbox.address();
 
-    let mut stockpile_2 = VectorStock::new()
+    let mut stockpile_2 = VectorStock::<Vector3>::new()
         .with_name("Stockpile 2".into())
-        .with_log_consumer(&stock_logger);
-    stockpile_2.low_capacity = 100.;
-    stockpile_2.max_capacity = 10000.;
-    stockpile_2.resource.vec = [0., 6000., 1000., 1000., 0.];
+        .with_low_capacity(100.)
+        .with_max_capacity(10_000.)
+        .with_initial_vector([0., 6000., 2000.].into());
 
-    let stockpile_2_mbox: Mailbox<VectorStock> = Mailbox::new();
+    let stockpile_2_mbox: Mailbox<VectorStock<Vector3>> = Mailbox::new(); 
     let stockpile_2_addr = stockpile_2_mbox.address();
 
-    let mut stockpile_3 = VectorStock::new()
+    let mut stockpile_3 = VectorStock::<Vector3>::new()
         .with_name("Stockpile 3".into())
-        .with_log_consumer(&stock_logger);
-    stockpile_3.low_capacity = 100.;
-    stockpile_3.max_capacity = 20000.;
-    stockpile_3.resource.vec = [5000., 5000., 5000., 5000., 0.];
+        .with_low_capacity(100.)
+        .with_max_capacity(10_000.)
+        .with_initial_vector([5000., 5000., 0.].into());
 
-    let stockpile_3_mbox: Mailbox<VectorStock> = Mailbox::new();
+    let stockpile_3_mbox: Mailbox<VectorStock<Vector3>> = Mailbox::new();
     let stockpile_3_addr = stockpile_3_mbox.address();
 
-    let mut reclaimer_1 = VectorCombinerProcess::new()
+    let mut reclaimer_1: VectorCombiner<Vector3, Vector3, f64, 2> = VectorCombiner::new()
         .with_name("Reclaimer 1".into())
-        .with_log_consumer(&logger);
-    reclaimer_1.process_quantity_dist = Some(
-        df.create(DistributionConfig::TruncNormal {
-            mean: 100.,
-            std: 30.,
-            min: Some(0.),
-            max: None,
-        })
-        .unwrap(),
-    );
-    reclaimer_1.process_duration_secs_dist = Some(Distribution::Constant(25.));
+        .with_process_quantity_distr(Distribution::Constant(100.))
+        .with_process_time_distr(Distribution::Constant(30.));
 
-    let reclaimer_1_mbox: Mailbox<VectorCombinerProcess> = Mailbox::new();
+    let reclaimer_1_mbox = Mailbox::new();
     let reclaimer_1_addr = reclaimer_1_mbox.address();
 
-    let mut output_stockpile_1 = VectorStock::new()
+    let mut output_stockpile_1 = VectorStock::<Vector3>::new()
         .with_name("Output Stockpile 1".into())
-        .with_log_consumer(&stock_logger);
-    output_stockpile_1.low_capacity = 100.;
-    output_stockpile_1.max_capacity = 15000.;
+        .with_low_capacity(100.)
+        .with_max_capacity(15_000.)
+        .with_initial_vector([0., 0., 0.].into());
 
-    let output_stockpile_1_mbox: Mailbox<VectorStock> = Mailbox::new();
+    let output_stockpile_1_mbox = Mailbox::new();
     let output_stockpile_1_addr = output_stockpile_1_mbox.address();
 
-    let mut reclaimer_2 = VectorCombinerProcess::new()
+    let mut reclaimer_2: VectorCombiner<Vector3, Vector3, f64, 2> = VectorCombiner::new()
         .with_name("Reclaimer 2".into())
-        .with_log_consumer(&logger);
-    reclaimer_2.process_quantity_dist = Some(
-        df.create(DistributionConfig::TruncNormal {
-            mean: 80.,
-            std: 5.,
-            min: Some(0.),
-            max: None,
-        })
-        .unwrap(),
-    );
-    reclaimer_2.process_duration_secs_dist = Some(df.create(DistributionConfig::Triangular { min: 10., max: 30., mode: 25. }).unwrap());
+        .with_process_quantity_distr(Distribution::Constant(100.))
+        .with_process_time_distr(Distribution::Constant(30.));
 
-    let reclaimer_2_mbox: Mailbox<VectorCombinerProcess> = Mailbox::new();
+    let reclaimer_2_mbox= Mailbox::new();
     let reclaimer_2_addr = reclaimer_2_mbox.address();
 
-    let mut output_stockpile_2 = VectorStock::new()
+    let mut output_stockpile_2 = VectorStock::<Vector3>::new()
         .with_name("Output Stockpile 2".into())
-        .with_log_consumer(&stock_logger);
-    output_stockpile_2.low_capacity = 100.;
-    output_stockpile_2.max_capacity = 15000.;
-    let output_stockpile_2_mbox: Mailbox<VectorStock> = Mailbox::new();
+        .with_low_capacity(100.)
+        .with_max_capacity(15_000.)
+        .with_initial_vector([0., 0., 0.].into());
+    let output_stockpile_2_mbox = Mailbox::new();
     let output_stockpile_2_addr = output_stockpile_2_mbox.address();
 
-    let mut reclaimer_3 = VectorProcess::new()
-        .with_name("Reclaimer 3".into());
-    reclaimer_3.log_emitter.connect_sink(&logger.buffer);
-    reclaimer_3.process_quantity_dist = Some(Distribution::Constant(100.));
-    reclaimer_3.process_duration_secs_dist = Some(Distribution::Constant(60.));
-    let reclaimer_3_mbox: Mailbox<VectorProcess> = Mailbox::new();
+    let mut reclaimer_3 = VectorCombiner::<Vector3, f64, f64, 1>::new()
+        .with_name("Reclaimer 3".into())
+        .with_process_quantity_distr(Distribution::Constant(100.))
+        .with_process_time_distr(Distribution::Constant(60.));
+    let reclaimer_3_mbox = Mailbox::new();
     let reclaimer_3_addr = reclaimer_3_mbox.address();
 
-    let mut stacker = VectorSplitterProcess::new()
+    let mut stacker = VectorSplitter::<Vector3, Vector3, f64, 2>::new()
         .with_name("Stacker".into())
-        .with_log_consumer(&logger);
-    stacker.process_quantity_dist = Some(Distribution::Constant(600.));
-    stacker.process_duration_secs_dist = Some(Distribution::Constant(360.));
-    let stacker_mbox: Mailbox<VectorSplitterProcess> = Mailbox::new();
+        .with_process_quantity_distr(Distribution::Constant(600.))
+        .with_process_time_distr(Distribution::Constant(360.));
+    let stacker_mbox = Mailbox::new();
     let stacker_addr = stacker_mbox.address();
 
     // Connections
 
     // - Reclaimer 1:
+
+    ComponentModel::connect_components(
+        ComponentModel::VectorStockVector3(&mut stockpile_1, &mut stockpile_1_addr),
+        ComponentModel::VectorCom(&mut reclaimer_1, &mut reclaimer_1_addr),
+    ).unwrap();
 
     reclaimer_1
         .req_upstreams
@@ -302,6 +295,6 @@ fn main() {
         .unwrap();
 
     std::fs::create_dir_all("outputs/material_blending").unwrap();
-    logger.write_csv("outputs/material_blending".into()).unwrap();
+    process_logger.write_csv("outputs/material_blending".into()).unwrap();
     stock_logger.write_csv("outputs/material_blending".into()).unwrap();
 }
