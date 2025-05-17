@@ -347,6 +347,10 @@ macro_rules! define_model_enums {
                 $U:ident $( ( $UT:ty ) )?
             ),* $(,)?
         }
+
+        $(#[$model_init_meta:meta])*
+        pub enum $ModelInitName:ident {
+        }
     ) => {
 
         use ::quokkasim::strum_macros::Display;
@@ -437,11 +441,20 @@ macro_rules! define_model_enums {
                 }
             }
 
-            pub fn register_component(mut sim_init: $crate::nexosim::SimInit, component: Self) -> $crate::nexosim::SimInit {
+            pub fn register_component(mut sim_init: $crate::nexosim::SimInit, mut init_configs: &mut Vec<$ModelInitName>, component: Self) -> $crate::nexosim::SimInit {
+                
                 match component {
-                    $ComponentsName::VectorStockF64(a, ad) => {
-                        // Have sim_init consume self by calling sim_init.add_model
-                        sim_init = sim_init.add_model(a, ad, "123");
+                    $ComponentsName::VectorProcessF64(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                        init_configs.push($ModelInitName::VectorProcessF64(addr));
+                    },
+                    $ComponentsName::VectorStockF64(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                        init_configs.push($ModelInitName::VectorStockF64(addr));
                     },
                     _ => {}
                 };
@@ -546,8 +559,9 @@ macro_rules! define_model_enums {
             } 
         }
 
-        pub enum EventInitConfig {
-            
+        pub enum $ModelInitName {
+            VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
+            VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
         }
 
         #[macro_export]
@@ -571,8 +585,8 @@ macro_rules! define_model_enums {
         }
 
         macro_rules! register_component {
-            ($sim_init:ident, $component:ident) => {
-                $ComponentsName::register_component($sim_init, $component)
+            ($sim_init:ident, &mut $init_configs:ident, $component:ident) => {
+                $ComponentsName::register_component($sim_init, &mut $init_configs, $component)
             };
         }
     }

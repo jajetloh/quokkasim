@@ -231,6 +231,9 @@ define_model_enums! {
         IronOreProcessLogger(IronOreProcessLogger),
         IronOreStockLogger(IronOreStockLogger),
     }
+    pub enum ComponentInit {
+
+    }
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -318,9 +321,10 @@ fn main() {
     // ];
 
     let mut sim_builder = SimInit::new();
-    sim_builder = register_component!(sim_builder, stock1);
-    sim_builder = register_component!(sim_builder, process1);
-    sim_builder = register_component!(sim_builder, stock2);
+    let mut init_configs: Vec<ComponentInit> = Vec::new();
+    sim_builder = register_component!(sim_builder, &mut init_configs, stock1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, process1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, stock2);
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
     // ComponentModel::initialise(&mut self, &mut simu)
