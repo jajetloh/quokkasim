@@ -302,12 +302,12 @@ pub trait Logger {
 }
 
 pub trait CustomComponentConnection {
-    fn connect_components(a: Self, b: Self) -> Result<(), Box<dyn ::std::error::Error>>;
+    fn connect_components(a: Self, b: Self, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
 pub trait CustomLoggerConnection<'a> {
     type ComponentType;
-    fn connect_logger(a: Self, b: Self::ComponentType) -> Result<(), Box<dyn ::std::error::Error>>;
+    fn connect_logger(a: Self, b: Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
 // pub trait Process {
@@ -354,7 +354,7 @@ macro_rules! define_model_enums {
         $(#[$components_enum_meta])*
         #[derive(Display)]
         pub enum $ComponentsName<'a> {
-            VectorStockF64(&'a mut $crate::components::vector::VectorStock<f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
+            VectorStockF64(&'a mut $crate::components::vector::VectorStock<f64>, &'a mut $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64(&'a mut $crate::components::vector::VectorProcess<f64, f64, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorCombiner1F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
             VectorCombiner2F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 2>>),
@@ -389,51 +389,79 @@ macro_rules! define_model_enums {
         impl<'a> $ComponentsName<'a> {
             pub fn connect_components(
                 mut a: $ComponentsName,
-                mut b: $ComponentsName
+                mut b: $ComponentsName,
+                n: Option<usize>,
             ) -> Result<(), Box<dyn ::std::error::Error>>{
                 use $crate::core::CustomComponentConnection;
-                match (a, b) {
-                    ($ComponentsName::VectorStockF64(mut a, ad), $ComponentsName::VectorProcessF64(mut b, bd)) => {
+                match (a, b, n) {
+                    ($ComponentsName::VectorStockF64(mut a, ad), $ComponentsName::VectorProcessF64(mut b, bd), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.clone());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.clone());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.clone());
                         Ok(())
                     },
-                    ($ComponentsName::VectorProcessF64(mut a, ad), $ComponentsName::VectorStockF64(mut b, bd)) => {
+                    ($ComponentsName::VectorProcessF64(mut a, ad), $ComponentsName::VectorStockF64(mut b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
                         Ok(())
                     },
-                    ($ComponentsName::VectorStockVector3(mut a, ad), $ComponentsName::VectorProcessVector3(mut b, bd)) => {
+                    ($ComponentsName::VectorStockVector3(mut a, ad), $ComponentsName::VectorProcessVector3(mut b, bd), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.clone());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.clone());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.clone());
                         Ok(())
                     },
-                    ($ComponentsName::VectorProcessVector3(mut a, ad), $ComponentsName::VectorStockVector3(mut b, bd)) => {
+                    ($ComponentsName::VectorProcessVector3(mut a, ad), $ComponentsName::VectorStockVector3(mut b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
                         Ok(())
                     },
-                    ($ComponentsName::SequenceStockString(mut a, ad), $ComponentsName::SequenceProcessString(mut b, bd)) => {
+                    ($ComponentsName::SequenceStockString(mut a, ad), $ComponentsName::SequenceProcessString(mut b, bd), _) => {
                         a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.clone());
                         b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.clone());
                         b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.clone());
                         Ok(())
                     },
-                    ($ComponentsName::SequenceProcessString(mut a, ad), $ComponentsName::SequenceStockString(mut b, bd)) => {
+                    ($ComponentsName::SequenceProcessString(mut a, ad), $ComponentsName::SequenceStockString(mut b, bd), _) => {
                         b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.clone());
                         a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.clone());
                         a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.clone());
                         Ok(())
                     },
-                    (a,b) => {
-                        <$ComponentsName as CustomComponentConnection>::connect_components(a, b)
+                    (a,b,n) => {
+                        <$ComponentsName as CustomComponentConnection>::connect_components(a, b, n)
                     }
                 }
             }
+
+            pub fn register_component(self, sim_init: &mut $crate::nexosim::SimInit) {
+                match self {
+                    $ComponentsName::VectorStockF64(a, ad) => {
+                        // Have sim_init consume self by calling sim_init.add_model
+                        sim_init.add_model(a, ad, "123");
+                    },
+                    _ => {}
+                }
+            }
+            
+            // pub fn register_component(sim_init: $crate::nexosim::SimInit, component: $ComponentsName) {
+            //     match component {
+            //         $ComponentsName::VectorStockF64(mut a, mut ad) => {
+            //             // sim_init.add_model(a, ad, a.get_name());
+            //             // let x = a.mut;
+            //             // sim_init.add_model(a, ad, a.get_name()),
+            //         }
+            //         _ => {}
+            //         // $(
+            //         //     $(#[$components_var_meta])*
+            //         //     $R $( ( $RT, $RT2 ) )? => {
+            //         //         register_component!(sim_init, $R);
+            //         //     }
+            //         // ),*
+            //     }
+            // }
         }
 
         $(#[$logger_enum_meta])*
@@ -452,36 +480,62 @@ macro_rules! define_model_enums {
         }
 
         impl<'a> $LoggersName<'a> {
-            pub fn connect_logger(mut a: $LoggersName, mut b: $ComponentsName) -> Result<(), Box<dyn ::std::error::Error>> {
+            pub fn connect_logger(mut a: $LoggersName, mut b: $ComponentsName, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
                 use $crate::core::CustomLoggerConnection;
-                match (a, b) {
-                    ($LoggersName::VectorStockLoggerF64(mut a), $ComponentsName::VectorStockF64(mut b, bd)) => {
+                match (a, b, n) {
+                    ($LoggersName::VectorStockLoggerF64(mut a), $ComponentsName::VectorStockF64(mut b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::VectorProcessLoggerF64(mut a), $ComponentsName::VectorProcessF64(mut b, bd)) => {
+                    ($LoggersName::VectorProcessLoggerF64(mut a), $ComponentsName::VectorProcessF64(mut b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::VectorStockLoggerVector3(mut a), $ComponentsName::VectorStockVector3(mut b, bd)) => {
+                    ($LoggersName::VectorStockLoggerVector3(mut a), $ComponentsName::VectorStockVector3(mut b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::VectorProcessLoggerVector3(mut a), $ComponentsName::VectorProcessVector3(mut b, bd)) => {
+                    ($LoggersName::VectorProcessLoggerVector3(mut a), $ComponentsName::VectorProcessVector3(mut b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::SequenceStockLoggerString(mut a), $ComponentsName::SequenceStockString(mut b, bd)) => {
+                    ($LoggersName::SequenceStockLoggerString(mut a), $ComponentsName::SequenceStockString(mut b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::SequenceProcessLoggerString(mut a), $ComponentsName::SequenceProcessString(mut b, bd)) => {
+                    ($LoggersName::SequenceProcessLoggerString(mut a), $ComponentsName::SequenceProcessString(mut b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    (a,b) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b),
+                    (a,b,n) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b, n)
                 }
             }
+        }
+
+        #[macro_export]
+        macro_rules! connect_components {
+            ($a:ident, $b:ident) => {
+                $crate::core::CustomComponentConnection::connect_components($a, $b, None)
+            };
+            ($a:ident, $b:ident, $n:expr) => {
+                $crate::core::CustomComponentConnection::connect_components($a, $b, Some($n))
+            };
+        }
+
+        #[macro_export]
+        macro_rules! connect_logger {
+            ($a:ident, $b:ident) => {
+                $crate::core::CustomLoggerConnection::connect_logger($a, $b, None)
+            };
+            ($a:ident, $b:ident, $n:expr) => {
+                $crate::core::CustomLoggerConnection::connect_logger($a, $b, Some($n))
+            };
+        }
+
+        macro_rules! register_component {
+            ($sim_init:ident, $component:ident) => {
+                $sim_init.add_model($component);
+            };
         }
     }
 }

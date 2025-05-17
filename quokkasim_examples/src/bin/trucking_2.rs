@@ -224,8 +224,8 @@ impl Logger for IronOreStockLogger {
 
 define_model_enums! {
     pub enum ComponentModel<'a> {
-        IronOreProcess(&'a mut VectorProcess<IronOre, IronOre, f64>, &'a mut Address<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStock(&'a mut VectorStock<IronOre>, &'a mut Address<VectorStock<IronOre>>),
+        IronOreProcess(&'a mut VectorProcess<IronOre, IronOre, f64>, &'a mut Mailbox<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreStock(&'a mut VectorStock<IronOre>, &'a mut Mailbox<VectorStock<IronOre>>),
     }
     pub enum ComponentLogger<'a> {
         IronOreProcessLogger(&'a mut IronOreProcessLogger),
@@ -234,18 +234,18 @@ define_model_enums! {
 }
 
 impl<'a> CustomComponentConnection for ComponentModel<'a> {
-    fn connect_components(a: Self, b: Self) -> Result<(), Box<dyn Error>> {
+    fn connect_components(a: Self, b: Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
             (ComponentModel::IronOreProcess(a, ad), ComponentModel::IronOreStock(b, bd)) => {
-                b.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, ad.clone());
-                a.req_downstream.connect(VectorStock::<IronOre>::get_state_async, bd.clone());
-                a.push_downstream.connect(VectorStock::<IronOre>::add, bd.clone());
+                b.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, ad.address());
+                a.req_downstream.connect(VectorStock::<IronOre>::get_state_async, bd.address());
+                a.push_downstream.connect(VectorStock::<IronOre>::add, bd.address());
                 Ok(())
             },
             (ComponentModel::IronOreStock(a, ad), ComponentModel::IronOreProcess(b, bd)) => {
-                a.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, bd.clone());
-                b.req_upstream.connect(VectorStock::<IronOre>::get_state_async, ad.clone());
-                b.withdraw_upstream.connect(VectorStock::<IronOre>::remove, ad.clone());
+                a.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, bd.address());
+                b.req_upstream.connect(VectorStock::<IronOre>::get_state_async, ad.address());
+                b.withdraw_upstream.connect(VectorStock::<IronOre>::remove, ad.address());
                 Ok(())
             },
             _ => Err("Invalid connection".into()),
@@ -255,13 +255,13 @@ impl<'a> CustomComponentConnection for ComponentModel<'a> {
 
 impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
     type ComponentType = ComponentModel<'a>;
-    fn connect_logger(a: Self, b: Self::ComponentType) -> Result<(), Box<dyn Error>> {
-        match (a, b) {
-            (ComponentLogger::IronOreProcessLogger(a), ComponentModel::IronOreProcess(b, _)) => {
+    fn connect_logger(a: Self, b: Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
+        match (a, b, n) {
+            (ComponentLogger::IronOreProcessLogger(a), ComponentModel::IronOreProcess(b, _), _) => {
                 b.log_emitter.map_connect_sink(|c| <VectorProcessLog<IronOre>>::into(c.clone()), &a.buffer);
                 Ok(())
             },
-            (ComponentLogger::IronOreStockLogger(a), ComponentModel::IronOreStock(b, _)) => {
+            (ComponentLogger::IronOreStockLogger(a), ComponentModel::IronOreStock(b, _), _) => {
                 b.log_emitter.map_connect_sink(|c| <VectorStockLog<IronOre>>::into(c.clone()), &a.buffer);
                 Ok(())
             },
@@ -272,55 +272,91 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
 
 fn main() {
 
-    let mut stock1 = VectorStock::<IronOre>::default().with_name("Stock1".into()).with_type("IronOreStock".into());
-    stock1.vector = IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. };
-    stock1.low_capacity = 10.;
-    stock1.max_capacity = 100.;
-    let stock1_mbox: Mailbox<VectorStock<IronOre>> = Mailbox::new();
-    let mut stock1_addr = stock1_mbox.address();
+    // let mut stock1 = VectorStock::<IronOre>::default().with_name("Stock1".into()).with_type("IronOreStock".into());
+    // stock1.vector = IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. };
+    // stock1.low_capacity = 10.;
+    // stock1.max_capacity = 100.;
+    // let stock1_mbox: Mailbox<VectorStock<IronOre>> = Mailbox::new();
+    // let mut stock1_addr = stock1_mbox.address();
+
+    let mut stock1 = ComponentModel::IronOreStock(
+        &mut VectorStock::new()
+            .with_name("MyStock1".into())
+            .with_type("IronOreStock".into())
+            .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
+            .with_low_capacity(10.)
+            .with_max_capacity(100.),
+        &mut Mailbox::new(),
+    );
     
-    let mut process1 = VectorProcess::<IronOre, IronOre, f64>::default().with_name("Process1".into()).with_type("IronOreProcess".into());
-    process1.process_quantity_distr = Distribution::Constant(4.);
-    process1.process_time_distr = Distribution::Constant(10.);
-    let process1_mbox: Mailbox<VectorProcess<IronOre, IronOre, f64>> = Mailbox::new();
-    let mut process1_addr: Address<VectorProcess<IronOre, IronOre, f64>> = process1_mbox.address();
+    // let mut process1 = VectorProcess::<IronOre, IronOre, f64>::default().with_name("Process1".into()).with_type("IronOreProcess".into());
+    // process1.process_quantity_distr = Distribution::Constant(4.);
+    // process1.process_time_distr = Distribution::Constant(10.);
+    // let process1_mbox: Mailbox<VectorProcess<IronOre, IronOre, f64>> = Mailbox::new();
+    // let mut process1_addr: Address<VectorProcess<IronOre, IronOre, f64>> = process1_mbox.address();
 
-    let mut stock2 = VectorStock::<IronOre>::default().with_name("Stock2".into()).with_type("IronOreStock".into());
-    stock2.vector = IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 };
-    stock2.low_capacity = 10.;
-    stock2.max_capacity = 100.;
-    let stock2_mbox: Mailbox<VectorStock<IronOre>> = Mailbox::new();
-    let mut stock2_addr = stock2_mbox.address();
+    let mut process1 = ComponentModel::IronOreProcess(
+        &mut VectorProcess::new()
+            .with_name("MyProcess1".into())
+            .with_type("IronOreProcess".into())
+            .with_process_quantity_distr(Distribution::Constant(4.))
+            .with_process_time_distr(Distribution::Constant(10.)),
+        &mut Mailbox::new(),
+    );
 
-    ComponentModel::connect_components(
-        ComponentModel::IronOreStock(&mut stock1, &mut stock1_addr),
-        ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
-    ).unwrap();
-    ComponentModel::connect_components(
-        ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
-        ComponentModel::IronOreStock(&mut stock2, &mut stock2_addr),
-    ).unwrap();
+    // let mut stock2 = VectorStock::<IronOre>::default().with_name("Stock2".into()).with_type("IronOreStock".into());
+    // stock2.vector = IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 };
+    // stock2.low_capacity = 10.;
+    // stock2.max_capacity = 100.;
+    // let stock2_mbox: Mailbox<VectorStock<IronOre>> = Mailbox::new();
+    // let mut stock2_addr = stock2_mbox.address();
 
-    let mut process_logger = IronOreProcessLogger::new("IronOreProcessLogger".into());
-    let mut stock_logger = IronOreStockLogger::new("IronOreStockLogger".into());
+    let mut stock2 = ComponentModel::IronOreStock(
+        &mut VectorStock::new()
+            .with_name("MyStock2".into())
+            .with_type("IronOreStock".into())
+            .with_initial_vector(IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 })
+            .with_low_capacity(10.)
+            .with_max_capacity(100.),
+        &mut Mailbox::new(),
+    );
 
-    ComponentLogger::connect_logger(
-        ComponentLogger::IronOreProcessLogger(&mut process_logger),
-        ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
-    ).unwrap();
-    ComponentLogger::connect_logger(
-        ComponentLogger::IronOreStockLogger(&mut stock_logger),
-        ComponentModel::IronOreStock(&mut stock1, &mut stock1_addr),
-    ).unwrap();
-    ComponentLogger::connect_logger(
-        ComponentLogger::IronOreStockLogger(&mut stock_logger),
-        ComponentModel::IronOreStock(&mut stock2, &mut stock2_addr),
-    ).unwrap();
+    // ComponentModel::connect_components(
+    //     ComponentModel::IronOreStock(&mut stock1, &mut stock1_addr, ),
+    //     ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
+    // ).unwrap();
+    // ComponentModel::connect_components(
+    //     ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
+    //     ComponentModel::IronOreStock(&mut stock2, &mut stock2_addr),
+    // ).unwrap();
+    connect_components!(stock1, process1).unwrap();
+    connect_components!(process1, stock2).unwrap();
 
-    let sim_builder = SimInit::new()
-        .add_model(stock1, stock1_mbox, "Stock1")
-        .add_model(process1, process1_mbox, "Process1")
-        .add_model(stock2, stock2_mbox, "Stock2");
+    let mut process_logger = ComponentLogger::IronOreProcessLogger(&mut IronOreProcessLogger::new("IronOreProcessLogger".into()));
+    let mut stock_logger = ComponentLogger::IronOreStockLogger(&mut IronOreStockLogger::new("IronOreStockLogger".into()));
+
+    connect_logger!(stock_logger, stock1).unwrap();
+    connect_logger!(process_logger, process1).unwrap();
+    connect_logger!(stock_logger, stock2).unwrap();
+
+    // ComponentLogger::connect_logger(
+    //     ComponentLogger::IronOreProcessLogger(&mut process_logger),
+    //     ComponentModel::IronOreProcess(&mut process1, &mut process1_addr),
+    // ).unwrap();
+    // ComponentLogger::connect_logger(
+    //     ComponentLogger::IronOreStockLogger(&mut stock_logger),
+    //     ComponentModel::IronOreStock(&mut stock1, &mut stock1_addr),
+    // ).unwrap();
+    // ComponentLogger::connect_logger(
+    //     ComponentLogger::IronOreStockLogger(&mut stock_logger),
+    //     ComponentModel::IronOreStock(&mut stock2, &mut stock2_addr),
+    // ).unwrap();
+
+    let sim_builder = SimInit::new();
+    sim_builder.add_model(stock1, mailbox, name);
+        // .add_model(stock1, stock1_mbox, "Stock1")
+        // .add_model(process1, process1_mbox, "Process1")
+        // .add_model(stock2, stock2_mbox, "Stock2");
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
     simu.process_event(
         VectorProcess::<IronOre, IronOre, f64>::update_state,
