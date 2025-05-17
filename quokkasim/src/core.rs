@@ -333,7 +333,7 @@ pub trait CustomLoggerConnection<'a> {
 macro_rules! define_model_enums {
     (
         $(#[$components_enum_meta:meta])*
-        pub enum $ComponentsName:ident<'a> {
+        pub enum $ComponentsName:ident {
           $(
             $(#[$components_var_meta:meta])*
             $R:ident $( ( $RT:ty, $RT2:ty ) )?
@@ -341,7 +341,7 @@ macro_rules! define_model_enums {
         }
 
         $(#[$logger_enum_meta:meta])*
-        pub enum $LoggersName:ident<'a> {
+        pub enum $LoggersName:ident {
             $(
                 $(#[$logger_var_meta:meta])*
                 $U:ident $( ( $UT:ty ) )?
@@ -353,40 +353,40 @@ macro_rules! define_model_enums {
 
         $(#[$components_enum_meta])*
         #[derive(Display)]
-        pub enum $ComponentsName<'a> {
-            VectorStockF64(&'a mut $crate::components::vector::VectorStock<f64>, &'a mut $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<f64>>),
-            VectorProcessF64(&'a mut $crate::components::vector::VectorProcess<f64, f64, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
-            VectorCombiner1F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
-            VectorCombiner2F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 2>>),
-            VectorCombiner3F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 3>>),
-            VectorCombiner4F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 4>>),
-            VectorCombiner5F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 5>>),
-            VectorSplitter1F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 1>>),
-            VectorSplitter2F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 2>>),
-            VectorSplitter3F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 3>>),
-            VectorSplitter4F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 4>>),
-            VectorSplitter5F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 5>>),
-            VectorStockVector3(&'a mut $crate::components::vector::VectorStock<Vector3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
-            VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
-            VectorCombiner1Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>>),
-            VectorCombiner2Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>>),
-            VectorCombiner3Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>>),
-            VectorCombiner4Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>>),
-            VectorCombiner5Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>>),
-            VectorSplitter1Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>>),
-            VectorSplitter2Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>>),
-            VectorSplitter3Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>>),
-            VectorSplitter4Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
-            VectorSplitter5Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
-            SequenceStockString(&'a mut $crate::components::sequence::SequenceStock<String>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
-            SequenceProcessString(&'a mut $crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
+        pub enum $ComponentsName {
+            VectorStockF64($crate::components::vector::VectorStock<f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<f64>>),
+            VectorProcessF64($crate::components::vector::VectorProcess<f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, f64, f64>>),
+            // VectorCombiner1F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
+            // VectorCombiner2F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 2>>),
+            // VectorCombiner3F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 3>>),
+            // VectorCombiner4F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 4>>),
+            // VectorCombiner5F64(&'a mut $crate::components::vector::VectorCombiner<f64, f64, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 5>>),
+            // VectorSplitter1F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 1>>),
+            // VectorSplitter2F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 2>>),
+            // VectorSplitter3F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 3>>),
+            // VectorSplitter4F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 4>>),
+            // VectorSplitter5F64(&'a mut $crate::components::vector::VectorSplitter<f64, f64, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 5>>),
+            // VectorStockVector3(&'a mut $crate::components::vector::VectorStock<Vector3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
+            // VectorProcessVector3(&'a mut $crate::components::vector::VectorProcess<Vector3, Vector3, f64>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
+            // VectorCombiner1Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>>),
+            // VectorCombiner2Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>>),
+            // VectorCombiner3Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>>),
+            // VectorCombiner4Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>>),
+            // VectorCombiner5Vector3(&'a mut $crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>>),
+            // VectorSplitter1Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>>),
+            // VectorSplitter2Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>>),
+            // VectorSplitter3Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>>),
+            // VectorSplitter4Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
+            // VectorSplitter5Vector3(&'a mut $crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, &'a mut $crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
+            // SequenceStockString(&'a mut $crate::components::sequence::SequenceStock<String>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
+            // SequenceProcessString(&'a mut $crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>, &'a mut $crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
             ),*
         }
   
-        impl<'a> $ComponentsName<'a> {
+        impl<'a> $ComponentsName {
             pub fn connect_components(
                 mut a: $ComponentsName,
                 mut b: $ComponentsName,
@@ -394,42 +394,42 @@ macro_rules! define_model_enums {
             ) -> Result<(), Box<dyn ::std::error::Error>>{
                 use $crate::core::CustomComponentConnection;
                 match (a, b, n) {
-                    ($ComponentsName::VectorStockF64(mut a, ad), $ComponentsName::VectorProcessF64(mut b, bd), _) => {
-                        a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.clone());
-                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.clone());
-                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.clone());
+                    ($ComponentsName::VectorStockF64(a, ad), $ComponentsName::VectorProcessF64(b, bd), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.address());
                         Ok(())
                     },
                     ($ComponentsName::VectorProcessF64(mut a, ad), $ComponentsName::VectorStockF64(mut b, bd), _) => {
-                        b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.clone());
-                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.clone());
-                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
+                        b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorStockVector3(mut a, ad), $ComponentsName::VectorProcessVector3(mut b, bd), _) => {
-                        a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.clone());
-                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.clone());
-                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.clone());
-                        Ok(())
-                    },
-                    ($ComponentsName::VectorProcessVector3(mut a, ad), $ComponentsName::VectorStockVector3(mut b, bd), _) => {
-                        b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.clone());
-                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.clone());
-                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
-                        Ok(())
-                    },
-                    ($ComponentsName::SequenceStockString(mut a, ad), $ComponentsName::SequenceProcessString(mut b, bd), _) => {
-                        a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.clone());
-                        b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.clone());
-                        b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.clone());
-                        Ok(())
-                    },
-                    ($ComponentsName::SequenceProcessString(mut a, ad), $ComponentsName::SequenceStockString(mut b, bd), _) => {
-                        b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.clone());
-                        a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.clone());
-                        a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.clone());
-                        Ok(())
-                    },
+                    // ($ComponentsName::VectorStockVector3(mut a, ad), $ComponentsName::VectorProcessVector3(mut b, bd), _) => {
+                    //     a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.clone());
+                    //     b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.clone());
+                    //     b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.clone());
+                    //     Ok(())
+                    // },
+                    // ($ComponentsName::VectorProcessVector3(mut a, ad), $ComponentsName::VectorStockVector3(mut b, bd), _) => {
+                    //     b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.clone());
+                    //     a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.clone());
+                    //     a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.clone());
+                    //     Ok(())
+                    // },
+                    // ($ComponentsName::SequenceStockString(mut a, ad), $ComponentsName::SequenceProcessString(mut b, bd), _) => {
+                    //     a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.clone());
+                    //     b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.clone());
+                    //     b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.clone());
+                    //     Ok(())
+                    // },
+                    // ($ComponentsName::SequenceProcessString(mut a, ad), $ComponentsName::SequenceStockString(mut b, bd), _) => {
+                    //     b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.clone());
+                    //     a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.clone());
+                    //     a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.clone());
+                    //     Ok(())
+                    // },
                     (a,b,n) => {
                         <$ComponentsName as CustomComponentConnection>::connect_components(a, b, n)
                     }
@@ -440,7 +440,7 @@ macro_rules! define_model_enums {
                 match self {
                     $ComponentsName::VectorStockF64(a, ad) => {
                         // Have sim_init consume self by calling sim_init.add_model
-                        sim_init.add_model(a, ad, "123");
+                        // sim_init.add_model(a, ad, "123");
                     },
                     _ => {}
                 }
@@ -468,11 +468,11 @@ macro_rules! define_model_enums {
         #[derive(Display)]
         pub enum $LoggersName<'a> {
             VectorStockLoggerF64(&'a mut $crate::components::vector::VectorStockLogger<f64>),
-            VectorStockLoggerVector3(&'a mut $crate::components::vector::VectorStockLogger<Vector3>),
+            // VectorStockLoggerVector3(&'a mut $crate::components::vector::VectorStockLogger<Vector3>),
             VectorProcessLoggerF64(&'a mut $crate::components::vector::VectorProcessLogger<f64>),
-            VectorProcessLoggerVector3(&'a mut $crate::components::vector::VectorProcessLogger<Vector3>),
-            SequenceStockLoggerString(&'a mut $crate::components::sequence::SequenceStockLogger<String>),
-            SequenceProcessLoggerString(&'a mut $crate::components::sequence::SequenceProcessLogger<Option<String>>),
+            // VectorProcessLoggerVector3(&'a mut $crate::components::vector::VectorProcessLogger<Vector3>),
+            // SequenceStockLoggerString(&'a mut $crate::components::sequence::SequenceStockLogger<String>),
+            // SequenceProcessLoggerString(&'a mut $crate::components::sequence::SequenceProcessLogger<Option<String>>),
             $(
                 $(#[$logger_var_meta])*
                 $U $( ( $UT ) )?
@@ -491,22 +491,22 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::VectorStockLoggerVector3(mut a), $ComponentsName::VectorStockVector3(mut b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(mut a), $ComponentsName::VectorProcessVector3(mut b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::SequenceStockLoggerString(mut a), $ComponentsName::SequenceStockString(mut b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::SequenceProcessLoggerString(mut a), $ComponentsName::SequenceProcessString(mut b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
+                    // ($LoggersName::VectorStockLoggerVector3(mut a), $ComponentsName::VectorStockVector3(mut b, bd), _) => {
+                    //     b.log_emitter.connect_sink(&a.buffer);
+                    //     Ok(())
+                    // },
+                    // ($LoggersName::VectorProcessLoggerVector3(mut a), $ComponentsName::VectorProcessVector3(mut b, bd), _) => {
+                    //     b.log_emitter.connect_sink(&a.buffer);
+                    //     Ok(())
+                    // },
+                    // ($LoggersName::SequenceStockLoggerString(mut a), $ComponentsName::SequenceStockString(mut b, bd), _) => {
+                    //     b.log_emitter.connect_sink(&a.buffer);
+                    //     Ok(())
+                    // },
+                    // ($LoggersName::SequenceProcessLoggerString(mut a), $ComponentsName::SequenceProcessString(mut b, bd), _) => {
+                    //     b.log_emitter.connect_sink(&a.buffer);
+                    //     Ok(())
+                    // },
                     (a,b,n) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b, n)
                 }
             }

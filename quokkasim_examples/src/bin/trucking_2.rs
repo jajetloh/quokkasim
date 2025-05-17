@@ -223,18 +223,18 @@ impl Logger for IronOreStockLogger {
 }
 
 define_model_enums! {
-    pub enum ComponentModel<'a> {
-        IronOreProcess(&'a mut VectorProcess<IronOre, IronOre, f64>, &'a mut Mailbox<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStock(&'a mut VectorStock<IronOre>, &'a mut Mailbox<VectorStock<IronOre>>),
+    pub enum ComponentModel {
+        IronOreProcess(VectorProcess<IronOre, IronOre, f64>, Mailbox<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>),
     }
-    pub enum ComponentLogger<'a> {
-        IronOreProcessLogger(&'a mut IronOreProcessLogger),
-        IronOreStockLogger(&'a mut IronOreStockLogger),
+    pub enum ComponentLogger {
+        IronOreProcessLogger(IronOreProcessLogger),
+        IronOreStockLogger(IronOreStockLogger),
     }
 }
 
-impl<'a> CustomComponentConnection for ComponentModel<'a> {
-    fn connect_components(a: Self, b: Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
+impl CustomComponentConnection for ComponentModel {
+    fn connect_components(a: &mut Self, b: Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
             (ComponentModel::IronOreProcess(a, ad), ComponentModel::IronOreStock(b, bd)) => {
                 b.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, ad.address());
