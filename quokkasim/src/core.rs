@@ -302,12 +302,12 @@ pub trait Logger {
 }
 
 pub trait CustomComponentConnection {
-    fn connect_components(a: Self, b: Self, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
+    fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
-pub trait CustomLoggerConnection<'a> {
+pub trait CustomLoggerConnection {
     type ComponentType;
-    fn connect_logger(a: Self, b: Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
+    fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
 // pub trait Process {
@@ -350,6 +350,7 @@ macro_rules! define_model_enums {
     ) => {
 
         use ::quokkasim::strum_macros::Display;
+        use ::quokkasim::core::Logger;
 
         $(#[$components_enum_meta])*
         #[derive(Display)]
@@ -386,10 +387,10 @@ macro_rules! define_model_enums {
             ),*
         }
   
-        impl<'a> $ComponentsName {
+        impl $ComponentsName {
             pub fn connect_components(
-                mut a: $ComponentsName,
-                mut b: $ComponentsName,
+                mut a: &mut $ComponentsName,
+                mut b: &mut $ComponentsName,
                 n: Option<usize>,
             ) -> Result<(), Box<dyn ::std::error::Error>>{
                 use $crate::core::CustomComponentConnection;
@@ -400,7 +401,7 @@ macro_rules! define_model_enums {
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorProcessF64(mut a, ad), $ComponentsName::VectorStockF64(mut b, bd), _) => {
+                    ($ComponentsName::VectorProcessF64(a, ad), $ComponentsName::VectorStockF64(b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
@@ -436,14 +437,15 @@ macro_rules! define_model_enums {
                 }
             }
 
-            pub fn register_component(self, sim_init: &mut $crate::nexosim::SimInit) {
-                match self {
+            pub fn register_component(mut sim_init: $crate::nexosim::SimInit, component: Self) -> $crate::nexosim::SimInit {
+                match component {
                     $ComponentsName::VectorStockF64(a, ad) => {
                         // Have sim_init consume self by calling sim_init.add_model
-                        // sim_init.add_model(a, ad, "123");
+                        sim_init = sim_init.add_model(a, ad, "123");
                     },
                     _ => {}
-                }
+                };
+                sim_init
             }
             
             // pub fn register_component(sim_init: $crate::nexosim::SimInit, component: $ComponentsName) {
@@ -466,10 +468,10 @@ macro_rules! define_model_enums {
 
         $(#[$logger_enum_meta])*
         #[derive(Display)]
-        pub enum $LoggersName<'a> {
-            VectorStockLoggerF64(&'a mut $crate::components::vector::VectorStockLogger<f64>),
+        pub enum $LoggersName {
+            VectorStockLoggerF64($crate::components::vector::VectorStockLogger<f64>),
             // VectorStockLoggerVector3(&'a mut $crate::components::vector::VectorStockLogger<Vector3>),
-            VectorProcessLoggerF64(&'a mut $crate::components::vector::VectorProcessLogger<f64>),
+            VectorProcessLoggerF64($crate::components::vector::VectorProcessLogger<f64>),
             // VectorProcessLoggerVector3(&'a mut $crate::components::vector::VectorProcessLogger<Vector3>),
             // SequenceStockLoggerString(&'a mut $crate::components::sequence::SequenceStockLogger<String>),
             // SequenceProcessLoggerString(&'a mut $crate::components::sequence::SequenceProcessLogger<Option<String>>),
@@ -479,15 +481,15 @@ macro_rules! define_model_enums {
             ),*
         }
 
-        impl<'a> $LoggersName<'a> {
-            pub fn connect_logger(mut a: $LoggersName, mut b: $ComponentsName, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
+        impl $LoggersName {
+            pub fn connect_logger(a: &mut $LoggersName, b: &mut $ComponentsName, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
                 use $crate::core::CustomLoggerConnection;
                 match (a, b, n) {
-                    ($LoggersName::VectorStockLoggerF64(mut a), $ComponentsName::VectorStockF64(mut b, bd), _) => {
+                    ($LoggersName::VectorStockLoggerF64(a), $ComponentsName::VectorStockF64(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::VectorProcessLoggerF64(mut a), $ComponentsName::VectorProcessF64(mut b, bd), _) => {
+                    ($LoggersName::VectorProcessLoggerF64(a), $ComponentsName::VectorProcessF64(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
@@ -510,31 +512,45 @@ macro_rules! define_model_enums {
                     (a,b,n) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b, n)
                 }
             }
+
+            pub fn write_csv(mut self, dir: &str) -> Result<(), Box<dyn Error>> {
+                match self {
+                    $LoggersName::VectorStockLoggerF64(mut a) => {
+                        a.write_csv(dir.to_string())
+                    },
+                    $LoggersName::VectorProcessLoggerF64(a) => {
+                        a.write_csv(dir.to_string())
+                    },
+                    _ => {
+                        Err(format!("Logger type not implemented for writing CSV").into())
+                    }
+                }
+            } 
         }
 
         #[macro_export]
         macro_rules! connect_components {
-            ($a:ident, $b:ident) => {
-                $crate::core::CustomComponentConnection::connect_components($a, $b, None)
+            (&mut $a:ident, &mut $b:ident) => {
+                $crate::core::CustomComponentConnection::connect_components(&mut $a, &mut $b, None)
             };
-            ($a:ident, $b:ident, $n:expr) => {
-                $crate::core::CustomComponentConnection::connect_components($a, $b, Some($n))
+            (&mut $a:ident, &mut $b:ident, $n:expr) => {
+                $crate::core::CustomComponentConnection::connect_components(&mut $a, &mut $b, Some($n))
             };
         }
 
         #[macro_export]
         macro_rules! connect_logger {
-            ($a:ident, $b:ident) => {
-                $crate::core::CustomLoggerConnection::connect_logger($a, $b, None)
+            (&mut $a:ident, &mut $b:ident) => {
+                $crate::core::CustomLoggerConnection::connect_logger(&mut $a, &mut $b, None)
             };
-            ($a:ident, $b:ident, $n:expr) => {
-                $crate::core::CustomLoggerConnection::connect_logger($a, $b, Some($n))
+            (&mut $a:ident, &mut $b:ident, $n:expr) => {
+                $crate::core::CustomLoggerConnection::connect_logger(&mut $a, &mut $b, Some($n))
             };
         }
 
         macro_rules! register_component {
             ($sim_init:ident, $component:ident) => {
-                $sim_init.add_model($component);
+                $ComponentsName::register_component($sim_init, $component)
             };
         }
     }

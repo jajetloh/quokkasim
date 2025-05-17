@@ -1,0 +1,129 @@
+1970-01-01 00:00:00,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [0]}"
+1970-01-01 00:00:00,Stock1,MyQueueStock,Add,Added [0]. Resources: QueueVector { queue: [0] }
+1970-01-01 00:00:00,Stock1,MyQueueStock,StateChange,"State changed from Empty { occupied: 0, empty: 20 } to Normal { occupied: 1, empty: 19 }"
+1970-01-01 00:00:00.000000001,Stock1,MyQueueStock,Add,Added 1. Resources: QueueVector { queue: [] }
+1970-01-01 00:00:00.000000001,Stock1,MyQueueStock,StateChange,"State changed from Normal { occupied: 1, empty: 19 } to Empty { occupied: 0, empty: 20 }"
+1970-01-01 00:00:00.000000001,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [0]}"
+1970-01-01 00:00:00.000000001,Sink1,Sink,Destroy,[0]
+1970-01-01 00:00:00.681857962,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [1]}"
+1970-01-01 00:00:00.681857962,Stock1,MyQueueStock,Add,Added [1]. Resources: QueueVector { queue: [1] }
+1970-01-01 00:00:00.681857962,Stock1,MyQueueStock,StateChange,"State changed from Empty { occupied: 0, empty: 20 } to Normal { occupied: 1, empty: 19 }"
+1970-01-01 00:00:00.886415351,Stock1,MyQueueStock,Add,Added 1. Resources: QueueVector { queue: [] }
+1970-01-01 00:00:00.886415351,Stock1,MyQueueStock,StateChange,"State changed from Normal { occupied: 1, empty: 19 } to Empty { occupied: 0, empty: 20 }"
+1970-01-01 00:00:00.886415351,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [1]}"
+1970-01-01 00:00:00.886415351,Sink1,Sink,Destroy,[1]
+1970-01-01 00:00:01.953497422,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [2]}"
+1970-01-01 00:00:01.953497422,Stock1,MyQueueStock,Add,Added [2]. Resources: QueueVector { queue: [2] }
+1970-01-01 00:00:01.953497422,Stock1,MyQueueStock,StateChange,"State changed from Empty { occupied: 0, empty: 20 } to Normal { occupied: 1, empty: 19 }"
+1970-01-01 00:00:02.539546648,Stock1,MyQueueStock,Add,Added 1. Resources: QueueVector { queue: [] }
+1970-01-01 00:00:02.539546648,Stock1,MyQueueStock,StateChange,"State changed from Normal { occupied: 1, empty: 19 } to Empty { occupied: 0, empty: 20 }"
+1970-01-01 00:00:02.539546648,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [2]}"
+1970-01-01 00:00:02.539546648,Sink1,Sink,Destroy,[2]
+1970-01-01 00:00:06.200733184,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [3]}"
+1970-01-01 00:00:06.200733184,Stock1,MyQueueStock,Add,Added [3]. Resources: QueueVector { queue: [3] }
+1970-01-01 00:00:06.200733184,Stock1,MyQueueStock,StateChange,"State changed from Empty { occupied: 0, empty: 20 } to Normal { occupied: 1, empty: 19 }"
+1970-01-01 00:00:07.050627272,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [4]}"
+1970-01-01 00:00:07.050627272,Stock1,MyQueueStock,Add,"Added [4]. Resources: QueueVector { queue: [3, 4] }"
+1970-01-01 00:00:08.060953139,Stock1,MyQueueStock,Add,Added 1. Resources: QueueVector { queue: [3] }
+1970-01-01 00:00:08.060953139,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [4]}"
+1970-01-01 00:00:08.060953139,Sink1,Sink,Destroy,[4]
+1970-01-01 00:00:09.165815454,Stock1,MyQueueStock,Add,Added 1. Resources: QueueVector { queue: [] }
+1970-01-01 00:00:09.165815454,Stock1,MyQueueStock,StateChange,"State changed from Normal { occupied: 1, empty: 19 } to Empty { occupied: 0, empty: 20 }"
+1970-01-01 00:00:09.165815454,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [3]}"
+1970-01-01 00:00:09.165815454,Sink1,Sink,Destroy,[3]
+1970-01-01 00:00:09.693165861,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [5]}"
+1970-01-01 00:00:09.693165861,Stock1,MyQueueStock,Add,Added [5]. Resources: QueueVector { queue: [5] }
+1970-01-01 00:00:09.693165861,Stock1,MyQueueStock,StateChange,"State changed from Empty { occupied: 0, empty: 20 } to Normal { occupied: 1, empty: 19 }"
+1970-01-01 00:00:11.401956244,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [6]}"
+1970-01-01 00:00:11.401956244,Stock1,MyQueueStock,Add,"Added [6]. Resources: QueueVector { queue: [5, 6] }"
+1970-01-01 00:00:11.752073741,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [7]}"
+1970-01-01 00:00:11.752073741,Stock1,MyQueueStock,Add,"Added [7]. Resources: QueueVector { queue: [5, 6, 7] }"
+1970-01-01 00:00:12.318178456,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [8]}"
+1970-01-01 00:00:12.318178456,Stock1,MyQueueStock,Add,"Added [8]. Resources: QueueVector { queue: [5, 6, 7, 8] }"
+1970-01-01 00:00:12.493356876,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [9]}"
+1970-01-01 00:00:12.493356876,Stock1,MyQueueStock,Add,"Added [9]. Resources: QueueVector { queue: [5, 6, 7, 8, 9] }"
+1970-01-01 00:00:12.60111562,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 8] }"
+1970-01-01 00:00:12.60111562,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [9]}"
+1970-01-01 00:00:12.60111562,Sink1,Sink,Destroy,[9]
+1970-01-01 00:00:13.156591524,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [10]}"
+1970-01-01 00:00:13.156591524,Stock1,MyQueueStock,Add,"Added [10]. Resources: QueueVector { queue: [5, 6, 7, 8, 10] }"
+1970-01-01 00:00:13.538234832,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [11]}"
+1970-01-01 00:00:13.538234832,Stock1,MyQueueStock,Add,"Added [11]. Resources: QueueVector { queue: [5, 6, 7, 8, 10, 11] }"
+1970-01-01 00:00:14.822543117,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 8, 10] }"
+1970-01-01 00:00:14.822543117,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [11]}"
+1970-01-01 00:00:14.822543117,Sink1,Sink,Destroy,[11]
+1970-01-01 00:00:14.980613231,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [12]}"
+1970-01-01 00:00:14.980613231,Stock1,MyQueueStock,Add,"Added [12]. Resources: QueueVector { queue: [5, 6, 7, 8, 10, 12] }"
+1970-01-01 00:00:15.277695863,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 8, 10] }"
+1970-01-01 00:00:15.277695863,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [12]}"
+1970-01-01 00:00:15.277695863,Sink1,Sink,Destroy,[12]
+1970-01-01 00:00:16.013631992,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 8] }"
+1970-01-01 00:00:16.013631992,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [10]}"
+1970-01-01 00:00:16.013631992,Sink1,Sink,Destroy,[10]
+1970-01-01 00:00:16.241363938,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7] }"
+1970-01-01 00:00:16.241363938,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [8]}"
+1970-01-01 00:00:16.241363938,Sink1,Sink,Destroy,[8]
+1970-01-01 00:00:16.672881658,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [13]}"
+1970-01-01 00:00:16.672881658,Stock1,MyQueueStock,Add,"Added [13]. Resources: QueueVector { queue: [5, 6, 7, 13] }"
+1970-01-01 00:00:16.743630897,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [14]}"
+1970-01-01 00:00:16.743630897,Stock1,MyQueueStock,Add,"Added [14]. Resources: QueueVector { queue: [5, 6, 7, 13, 14] }"
+1970-01-01 00:00:17.10356898,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 13] }"
+1970-01-01 00:00:17.10356898,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [14]}"
+1970-01-01 00:00:17.10356898,Sink1,Sink,Destroy,[14]
+1970-01-01 00:00:17.59970528,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7] }"
+1970-01-01 00:00:17.59970528,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [13]}"
+1970-01-01 00:00:17.59970528,Sink1,Sink,Destroy,[13]
+1970-01-01 00:00:18.633961992,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [15]}"
+1970-01-01 00:00:18.633961992,Stock1,MyQueueStock,Add,"Added [15]. Resources: QueueVector { queue: [5, 6, 7, 15] }"
+1970-01-01 00:00:19.109350016,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [16]}"
+1970-01-01 00:00:19.109350016,Stock1,MyQueueStock,Add,"Added [16]. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:19.25841481,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [17]}"
+1970-01-01 00:00:19.25841481,Stock1,MyQueueStock,Add,"Added [17]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 17] }"
+1970-01-01 00:00:19.474797198,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:19.474797198,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [17]}"
+1970-01-01 00:00:19.474797198,Sink1,Sink,Destroy,[17]
+1970-01-01 00:00:19.690222024,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [18]}"
+1970-01-01 00:00:19.690222024,Stock1,MyQueueStock,Add,"Added [18]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 18] }"
+1970-01-01 00:00:21.006187663,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [19]}"
+1970-01-01 00:00:21.006187663,Stock1,MyQueueStock,Add,"Added [19]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 18, 19] }"
+1970-01-01 00:00:21.674746153,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 18] }"
+1970-01-01 00:00:21.674746153,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [19]}"
+1970-01-01 00:00:21.674746153,Sink1,Sink,Destroy,[19]
+1970-01-01 00:00:21.766720163,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:21.766720163,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [18]}"
+1970-01-01 00:00:21.766720163,Sink1,Sink,Destroy,[18]
+1970-01-01 00:00:23.23583403,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [20]}"
+1970-01-01 00:00:23.23583403,Stock1,MyQueueStock,Add,"Added [20]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 20] }"
+1970-01-01 00:00:24.224150586,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:24.224150586,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [20]}"
+1970-01-01 00:00:24.224150586,Sink1,Sink,Destroy,[20]
+1970-01-01 00:00:24.752360073,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [21]}"
+1970-01-01 00:00:24.752360073,Stock1,MyQueueStock,Add,"Added [21]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 21] }"
+1970-01-01 00:00:24.842155018,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:24.842155018,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [21]}"
+1970-01-01 00:00:24.842155018,Sink1,Sink,Destroy,[21]
+1970-01-01 00:00:25.029925813,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [22]}"
+1970-01-01 00:00:25.029925813,Stock1,MyQueueStock,Add,"Added [22]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 22] }"
+1970-01-01 00:00:25.03593925,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:25.03593925,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [22]}"
+1970-01-01 00:00:25.03593925,Sink1,Sink,Destroy,[22]
+1970-01-01 00:00:25.246605221,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [23]}"
+1970-01-01 00:00:25.246605221,Stock1,MyQueueStock,Add,"Added [23]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 23] }"
+1970-01-01 00:00:25.597288628,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16] }"
+1970-01-01 00:00:25.597288628,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [23]}"
+1970-01-01 00:00:25.597288628,Sink1,Sink,Destroy,[23]
+1970-01-01 00:00:25.831674781,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [24]}"
+1970-01-01 00:00:25.831674781,Stock1,MyQueueStock,Add,"Added [24]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24] }"
+1970-01-01 00:00:26.064037678,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [25]}"
+1970-01-01 00:00:26.064037678,Stock1,MyQueueStock,Add,"Added [25]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24, 25] }"
+1970-01-01 00:00:26.703983087,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [26]}"
+1970-01-01 00:00:26.703983087,Stock1,MyQueueStock,Add,"Added [26]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24, 25, 26] }"
+1970-01-01 00:00:27.308043959,Stock1,MyQueueStock,Add,"Added 1. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24, 25] }"
+1970-01-01 00:00:27.308043959,Sink1,Sink,info,"{""message"": ""Received item"", ""item"": [26]}"
+1970-01-01 00:00:27.308043959,Sink1,Sink,Destroy,[26]
+1970-01-01 00:00:27.595381519,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [27]}"
+1970-01-01 00:00:27.595381519,Stock1,MyQueueStock,Add,"Added [27]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24, 25, 27] }"
+1970-01-01 00:00:27.643838832,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [28]}"
+1970-01-01 00:00:27.643838832,Stock1,MyQueueStock,Add,"Added [28]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24, 25, 27, 28] }"
+1970-01-01 00:00:29.33344516,Source1,Source,info,"{""message"": ""Created new to queue"", ""item"": [29]}"
+1970-01-01 00:00:29.33344516,Stock1,MyQueueStock,Add,"Added [29]. Resources: QueueVector { queue: [5, 6, 7, 15, 16, 24, 25, 27, 28, 29] }"
