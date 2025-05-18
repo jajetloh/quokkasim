@@ -353,12 +353,7 @@ macro_rules! define_model_enums {
         }
 
         $(#[$model_init_meta:meta])*
-        pub enum $ModelInitName:ident {
-            $(
-                $(#[$model_init_var_meta:meta])*
-                $V:ident $( ( $VT:ty ) )?
-            ),* $(,)?
-        }
+        pub enum $ModelInitName:ident {}
     ) => {
 
         use ::quokkasim::strum_macros::Display;
@@ -464,7 +459,17 @@ macro_rules! define_model_enums {
                         sim_init = sim_init.add_model(a, mb, name);
                         init_configs.push($ModelInitName::VectorStockF64(addr));
                     },
-                    _ => {}
+                    $(
+                        $ComponentsName::$R(a, mb) => {
+                            let name = a.element_name.clone();
+                            let addr = mb.address();
+                            sim_init = sim_init.add_model(a, mb, name);
+                            init_configs.push($ModelInitName::$R(addr));
+                        }
+                    ),*
+                    _ => {
+                        panic!("Component type {} not implemented for registration", component);
+                    }
                 };
                 sim_init
             }
@@ -556,14 +561,14 @@ macro_rules! define_model_enums {
 
             pub fn write_csv(mut self, dir: &str) -> Result<(), Box<dyn Error>> {
                 match self {
-                    $LoggersName::VectorStockLoggerF64(mut a) => {
+                    $LoggersName::VectorStockLoggerF64(a) => {
                         a.write_csv(dir.to_string())
                     },
                     $LoggersName::VectorProcessLoggerF64(a) => {
                         a.write_csv(dir.to_string())
                     },
                     $(
-                        $LoggersName::$U ( mut a ) => {
+                        $LoggersName::$U (a) => {
                             a.write_csv(dir.to_string())
                         }
                     ),*
@@ -578,8 +583,7 @@ macro_rules! define_model_enums {
             VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
             $(
-                $(#[$model_init_var_meta])*
-                $V $( ( $VT ) )?
+                $R $( ( $crate::nexosim::Address<$RT> ) )?
             ),*
         }
 

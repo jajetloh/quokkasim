@@ -231,10 +231,7 @@ define_model_enums! {
         IronOreProcessLogger(IronOreProcessLogger),
         IronOreStockLogger(IronOreStockLogger),
     }
-    pub enum ComponentInit {
-        IronOreProcessInit(Address<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStockInit(Address<VectorStock<IronOre>>),
-    }
+    pub enum ComponentInit {}
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -282,11 +279,12 @@ impl CustomInit for ComponentInit {
             message: "Start".into(),
         };
         match self {
-            ComponentInit::IronOreProcessInit(addr) => {
+            ComponentInit::IronOreProcess(addr) => {
                 simu.process_event(VectorProcess::<IronOre, IronOre, f64>::update_state, notif_meta, addr.clone())?;
+                println!("Initialising IronOreProcess");
                 Ok(())
             },
-            ComponentInit::IronOreStockInit(_) => {
+            ComponentInit::IronOreStock(_) => {
                 // No init required for this stock
                 Ok(())
             },
@@ -338,33 +336,24 @@ fn main() {
     connect_logger!(&mut process_logger, &mut process1).unwrap();
     connect_logger!(&mut stock_logger, &mut stock2).unwrap();
 
-    // let x: Vec<dyn InputFn<>> = vec![
-    //     VectorProcess::<IronOre, IronOre, f64>::update_state,
-    //     VectorProcess::<IronOre, IronOre, f64>::update_state,
-    //     VectorProcess::<f64, f64, f64>::update_state,
-    // ];
-
     let mut sim_builder = SimInit::new();
     let mut init_configs: Vec<ComponentInit> = Vec::new();
     sim_builder = register_component!(sim_builder, &mut init_configs, stock1);
     sim_builder = register_component!(sim_builder, &mut init_configs, process1);
     sim_builder = register_component!(sim_builder, &mut init_configs, stock2);
+
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    // ComponentModel::initialise(&mut self, &mut simu)
+    init_configs.iter_mut().for_each(|x| {
+        x.initialise(&mut simu).unwrap();
+    });
 
-    // simu.process_event(
-    //     VectorProcess::<IronOre, IronOre, f64>::update_state,
-    //     NotificationMetadata {
-    //         time: MonotonicTime::EPOCH,
-    //         element_from: "Init".into(),
-    //         message: "Start".into(),
-    //     }, &process1_addr
-    // ).unwrap();
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 
-    create_dir_all("outputs/trucking_2").unwrap();
-    process_logger.write_csv("outputs/trucking_2".into()).unwrap();
-    stock_logger.write_csv("outputs/trucking_2".into()).unwrap();
+    let output_dir = "outputs/trucking_2";
+
+    create_dir_all(output_dir).unwrap();
+    process_logger.write_csv(output_dir.into()).unwrap();
+    stock_logger.write_csv(output_dir.into()).unwrap();
 
 }
