@@ -619,6 +619,7 @@ pub struct VectorCombiner<
     next_event_id: u64,
     pub log_emitter: Output<VectorProcessLog<T>>,
     pub previous_check_time: MonotonicTime,
+    pub split_ratios: [f64; M],
 }
 
 impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static, const M: usize> Model for VectorCombiner<T, T, f64, M> {}
@@ -644,6 +645,7 @@ impl<
             next_event_id: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
+            split_ratios: [1./(M as f64); M],
         }
     }
 
