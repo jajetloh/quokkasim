@@ -1,4 +1,4 @@
-use std::{error::Error, fs::create_dir_all, os::windows::process, time::Duration};
+use std::{error::Error, fs::create_dir_all, time::Duration};
 
 use nexosim::time::MonotonicTime;
 use quokkasim::{define_model_enums, prelude::*};

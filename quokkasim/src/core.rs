@@ -15,21 +15,9 @@ impl VectorArithmetic<f64, f64, f64> for f64 {
         *self += other;
     }
 
-    // fn subtract(&self, other: &Self) -> Self {
-    //     self - other
-    // }
-
     fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, f64> {
         SubtractParts { remaining: self - quantity, subtracted: quantity }
     }
-
-    // fn multiply(&self, scalar: f64) -> Self {
-    //     self * scalar
-    // }
-
-    // fn divide(&self, scalar: f64) -> Self {
-    //     self / scalar
-    // }
 
     fn total(&self) -> f64 {
         *self
@@ -242,42 +230,19 @@ pub trait Process<T: VectorArithmetic<U, V, C> + Clone + Debug, U, V, C> {
 
 
     fn update_state<'a>(&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
-        // async move {}
         async move {
             self.pre_update_state(&notif_meta, cx).await;
             self.update_state_impl(&notif_meta, cx).await;
             self.post_update_state(&notif_meta, cx).await;
         }
     }
-    // {
-    //     self.pre_update_state(item);
-    //     self.update_state_impl(item);
-    //     self.post_update_state(item);
-    // }
+
     fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
         async move {}
     }
 
     fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send;
-    // fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model,  {
-    //     // self.set_next_event_time(time);
-    //     async move {
-            
-    //         self.set_previous_check_time(cx.time());
-    //         match self.get_time_to_next_event() {
-    //             None => {},
-    //             Some(time_until_next) => {
-    //                 if time_until_next.is_zero() {
-    //                     panic!("Time until next event is zero!");
-    //                 } else {
-    //                     let next_time = cx.time() + *time_until_next;
-    //                     cx.schedule_event(MonotonicTime::EPOCH, <Self as Process<T>>::update_state, notif_meta.clone()).unwrap();
-    //                     // cx.schedule_event(next_time, <Self as Process<T>>::post_update_state, notif_meta.clone())
-    //                 };
-    //             }
-    //         };
-    //     }
-    // }
+
 }
 
 pub trait Logger {
@@ -313,24 +278,6 @@ pub trait CustomLoggerConnection {
 pub trait CustomInit {
     fn initialise(&mut self, simu: &mut crate::nexosim::Simulation) -> Result<(), ExecutionError>;
 } 
-
-// pub trait Process {
-//     fn pre_update_state() {
-
-//     }
-
-//     fn update_state_impl() {}
-
-//     fn post_update_state() {
-
-//     }
-
-//     fn update_state(&mut self) {
-//         self.pre_update_state();
-//         self.update_state_impl();
-//         self.post_update_state();
-//     }
-// }
 
 // Components and loggers enums must be defined together as logger enum connector method requires the components enum
 #[macro_export]
@@ -680,43 +627,6 @@ macro_rules! define_model_enums {
                 };
                 sim_init
             }
-
-            // pub fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
-            //     let notif_meta = NotificationMetadata {
-            //         time: simu.time(),
-            //         element_from: "Init".into(),
-            //         message: "Init".into(),
-            //     };
-            //     match self {
-            //         $ComponentsName::VectorProcessF64(a, am) => {
-            //             simu.process_event(
-            //                 VectorProcess::<f64, f64, f64>::update_state,
-            //                 notif_meta,
-            //                 am.address(),
-            //             )
-            //         },
-            //         _ => {
-            //             <$ComponentsName as 
-            //         }
-            //     }
-            // }
-            
-            // pub fn register_component(sim_init: $crate::nexosim::SimInit, component: $ComponentsName) {
-            //     match component {
-            //         $ComponentsName::VectorStockF64(mut a, mut ad) => {
-            //             // sim_init.add_model(a, ad, a.get_name());
-            //             // let x = a.mut;
-            //             // sim_init.add_model(a, ad, a.get_name()),
-            //         }
-            //         _ => {}
-            //         // $(
-            //         //     $(#[$components_var_meta])*
-            //         //     $R $( ( $RT, $RT2 ) )? => {
-            //         //         register_component!(sim_init, $R);
-            //         //     }
-            //         // ),*
-            //     }
-            // }
         }
 
         $(#[$logger_enum_meta])*

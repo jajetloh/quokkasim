@@ -347,7 +347,7 @@ fn main() {
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 
-    let output_dir = "outputs/trucking_2";
+    let output_dir = "outputs/iron_ore";
 
     create_dir_all(output_dir).unwrap();
     process_logger.write_csv(output_dir.into()).unwrap();
