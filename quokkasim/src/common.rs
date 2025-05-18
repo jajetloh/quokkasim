@@ -90,6 +90,13 @@ impl Display for DistributionParametersError {
 }
 
 impl DistributionFactory {
+    pub fn new(base_seed: u64) -> Self {
+        DistributionFactory {
+            base_seed,
+            next_seed: base_seed,
+        }
+    }
+
     pub fn create(&mut self, config: DistributionConfig) -> Result<Distribution, DistributionParametersError> {
         let result = match config {
             DistributionConfig::Uniform { min, max } => {

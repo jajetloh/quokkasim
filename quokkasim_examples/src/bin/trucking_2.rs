@@ -77,8 +77,7 @@ struct IronOreProcessLog {
     event_id: u64,
     element_name: String,
     element_type: String,
-    log_type: String,
-    truck_id: u32,
+    truck_id: Option<u32>,
     event: VectorProcessLogType<IronOre>,
 }
 impl Serialize for IronOreProcessLog {
@@ -91,7 +90,6 @@ impl Serialize for IronOreProcessLog {
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("truck_id", &self.truck_id)?;
 
         let (event_type, total, fe, other_elements, fe_pc, magnetite, hematite, limonite, message) = match &self.event {
@@ -127,9 +125,7 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
             event_id: log.event_id,
             element_name: log.element_name,
             element_type: log.element_type,
-            // TODO: treat log_type and truck_id properly
-            log_type: "LOGTYPE".into(),
-            truck_id: 0,
+            truck_id: None,
             event: log.event,
         }
     }
@@ -162,7 +158,7 @@ struct IronOreStockLog {
     element_name: String,
     element_type: String,
     log_type: String,
-    truck_id: u32,
+    truck_id: Option<u32>,
     resource: IronOre,
 }
 impl Serialize for IronOreStockLog {
@@ -194,9 +190,8 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
             event_id: log.event_id,
             element_name: log.element_name,
             element_type: log.element_type,
-            // TODO: treat log_type and truck_id properly
-            log_type: "LOGTYPE".into(),
-            truck_id: 0,
+            log_type: log.log_type,
+            truck_id: None,
             resource: log.vector
         }
     }
@@ -249,7 +244,7 @@ impl CustomComponentConnection for ComponentModel {
                 b.withdraw_upstream.connect(VectorStock::<IronOre>::remove, ad.address());
                 Ok(())
             },
-            _ => Err("Invalid connection".into()),
+            (a, b) => Err(format!("No component connection defined from {} to {}", a, b).into()),
         }
     }
 }
@@ -266,7 +261,7 @@ impl CustomLoggerConnection for ComponentLogger {
                 b.log_emitter.map_connect_sink(|c| <VectorStockLog<IronOre>>::into(c.clone()), &a.buffer);
                 Ok(())
             },
-            _ => Err("Invalid connection".into()),
+            (a, b, _) => Err(format!("No logger connection defined from {} to {}", a, b).into()),
         }
     }
 }
@@ -281,7 +276,6 @@ impl CustomInit for ComponentInit {
         match self {
             ComponentInit::IronOreProcess(addr) => {
                 simu.process_event(VectorProcess::<IronOre, IronOre, f64>::update_state, notif_meta, addr.clone())?;
-                println!("Initialising IronOreProcess");
                 Ok(())
             },
             ComponentInit::IronOreStock(_) => {
@@ -297,6 +291,9 @@ impl CustomInit for ComponentInit {
 
 fn main() {
 
+    let base_seed = 123456789;
+    let mut df = DistributionFactory::new(base_seed);
+
     let mut stock1 = ComponentModel::IronOreStock(
         VectorStock::new()
             .with_name("MyStock1".into())
@@ -311,7 +308,7 @@ fn main() {
         VectorProcess::new()
             .with_name("MyProcess1".into())
             .with_type("IronOreProcess".into())
-            .with_process_quantity_distr(Distribution::Constant(4.))
+            .with_process_quantity_distr(df.create(DistributionConfig::Uniform { min: 2., max: 8. }).unwrap())
             .with_process_time_distr(Distribution::Constant(10.)),
         Mailbox::new(),
     );
