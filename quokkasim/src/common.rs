@@ -13,36 +13,6 @@ pub struct EventLog {
     pub json_data: String,
 }
 
-// pub trait Logger {
-//     type RecordType: Serialize;
-//     fn get_name(&self) -> &String;
-//     fn get_buffer(&self) -> &EventBuffer<Self::RecordType>;
-//     fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>>;
-// }
-
-// #[derive()]
-// pub struct EventLogger<T: Serialize> {
-//     pub buffer: EventBuffer<T>
-// } 
-
-// impl<T> EventLogger<T> where T: Serialize + std::fmt::Debug {
-//     pub fn new(capacity: usize) -> Self {
-//         EventLogger {
-//             buffer: EventBuffer::with_capacity(capacity)
-//         }
-//     }
-
-//     pub fn write_csv(self, filename: &str) -> Result<(), std::io::Error> {
-//         let file = std::fs::File::create(filename)?;
-//         let mut writer = csv::Writer::from_writer(file);
-//         self.buffer.for_each(|log: T| {
-//             writer.serialize(log).expect("Failed to write record");
-//         });
-//         writer.flush().expect("Failed to flush writer");
-//         Ok(())
-//     }
-// }
-
 #[derive(Debug, Clone)]
 pub struct NotificationMetadata {
     pub time: MonotonicTime,
