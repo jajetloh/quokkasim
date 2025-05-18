@@ -426,6 +426,141 @@ macro_rules! define_model_enums {
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
                         Ok(())
                     },
+
+                    // VectorCombiner1Vector3
+                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner1Vector3(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorCombiner1Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    // VectorCombiner2Vector3
+                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner2Vector3(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorCombiner2Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    // VectorCombiner3Vector3
+                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner3Vector3(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorCombiner3Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    // VectorCombiner4Vector3
+                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner4Vector3(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorCombiner4Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    // VectorCombiner5Vector3
+                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner5Vector3(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorCombiner5Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+
+
+                    // VectorSplitter1Vector3
+                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter1Vector3(b, bmb), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorSplitter1Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
+                        Ok(())
+                    },
+                    // VectorSplitter2Vector3
+                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter2Vector3(b, bmb), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorSplitter2Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
+                        Ok(())
+                    },
+                    // VectorSplitter3Vector3
+                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter3Vector3(b, bmb), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorSplitter3Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
+                        Ok(())
+                    },
+                    // VectorSplitter4Vector3
+                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter4Vector3(b, bmb), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorSplitter4Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
+                        Ok(())
+                    },
+                    // VectorSplitter5Vector3
+                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter5Vector3(b, bmb), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
+                        Ok(())
+                    },
+                    ($ComponentsName::VectorSplitter5Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
+                        Ok(())
+                    },
+
+
                     ($ComponentsName::SequenceStockString(a, ad), $ComponentsName::SequenceProcessString(b, bd), _) => {
                         a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.address());
@@ -729,10 +864,10 @@ macro_rules! define_model_enums {
         #[macro_export]
         macro_rules! connect_components {
             (&mut $a:ident, &mut $b:ident) => {
-                $crate::core::CustomComponentConnection::connect_components(&mut $a, &mut $b, None)
+                $ComponentsName::connect_components(&mut $a, &mut $b, None)
             };
             (&mut $a:ident, &mut $b:ident, $n:expr) => {
-                $crate::core::CustomComponentConnection::connect_components(&mut $a, &mut $b, Some($n))
+                $ComponentsName::connect_components(&mut $a, &mut $b, Some($n))
             };
         }
 

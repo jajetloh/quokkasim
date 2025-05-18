@@ -12,7 +12,7 @@ define_model_enums! {
 impl CustomComponentConnection for ComponentModel {
     fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
-            (a, b) => Err(format!("No component connection defined from {} to {}", a, b).into()),
+            (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }
 }
@@ -21,7 +21,7 @@ impl CustomLoggerConnection for ComponentLogger {
     type ComponentType = ComponentModel;
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b, n) {
-            (a, b, _) => Err(format!("No logger connection defined from {} to {}", a, b).into()),
+            (a, b, _) => Err(format!("No logger connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }
 }
@@ -128,31 +128,31 @@ fn main() {
         Mailbox::new()
     );
 
-    connect_components!(&mut stockpile_1, &mut reclaimer_1, 0);
-    connect_components!(&mut stockpile_2, &mut reclaimer_1, 1);
-    connect_components!(&mut reclaimer_1, &mut output_stockpile_1);
+    connect_components!(&mut stockpile_1, &mut reclaimer_1, 0).unwrap();
+    connect_components!(&mut stockpile_2, &mut reclaimer_1, 1).unwrap();
+    connect_components!(&mut reclaimer_1, &mut output_stockpile_1).unwrap();
 
-    connect_components!(&mut stockpile_2, &mut reclaimer_2, 0);
-    connect_components!(&mut stockpile_3, &mut reclaimer_2, 1);
-    connect_components!(&mut reclaimer_2, &mut output_stockpile_2);
+    connect_components!(&mut stockpile_2, &mut reclaimer_2, 0).unwrap();
+    connect_components!(&mut stockpile_3, &mut reclaimer_2, 1).unwrap();
+    connect_components!(&mut reclaimer_2, &mut output_stockpile_2).unwrap();
 
-    connect_components!(&mut stockpile_1, &mut reclaimer_3);
-    connect_components!(&mut reclaimer_3, &mut output_stockpile_1);
+    connect_components!(&mut stockpile_1, &mut reclaimer_3, 0).unwrap();
+    connect_components!(&mut reclaimer_3, &mut output_stockpile_1).unwrap();
 
-    connect_components!(&mut output_stockpile_1, &mut stacker);
-    connect_components!(&mut stacker, &mut stockpile_2, 0);
-    connect_components!(&mut stacker, &mut stockpile_3, 1);
+    connect_components!(&mut output_stockpile_1, &mut stacker).unwrap();
+    connect_components!(&mut stacker, &mut stockpile_2, 0).unwrap();
+    connect_components!(&mut stacker, &mut stockpile_3, 1).unwrap();
 
-    connect_logger!(&mut process_logger, &mut reclaimer_1);
-    connect_logger!(&mut process_logger, &mut reclaimer_2);
-    connect_logger!(&mut process_logger, &mut reclaimer_3);
-    connect_logger!(&mut process_logger, &mut stacker);
+    connect_logger!(&mut process_logger, &mut reclaimer_1).unwrap();
+    connect_logger!(&mut process_logger, &mut reclaimer_2).unwrap();
+    connect_logger!(&mut process_logger, &mut reclaimer_3).unwrap();
+    connect_logger!(&mut process_logger, &mut stacker).unwrap();
 
-    connect_logger!(&mut stock_logger, &mut stockpile_1);
-    connect_logger!(&mut stock_logger, &mut stockpile_2);
-    connect_logger!(&mut stock_logger, &mut stockpile_3);
-    connect_logger!(&mut stock_logger, &mut output_stockpile_1);
-    connect_logger!(&mut stock_logger, &mut output_stockpile_2);
+    connect_logger!(&mut stock_logger, &mut stockpile_1).unwrap();
+    connect_logger!(&mut stock_logger, &mut stockpile_2).unwrap();
+    connect_logger!(&mut stock_logger, &mut stockpile_3).unwrap();
+    connect_logger!(&mut stock_logger, &mut output_stockpile_1).unwrap();
+    connect_logger!(&mut stock_logger, &mut output_stockpile_2).unwrap();
 
     let mut sim_builder = SimInit::new();
     let mut init_configs: Vec<ComponentInit> = Vec::new();

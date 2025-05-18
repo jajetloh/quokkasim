@@ -690,6 +690,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {
             let time = cx.time();
+            println!("{} Combiner update state, {:?}", self.element_name, self.process_state.clone());
 
             match self.process_state.take() {
                 Some((mut process_time_left, mut resources)) => {
@@ -725,6 +726,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                         }));
                     }
                     let ds_state = self.req_downstream.send(()).await.next();
+                    println!("{} Combiner update state, us_states: {:?}, ds_state: {:?}, all_us_available: {:?}", self.element_name, us_states, ds_state, all_us_available);
                     match (all_us_available, ds_state) {
                         (
                             Some(true),
@@ -733,7 +735,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                             let process_quantity = self.process_quantity_distr.sample();
                             let withdraw_iterators = join_all(self.withdraw_upstreams.iter_mut().map(|req| {
                                 req.send((process_quantity, NotificationMetadata {
-                                    time,
+                                    time, 
                                     element_from: self.element_name.clone(),
                                     message: format!("Withdrawing quantity {:?}", process_quantity),
                                 }))
