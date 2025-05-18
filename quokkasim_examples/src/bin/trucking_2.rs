@@ -232,7 +232,8 @@ define_model_enums! {
         IronOreStockLogger(IronOreStockLogger),
     }
     pub enum ComponentInit {
-
+        IronOreProcessInit(Address<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreStockInit(Address<VectorStock<IronOre>>),
     }
 }
 
@@ -269,6 +270,29 @@ impl CustomLoggerConnection for ComponentLogger {
                 Ok(())
             },
             _ => Err("Invalid connection".into()),
+        }
+    }
+}
+
+impl CustomInit for ComponentInit {
+    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
+        let notif_meta = NotificationMetadata {
+            time: simu.time(),
+            element_from: "Init".into(),
+            message: "Start".into(),
+        };
+        match self {
+            ComponentInit::IronOreProcessInit(addr) => {
+                simu.process_event(VectorProcess::<IronOre, IronOre, f64>::update_state, notif_meta, addr.clone())?;
+                Ok(())
+            },
+            ComponentInit::IronOreStockInit(_) => {
+                // No init required for this stock
+                Ok(())
+            },
+            _ => {
+                Err(ExecutionError::BadQuery)
+            }
         }
     }
 }

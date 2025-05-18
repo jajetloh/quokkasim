@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Debug, fs::File, time::Duration};
 use crate::common::{NotificationMetadata};
 use csv::WriterBuilder;
-use nexosim::{model::{Context, Model}, ports::EventQueue};
+use nexosim::{model::{Context, Model}, ports::EventQueue, simulation::ExecutionError};
 use serde::Serialize;
 use tai_time::MonotonicTime;
 
@@ -310,6 +310,10 @@ pub trait CustomLoggerConnection {
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
+pub trait CustomInit {
+    fn initialise(&mut self, simu: &mut crate::nexosim::Simulation) -> Result<(), ExecutionError>;
+} 
+
 // pub trait Process {
 //     fn pre_update_state() {
 
@@ -350,6 +354,10 @@ macro_rules! define_model_enums {
 
         $(#[$model_init_meta:meta])*
         pub enum $ModelInitName:ident {
+            $(
+                $(#[$model_init_var_meta:meta])*
+                $V:ident $( ( $VT:ty ) )?
+            ),* $(,)?
         }
     ) => {
 
@@ -461,23 +469,25 @@ macro_rules! define_model_enums {
                 sim_init
             }
 
-            pub fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
-                let notif_meta = NotificationMetadata {
-                    time: simu.time(),
-                    element_from: "Init".into(),
-                    message: "Init".into(),
-                };
-                match self {
-                    $ComponentsName::VectorProcessF64(a, am) => {
-                        simu.process_event(
-                            VectorProcess::<f64, f64, f64>::update_state,
-                            notif_meta,
-                            am.address(),
-                        )
-                    },
-                    _ => Ok(())
-                }
-            }
+            // pub fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
+            //     let notif_meta = NotificationMetadata {
+            //         time: simu.time(),
+            //         element_from: "Init".into(),
+            //         message: "Init".into(),
+            //     };
+            //     match self {
+            //         $ComponentsName::VectorProcessF64(a, am) => {
+            //             simu.process_event(
+            //                 VectorProcess::<f64, f64, f64>::update_state,
+            //                 notif_meta,
+            //                 am.address(),
+            //             )
+            //         },
+            //         _ => {
+            //             <$ComponentsName as 
+            //         }
+            //     }
+            // }
             
             // pub fn register_component(sim_init: $crate::nexosim::SimInit, component: $ComponentsName) {
             //     match component {
@@ -552,8 +562,13 @@ macro_rules! define_model_enums {
                     $LoggersName::VectorProcessLoggerF64(a) => {
                         a.write_csv(dir.to_string())
                     },
+                    $(
+                        $LoggersName::$U ( mut a ) => {
+                            a.write_csv(dir.to_string())
+                        }
+                    ),*
                     _ => {
-                        Err(format!("Logger type not implemented for writing CSV").into())
+                        Err(format!("Logger type {} not implemented for writing CSV", self).into())
                     }
                 }
             } 
@@ -562,6 +577,32 @@ macro_rules! define_model_enums {
         pub enum $ModelInitName {
             VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
+            $(
+                $(#[$model_init_var_meta])*
+                $V $( ( $VT ) )?
+            ),*
+        }
+
+        impl $ModelInitName {
+            fn initialise(&mut self, simu: &mut $crate::nexosim::Simulation) -> Result<(), $crate::nexosim::ExecutionError> {
+                let notif_meta = NotificationMetadata {
+                    time: simu.time(),
+                    element_from: "Init".into(),
+                    message: "Init".into(),
+                }; 
+                match self {
+                    $ModelInitName::VectorProcessF64(a) => {
+                        simu.process_event(
+                            $crate::components::vector::VectorProcess::<f64, f64, f64>::update_state,
+                            notif_meta,
+                            a.clone(),
+                        )
+                    },
+                    a => {
+                        <Self as CustomInit>::initialise(a, simu)
+                    }
+                }
+            }
         }
 
         #[macro_export]
