@@ -1,4 +1,4 @@
-use std::{error::Error, fs::create_dir_all, time::Duration};
+use std::{error::Error, fs::create_dir_all, os::windows::process, time::Duration};
 
 use nexosim::time::MonotonicTime;
 use quokkasim::{define_model_enums, prelude::*};
@@ -179,6 +179,7 @@ fn main() {
 
     let output_dir= "outputs/material_blending";
     create_dir_all(output_dir).unwrap();
+
     process_logger.write_csv(output_dir.into()).unwrap();
     stock_logger.write_csv(output_dir.into()).unwrap();
 }

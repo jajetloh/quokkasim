@@ -748,6 +748,7 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
+
                     ($LoggersName::VectorStockLoggerVector3(a), $ComponentsName::VectorStockVector3(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
@@ -756,6 +757,47 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner1Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner2Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner3Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner4Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner5Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter1Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter2Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter3Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter4Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter5Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+
                     ($LoggersName::SequenceStockLoggerString(a), $ComponentsName::SequenceStockString(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
@@ -874,10 +916,10 @@ macro_rules! define_model_enums {
         #[macro_export]
         macro_rules! connect_logger {
             (&mut $a:ident, &mut $b:ident) => {
-                $crate::core::CustomLoggerConnection::connect_logger(&mut $a, &mut $b, None)
+                $LoggersName::connect_logger(&mut $a, &mut $b, None)
             };
             (&mut $a:ident, &mut $b:ident, $n:expr) => {
-                $crate::core::CustomLoggerConnection::connect_logger(&mut $a, &mut $b, Some($n))
+                $LoggersName::connect_logger(&mut $a, &mut $b, Some($n))
             };
         }
 

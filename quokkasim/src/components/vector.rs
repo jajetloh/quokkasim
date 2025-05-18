@@ -566,7 +566,7 @@ impl Serialize for VectorProcessLog<Vector3> {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("VectorProcessLog", 6)?;
+        let mut state = serializer.serialize_struct("VectorProcessLog", 11)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
@@ -587,7 +587,8 @@ impl Serialize for VectorProcessLog<Vector3> {
         state.serialize_field("x0", &x0)?;
         state.serialize_field("x1", &x1)?;
         state.serialize_field("x2", &x2)?;
-        state.serialize_field("parts", &parts)?;
+        let parts_str = parts.as_ref().map(|vs| serde_json::to_string(vs).unwrap());
+        state.serialize_field("parts", &parts_str)?;
         state.serialize_field("reason", &reason)?;
         state.end()
     }
