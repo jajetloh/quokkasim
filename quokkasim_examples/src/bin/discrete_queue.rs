@@ -1,154 +1,110 @@
-use std::time::Duration;
+use std::{error::Error, fs::create_dir_all, time::Duration};
+use quokkasim::{define_model_enums, prelude::*};
 
-use nexosim::time::MonotonicTime;
-use quokkasim::components::queue::{MyQueueCombinerProcess, MyQueueProcess, MyQueueSink, MyQueueSource, MyQueueStock, QueueProcessLogger, QueueStockLogger};
-use quokkasim::common::Logger;
-use quokkasim::core::{Distribution, DistributionConfig, DistributionFactory, NotificationMetadata, Process, SimInit, Sink, Source, Stock};
-use nexosim::simulation::Mailbox;
 
+define_model_enums! {
+    pub enum ComponentModel {}
+    pub enum ComponentLogger {}
+    pub enum ComponentInit {}
+}
+
+impl CustomComponentConnection for ComponentModel {
+    fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
+        match (a, b) {
+            (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
+        }
+    }
+}
+
+impl CustomLoggerConnection for ComponentLogger { 
+    type ComponentType = ComponentModel;
+    fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
+        match (a, b, n) {
+            (a, b, _) => Err(format!("No logger connection defined from {} to {} (n={:?})", a, b, n).into()),
+        }
+    }
+}
+
+impl CustomInit for ComponentInit {
+    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
+        let notif_meta = NotificationMetadata {
+            time: simu.time(),
+            element_from: "Init".into(),
+            message: "Start".into(),
+        };
+        match self {
+            _ => {
+                Err(ExecutionError::BadQuery)
+            }
+        }
+    }
+}
 
 fn main() {
-    let stock_logger = QueueStockLogger::new("StockLogger".into(), 100_000);
-    let process_logger = QueueProcessLogger::new("ProcessLogger".into(), 100_000);
 
-    let mut df = DistributionFactory { base_seed: 1234, next_seed: 0 };
+    let mut df = DistributionFactory {
+        base_seed: 1234,
+        next_seed: 0,
+    };
 
-    let mut source1 = MyQueueSource::new()
-        .with_name("Source1".into())
-        .with_time_to_new_dist(df.create(DistributionConfig::Constant(500.0)).unwrap());
-    source1.log_emitter.connect_sink(process_logger.get_buffer());
-    source1.next_id = 50;
-    let source1_mbox: Mailbox<MyQueueSource> = Mailbox::new();
-    let source1_addr = source1_mbox.address();
+    let mut queue_1 = ComponentModel::SequenceStockString(SequenceStock::new()
+        .with_name("Queue1".into())
+        .with_low_capacity(0)
+        .with_max_capacity(10)
+        .with_initial_contents((0..12).into_iter().map(|i| format!("Person_{:0>2}", i)).collect()),
+        Mailbox::new()
+    );
 
-    let mut stock1 = MyQueueStock::new()
-        .with_name("Stock1".into())
-        .with_log_consumer(&stock_logger);
-    let stock1_mbox: Mailbox<MyQueueStock> = Mailbox::new();
-    let stock1_addr = stock1_mbox.address();
-    stock1.low_capacity = 0;
-    stock1.max_capacity = 100;
-    stock1.resource.queue = (0..50).into_iter().collect::<Vec<i32>>();
+    let mut process_1 = ComponentModel::SequenceProcessString(SequenceProcess::new()
+        .with_name("Process1".into())
+        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 4. }).unwrap()),
+        Mailbox::new()
+    );
 
-    let mut source2 = MyQueueSource::new()
-        .with_name("Source2".into())
-        .with_time_to_new_dist(df.create(DistributionConfig::Constant(10.)).unwrap());
-    source2.log_emitter.connect_sink(process_logger.get_buffer());
-    let source2_mbox: Mailbox<MyQueueSource> = Mailbox::new();
-    let source2_addr = source2_mbox.address();
-    source2.next_id = 1001;
+    let mut queue_2 = ComponentModel::SequenceStockString(SequenceStock::new()
+        .with_name("Queue2".into())
+        .with_low_capacity(0)
+        .with_max_capacity(10)
+        .with_initial_contents(Vec::new()),
+        Mailbox::new()
+    );
 
-    let mut stock2 = MyQueueStock::new()
-        .with_name("Stock2".into())
-        .with_log_consumer(&stock_logger);
-    let stock2_mbox: Mailbox<MyQueueStock> = Mailbox::new();
-    let stock2_addr = stock2_mbox.address();
-    stock2.low_capacity = 0;
-    stock2.max_capacity = 100;
-    
-    let mut combiner = MyQueueCombinerProcess::new()
-        .with_name("Combiner".into())
-        .with_log_consumer(&process_logger);
-    combiner.process_duration_secs_dist = Some(Distribution::Constant(30.));
-    combiner.process_quantity_dist = Some(Distribution::Constant(2.));
-    let combiner_mbox: Mailbox<MyQueueCombinerProcess> = Mailbox::new();
-    let combiner_addr = combiner_mbox.address();
+    let mut process_2 = ComponentModel::SequenceProcessString(SequenceProcess::new()
+        .with_name("Process2".into())
+        .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 3., max: 7. }).unwrap()),
+        Mailbox::new()
+    );
 
-    let mut process = MyQueueProcess::new()
-        .with_name("Process".into());
-    process.log_emitter.connect_sink(process_logger.get_buffer());
-    process.process_quantity_dist = Some(Distribution::Constant(1.));
-    process.process_duration_secs_dist = Some(Distribution::Constant(15.));
-    let process_mbox: Mailbox<MyQueueProcess> = Mailbox::new();
-    let process_addr = process_mbox.address();
+    connect_components!(&mut queue_1, &mut process_1).unwrap();
+    connect_components!(&mut process_1, &mut queue_2).unwrap();
+    connect_components!(&mut queue_2, &mut process_2).unwrap();
+    connect_components!(&mut process_2, &mut queue_1).unwrap();
 
-    let mut stock3 = MyQueueStock::new()
-        .with_name("Stock3".into())
-        .with_log_consumer(&stock_logger);
-    let stock3_mbox: Mailbox<MyQueueStock> = Mailbox::new();
-    let stock3_addr = stock3_mbox.address();
-    stock3.low_capacity = 0;
-    stock3.max_capacity = 10;
+    let mut queue_logger = ComponentLogger::SequenceStockLoggerString(SequenceStockLogger::new("QueueLogger".into()));
+    let mut process_logger = ComponentLogger::SequenceProcessLoggerString(SequenceProcessLogger::new("ProcessLogger".into()));
 
-    let mut sink= MyQueueSink::new()
-        .with_name("Sink".into())
-        .with_time_to_destroy_dist(Distribution::Constant( 1. ));
-    sink.log_emitter.connect_sink(process_logger.get_buffer());
-    let sink_mbox: Mailbox<MyQueueSink> = Mailbox::new();
-    let sink_addr = sink_mbox.address();
+    connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
+    connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
+    connect_logger!(&mut process_logger, &mut process_1).unwrap();
+    connect_logger!(&mut process_logger, &mut process_2).unwrap();
 
-    source1.push_downstream.connect(MyQueueStock::add, &stock1_addr);
-    source1.req_downstream.connect(MyQueueStock::get_state, &stock1_addr);
-    stock1.state_emitter.connect(MyQueueSource::check_update_state, &source1_addr);
-
-    source2.push_downstream.connect(MyQueueStock::add, &stock2_addr);
-    source2.req_downstream.connect(MyQueueStock::get_state, &stock2_addr);
-    stock2.state_emitter.connect(MyQueueSource::check_update_state, &source2_addr);
-
-    combiner.withdraw_upstreams.0.connect(MyQueueStock::remove, &stock1_addr);
-    combiner.withdraw_upstreams.1.connect(MyQueueStock::remove, &stock2_addr);
-    combiner.req_upstreams.0.connect(MyQueueStock::get_state, &stock1_addr);
-    combiner.req_upstreams.1.connect(MyQueueStock::get_state, &stock2_addr);
-    stock1.state_emitter.connect(MyQueueCombinerProcess::check_update_state, &combiner_addr);
-    stock2.state_emitter.connect(MyQueueCombinerProcess::check_update_state, &combiner_addr);
-    combiner.push_downstream.connect(MyQueueStock::add, &stock3_addr);
-    combiner.req_downstream.connect(MyQueueStock::get_state, &stock3_addr);
-    stock3.state_emitter.connect(MyQueueCombinerProcess::check_update_state, &combiner_addr);
-
-    process.withdraw_upstream.connect(MyQueueStock::remove, &stock1_addr);
-    process.req_upstream.connect(MyQueueStock::get_state, &stock1_addr);
-    stock1.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
-    process.push_downstream.connect(MyQueueStock::add, &stock2_addr);
-    process.req_downstream.connect(MyQueueStock::get_state, &stock2_addr);
-    stock3.state_emitter.connect(MyQueueProcess::check_update_state, &process_addr);
-
-    sink.withdraw_upstream.connect(MyQueueStock::remove, &stock3_addr);
-    sink.req_upstream.connect(MyQueueStock::get_state, &stock3_addr);
-    stock3.state_emitter.connect(MyQueueSink::check_update_state, &sink_addr);
-
-    let sim_builder = SimInit::new()
-        .add_model(source1, source1_mbox, "Source1")
-        .add_model(stock1, stock1_mbox, "Stock1")
-        .add_model(source2, source2_mbox, "Source2")
-        .add_model(stock2, stock2_mbox, "Stock2")
-        .add_model(combiner, combiner_mbox, "Combiner")
-        .add_model(process, process_mbox, "Process")
-        .add_model(stock3, stock3_mbox, "Stock3")
-        .add_model(sink, sink_mbox, "Sink");
+    let mut sim_builder = SimInit::new();
+    let mut init_configs: Vec<ComponentInit> = Vec::new();
+    sim_builder = register_component!(sim_builder, &mut init_configs, queue_1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, process_1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
+    sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
-    simu.process_event(
-        MyQueueSource::check_update_state,
-        NotificationMetadata {
-            time: MonotonicTime::EPOCH,
-            element_from: "Init".into(),
-            message: "check_update_state".into(),
-        },
-        &source1_addr,
-    ).unwrap();
-    simu.process_event(
-        MyQueueSource::check_update_state,
-        NotificationMetadata {
-            time: MonotonicTime::EPOCH,
-            element_from: "Init".into(),
-            message: "check_update_state".into(),
-        },
-        &source2_addr,
-    ).unwrap();
-    simu.process_event(MyQueueCombinerProcess::check_update_state, NotificationMetadata {
-        time: MonotonicTime::EPOCH,
-        element_from: "Init".into(),
-        message: "check_update_state".into(),
-    }, &combiner_addr).unwrap();
-    simu.process_event(MyQueueProcess::check_update_state, NotificationMetadata {
-        time: MonotonicTime::EPOCH,
-        element_from: "Init".into(),
-        message: "check_update_state".into(),
-    }, &process_addr).unwrap();
+
+    init_configs.iter_mut().for_each(|x| {
+        x.initialise(&mut simu).unwrap();
+    });
+
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
-    // Create the output directory if it doesn't exist
-    std::fs::create_dir_all("outputs/discrete_queue").unwrap();
-    process_logger.write_csv("outputs/discrete_queue".into()).unwrap();
-    stock_logger.write_csv("outputs/discrete_queue".into()).unwrap();
+    let output_dir = "outputs/discrete_queue";
+    create_dir_all(output_dir).unwrap();
+    queue_logger.write_csv(output_dir.into()).unwrap();
+    process_logger.write_csv(output_dir.into()).unwrap();
 }

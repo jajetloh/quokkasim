@@ -613,6 +613,18 @@ macro_rules! define_model_enums {
                         sim_init = sim_init.add_model(a, mb, name);
                         init_configs.push($ModelInitName::VectorSplitter5Vector3(addr));
                     },
+                    $ComponentsName::SequenceStockString(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                        init_configs.push($ModelInitName::SequenceStockString(addr));
+                    },
+                    $ComponentsName::SequenceProcessString(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                        init_configs.push($ModelInitName::SequenceProcessString(addr));
+                    },
                     $(
                         $ComponentsName::$R(a, mb) => {
                             let name = a.element_name.clone();
@@ -728,6 +740,9 @@ macro_rules! define_model_enums {
                     $LoggersName::VectorStockLoggerVector3(a) => { a.write_csv(dir.to_string()) },
                     $LoggersName::VectorProcessLoggerVector3(a) => { a.write_csv(dir.to_string()) },
 
+                    $LoggersName::SequenceStockLoggerString(a) => { a.write_csv(dir.to_string()) },
+                    $LoggersName::SequenceProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
+
                     $(
                         $LoggersName::$U (a) => {
                             a.write_csv(dir.to_string())
@@ -767,6 +782,8 @@ macro_rules! define_model_enums {
             VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
             VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),            
 
+            SequenceStockString($crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
+            SequenceProcessString($crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
             $(
                 $R $( ( $crate::nexosim::Address<$RT> ) )?
             ),*
@@ -806,6 +823,8 @@ macro_rules! define_model_enums {
                     $ModelInitName::VectorSplitter4Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 4>::update_state, notif_meta, a.clone()) },
                     $ModelInitName::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
 
+                    $ModelInitName::SequenceStockString(a) => { Ok(()) },
+                    $ModelInitName::SequenceProcessString(a) => { simu.process_event($crate::components::sequence::SequenceProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)
                     }
