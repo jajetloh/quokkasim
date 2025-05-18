@@ -420,10 +420,6 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
     }
 
     fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
-        // async move {
-        //     cx.schedule_event(MonotonicTime::EPOCH, <Self as Process<f64>>::update_state, notif_meta.clone()).unwrap();
-        //     // cx.schedule_event(next_time, <Self as Process<f64>>::post_update_state, notif_meta.clone()).unwrap();
-        // }
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -691,7 +687,6 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
         async move {
             let time = cx.time();
-            println!("{} Combiner update state, {:?}", self.element_name, self.process_state.clone());
 
             match self.process_state.take() {
                 Some((mut process_time_left, mut resources)) => {
@@ -714,6 +709,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                 },
                 None => {}
             }
+            println!("Combiner: {}, {:?}", self.element_name, self.process_state);
             match self.process_state {
                 None => {
                     let iterators = join_all(self.req_upstreams.iter_mut().map(|req| req.send(()))).await;
@@ -727,7 +723,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                         }));
                     }
                     let ds_state = self.req_downstream.send(()).await.next();
-                    println!("{} Combiner update state, us_states: {:?}, ds_state: {:?}, all_us_available: {:?}", self.element_name, us_states, ds_state, all_us_available);
+                    println!("Combiner: {}, {:?} {:?} {:?}", self.element_name, us_states, ds_state, all_us_available);
                     match (all_us_available, ds_state) {
                         (
                             Some(true),
@@ -746,6 +742,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
                             self.log(time, VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            println!("ttn: {:?}", self.time_to_next_event);
                         },
                         (Some(false), _) => {
                             self.log(time, VectorProcessLogType::ProcessFailure { reason: "At least one upstream is empty" }).await;
@@ -769,6 +766,23 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                     self.time_to_next_event = Some(time);
                 }
             }
+        }
+    }
+
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+        async move {
+            self.set_previous_check_time(cx.time());
+            match self.time_to_next_event {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + time_until_next;
+                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
+                    };
+                }
+            };
         }
     }
 
@@ -971,6 +985,23 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                     self.time_to_next_event = Some(time);
                 }
             }
+        }
+    }
+
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+        async move {
+            self.set_previous_check_time(cx.time());
+            match self.time_to_next_event {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + time_until_next;
+                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
+                    };
+                }
+            };
         }
     }
 
