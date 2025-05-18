@@ -1,300 +1,184 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, fs::create_dir_all, time::Duration};
 
 use nexosim::time::MonotonicTime;
 use quokkasim::{define_model_enums, prelude::*};
 
 define_model_enums! {
-    pub enum ComponentModel<'a> {}
-    pub enum ComponentLogger<'a> {}
+    pub enum ComponentModel {}
+    pub enum ComponentLogger {}
+    pub enum ComponentInit {}
 }
 
-impl<'a> CustomComponentConnection for ComponentModel<'a> {
-    fn connect_components(a: Self, b: Self) -> Result<(), Box<dyn Error>> {
+impl CustomComponentConnection for ComponentModel {
+    fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
-            _ => Err("Invalid connection".into()),
+            (a, b) => Err(format!("No component connection defined from {} to {}", a, b).into()),
         }
     }
 }
 
-impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
-    type ComponentType = ComponentModel<'a>;
-    fn connect_logger(a: Self, b: Self::ComponentType) -> Result<(), Box<dyn Error>> {
-        match (a, b) {
-            _ => Err("Invalid connection".into()),
+impl CustomLoggerConnection for ComponentLogger { 
+    type ComponentType = ComponentModel;
+    fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
+        match (a, b, n) {
+            (a, b, _) => Err(format!("No logger connection defined from {} to {}", a, b).into()),
         }
     }
 }
 
+impl CustomInit for ComponentInit {
+    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
+        let notif_meta = NotificationMetadata {
+            time: simu.time(),
+            element_from: "Init".into(),
+            message: "Start".into(),
+        };
+        match self {
+            _ => {
+                Err(ExecutionError::BadQuery)
+            }
+        }
+    }
+}
 
 fn main() {
     // Declarations
 
-    let process_logger = VectorProcessLogger::<f64>::new("ProcessLogger".into());
-    let stock_logger = VectorStockLogger::<f64>::new("StockLogger".into());
+    let mut process_logger = ComponentLogger::VectorProcessLoggerVector3(VectorProcessLogger::new("ProcessLogger".into()));
+    let mut stock_logger = ComponentLogger::VectorStockLoggerVector3(VectorStockLogger::new("StockLogger".into()));
     let mut df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
     };
 
-    let mut stockpile_1 = VectorStock::<Vector3>::new()
-        .with_name("Stockpile 1".into())
-        .with_low_capacity(100.)
-        .with_max_capacity(10_000.)
-        .with_initial_vector([8000., 2000., 0.].into());
+    let mut stockpile_1 = ComponentModel::VectorStockVector3(
+        VectorStock::new()
+            .with_name("Stockpile 1".into())
+            .with_low_capacity(100.)
+            .with_max_capacity(10_000.)
+            .with_initial_vector([8000., 2000., 0.].into()),
+        Mailbox::new()
+    );
 
-    let stockpile_1_mbox: Mailbox<VectorStock<Vector3>> = Mailbox::new();
-    let stockpile_1_addr = stockpile_1_mbox.address();
+    let mut stockpile_2 = ComponentModel::VectorStockVector3(
+        VectorStock::new()
+            .with_name("Stockpile 2".into())
+            .with_low_capacity(100.)
+            .with_max_capacity(10_000.)
+            .with_initial_vector([0., 6000., 2000.].into()),
+        Mailbox::new()
+    );
 
-    let mut stockpile_2 = VectorStock::<Vector3>::new()
-        .with_name("Stockpile 2".into())
-        .with_low_capacity(100.)
-        .with_max_capacity(10_000.)
-        .with_initial_vector([0., 6000., 2000.].into());
+    let mut stockpile_3 = ComponentModel::VectorStockVector3(
+        VectorStock::new()
+            .with_name("Stockpile 3".into())
+            .with_low_capacity(100.)
+            .with_max_capacity(10_000.)
+            .with_initial_vector([5000., 5000., 0.].into()),
+        Mailbox::new()
+    );
 
-    let stockpile_2_mbox: Mailbox<VectorStock<Vector3>> = Mailbox::new(); 
-    let stockpile_2_addr = stockpile_2_mbox.address();
+    let mut reclaimer_1 = ComponentModel::VectorCombiner2Vector3(
+        VectorCombiner::new()
+            .with_name("Reclaimer 1".into())
+            .with_process_quantity_distr(Distribution::Constant(100.))
+            .with_process_time_distr(Distribution::Constant(30.)),
+        Mailbox::new()
+    );
 
-    let mut stockpile_3 = VectorStock::<Vector3>::new()
-        .with_name("Stockpile 3".into())
-        .with_low_capacity(100.)
-        .with_max_capacity(10_000.)
-        .with_initial_vector([5000., 5000., 0.].into());
+    let mut output_stockpile_1 = ComponentModel::VectorStockVector3(
+        VectorStock::new()
+            .with_name("Output Stockpile 1".into())
+            .with_low_capacity(100.)
+            .with_max_capacity(15_000.)
+            .with_initial_vector([0., 0., 0.].into()),
+        Mailbox::new()
+    );
 
-    let stockpile_3_mbox: Mailbox<VectorStock<Vector3>> = Mailbox::new();
-    let stockpile_3_addr = stockpile_3_mbox.address();
+        let mut output_stockpile_2 = ComponentModel::VectorStockVector3(
+        VectorStock::new()
+            .with_name("Output Stockpile 2".into())
+            .with_low_capacity(100.)
+            .with_max_capacity(15_000.)
+            .with_initial_vector([0., 0., 0.].into()),
+        Mailbox::new()
+    );
 
-    let mut reclaimer_1: VectorCombiner<Vector3, Vector3, f64, 2> = VectorCombiner::new()
-        .with_name("Reclaimer 1".into())
-        .with_process_quantity_distr(Distribution::Constant(100.))
-        .with_process_time_distr(Distribution::Constant(30.));
+    let mut reclaimer_2 = ComponentModel::VectorCombiner2Vector3(
+        VectorCombiner::new()
+            .with_name("Reclaimer 2".into())
+            .with_process_quantity_distr(Distribution::Constant(100.))
+            .with_process_time_distr(Distribution::Constant(30.)),
+        Mailbox::new()
+    );
 
-    let reclaimer_1_mbox = Mailbox::new();
-    let reclaimer_1_addr = reclaimer_1_mbox.address();
+    let mut reclaimer_3 = ComponentModel::VectorCombiner1Vector3(
+        VectorCombiner::new()
+            .with_name("Reclaimer 3".into())
+            .with_process_quantity_distr(Distribution::Constant(100.))
+            .with_process_time_distr(Distribution::Constant(60.)),
+        Mailbox::new()
+    );
 
-    let mut output_stockpile_1 = VectorStock::<Vector3>::new()
-        .with_name("Output Stockpile 1".into())
-        .with_low_capacity(100.)
-        .with_max_capacity(15_000.)
-        .with_initial_vector([0., 0., 0.].into());
+    let mut stacker = ComponentModel::VectorSplitter2Vector3(
+        VectorSplitter::new()
+            .with_name("Stacker".into())
+            .with_process_quantity_distr(Distribution::Constant(600.))
+            .with_process_time_distr(Distribution::Constant(360.)),
+        Mailbox::new()
+    );
 
-    let output_stockpile_1_mbox = Mailbox::new();
-    let output_stockpile_1_addr = output_stockpile_1_mbox.address();
+    connect_components!(&mut stockpile_1, &mut reclaimer_1, 0);
+    connect_components!(&mut stockpile_2, &mut reclaimer_1, 1);
+    connect_components!(&mut reclaimer_1, &mut output_stockpile_1);
 
-    let mut reclaimer_2: VectorCombiner<Vector3, Vector3, f64, 2> = VectorCombiner::new()
-        .with_name("Reclaimer 2".into())
-        .with_process_quantity_distr(Distribution::Constant(100.))
-        .with_process_time_distr(Distribution::Constant(30.));
+    connect_components!(&mut stockpile_2, &mut reclaimer_2, 0);
+    connect_components!(&mut stockpile_3, &mut reclaimer_2, 1);
+    connect_components!(&mut reclaimer_2, &mut output_stockpile_2);
 
-    let reclaimer_2_mbox= Mailbox::new();
-    let reclaimer_2_addr = reclaimer_2_mbox.address();
+    connect_components!(&mut stockpile_1, &mut reclaimer_3);
+    connect_components!(&mut reclaimer_3, &mut output_stockpile_1);
 
-    let mut output_stockpile_2 = VectorStock::<Vector3>::new()
-        .with_name("Output Stockpile 2".into())
-        .with_low_capacity(100.)
-        .with_max_capacity(15_000.)
-        .with_initial_vector([0., 0., 0.].into());
-    let output_stockpile_2_mbox = Mailbox::new();
-    let output_stockpile_2_addr = output_stockpile_2_mbox.address();
+    connect_components!(&mut output_stockpile_1, &mut stacker);
+    connect_components!(&mut stacker, &mut stockpile_2, 0);
+    connect_components!(&mut stacker, &mut stockpile_3, 1);
 
-    let mut reclaimer_3 = VectorCombiner::<Vector3, f64, f64, 1>::new()
-        .with_name("Reclaimer 3".into())
-        .with_process_quantity_distr(Distribution::Constant(100.))
-        .with_process_time_distr(Distribution::Constant(60.));
-    let reclaimer_3_mbox = Mailbox::new();
-    let reclaimer_3_addr = reclaimer_3_mbox.address();
+    connect_logger!(&mut process_logger, &mut reclaimer_1);
+    connect_logger!(&mut process_logger, &mut reclaimer_2);
+    connect_logger!(&mut process_logger, &mut reclaimer_3);
+    connect_logger!(&mut process_logger, &mut stacker);
 
-    let mut stacker = VectorSplitter::<Vector3, Vector3, f64, 2>::new()
-        .with_name("Stacker".into())
-        .with_process_quantity_distr(Distribution::Constant(600.))
-        .with_process_time_distr(Distribution::Constant(360.));
-    let stacker_mbox = Mailbox::new();
-    let stacker_addr = stacker_mbox.address();
+    connect_logger!(&mut stock_logger, &mut stockpile_1);
+    connect_logger!(&mut stock_logger, &mut stockpile_2);
+    connect_logger!(&mut stock_logger, &mut stockpile_3);
+    connect_logger!(&mut stock_logger, &mut output_stockpile_1);
+    connect_logger!(&mut stock_logger, &mut output_stockpile_2);
 
-    // Connections
+    let mut sim_builder = SimInit::new();
+    let mut init_configs: Vec<ComponentInit> = Vec::new();
 
-    // - Reclaimer 1:
-
-    ComponentModel::connect_components(
-        ComponentModel::VectorStockVector3(&mut stockpile_1, &mut stockpile_1_addr),
-        ComponentModel::VectorCom(&mut reclaimer_1, &mut reclaimer_1_addr),
-    ).unwrap();
-
-    reclaimer_1
-        .req_upstreams
-        .0
-        .connect(VectorStock::get_state, &stockpile_1_addr);
-    reclaimer_1
-        .withdraw_upstreams
-        .0
-        .connect(VectorStock::remove, &stockpile_1_addr);
-    stockpile_1
-        .state_emitter
-        .connect(VectorCombinerProcess::check_update_state, &reclaimer_1_addr);
-
-    reclaimer_1
-        .req_upstreams
-        .1
-        .connect(VectorStock::get_state, &stockpile_2_addr);
-    reclaimer_1
-        .withdraw_upstreams
-        .1
-        .connect(VectorStock::remove, &stockpile_2_addr);
-    stockpile_2
-        .state_emitter
-        .connect(VectorCombinerProcess::check_update_state, &reclaimer_1_addr);
-
-    reclaimer_1
-        .push_downstream
-        .connect(VectorStock::add, &output_stockpile_1_addr);
-    reclaimer_1
-        .req_downstream
-        .connect(VectorStock::get_state, &output_stockpile_1_addr);
-    output_stockpile_1
-        .state_emitter
-        .connect(VectorCombinerProcess::check_update_state, &reclaimer_1_addr);
-
-    // - Reclaimer 2:
-
-    reclaimer_2
-        .req_upstreams
-        .0
-        .connect(VectorStock::get_state, &stockpile_2_addr);
-    reclaimer_2
-        .withdraw_upstreams
-        .0
-        .connect(VectorStock::remove, &stockpile_2_addr);
-    stockpile_2
-        .state_emitter
-        .connect(VectorCombinerProcess::check_update_state, &reclaimer_2_addr);
-
-    reclaimer_2
-        .req_upstreams
-        .1
-        .connect(VectorStock::get_state, &stockpile_3_addr);
-    reclaimer_2
-        .withdraw_upstreams
-        .1
-        .connect(VectorStock::remove, &stockpile_3_addr);
-    stockpile_3
-        .state_emitter
-        .connect(VectorCombinerProcess::check_update_state, &reclaimer_2_addr);
-
-    reclaimer_2
-        .push_downstream
-        .connect(VectorStock::add, &output_stockpile_2_addr);
-    reclaimer_2
-        .req_downstream
-        .connect(VectorStock::get_state, &output_stockpile_2_addr);
-    output_stockpile_2
-        .state_emitter
-        .connect(VectorCombinerProcess::check_update_state, &reclaimer_2_addr);
-
-    // - Reclaimer 3
-
-    reclaimer_3
-        .req_upstream
-        .connect(VectorStock::get_state, &stockpile_1_addr);
-    reclaimer_3
-        .withdraw_upstream
-        .connect(VectorStock::remove, &stockpile_1_addr);
-    stockpile_1
-        .state_emitter
-        .connect(VectorProcess::check_update_state, &reclaimer_3_addr);
-
-    reclaimer_3
-        .req_downstream
-        .connect(VectorStock::get_state, &output_stockpile_1_addr);
-    reclaimer_3
-        .push_downstream
-        .connect(VectorStock::add, &output_stockpile_1_addr);
-    output_stockpile_1
-        .state_emitter
-        .connect(VectorProcess::check_update_state, &reclaimer_3_addr);
-
-    // Stacker
-
-    stacker
-        .req_upstream
-        .connect(VectorStock::get_state, &output_stockpile_1_addr);
-    stacker
-        .withdraw_upstream
-        .connect(VectorStock::remove, &output_stockpile_1_addr);
-    output_stockpile_1
-        .state_emitter
-        .connect(VectorSplitterProcess::check_update_state, &stacker_addr);
-
-    stacker.req_downstreams.0.connect(VectorStock::get_state, &stockpile_2_addr);
-    stacker.push_downstreams.0.connect(VectorStock::add, &stockpile_2_addr);
-    stockpile_2.state_emitter.connect(VectorSplitterProcess::check_update_state, &stacker_addr);
-
-    stacker.req_downstreams.1.connect(VectorStock::get_state, &stockpile_3_addr);
-    stacker.push_downstreams.1.connect(VectorStock::add, &stockpile_3_addr);
-    stockpile_3.state_emitter.connect(VectorSplitterProcess::check_update_state, &stacker_addr);
-
-    // Model compilation and running
-
-    let sim_builder = SimInit::new()
-        .add_model(stockpile_1, stockpile_1_mbox, "Stockpile 1")
-        .add_model(stockpile_2, stockpile_2_mbox, "Stockpile 2")
-        .add_model(stockpile_3, stockpile_3_mbox, "Stockpile 3")
-        .add_model(reclaimer_1, reclaimer_1_mbox, "Reclaimer 1")
-        .add_model(
-            output_stockpile_1,
-            output_stockpile_1_mbox,
-            "Output Stockpile 1",
-        )
-        .add_model(reclaimer_2, reclaimer_2_mbox, "Reclaimer 2")
-        .add_model(
-            output_stockpile_2,
-            output_stockpile_2_mbox,
-            "Output Stockpile 2",
-        )
-        .add_model(reclaimer_3, reclaimer_3_mbox, "Reclaimer 3")
-        .add_model(stacker, stacker_mbox, "Stacker");
+    sim_builder = register_component!(sim_builder, &mut init_configs, reclaimer_1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, reclaimer_2);
+    sim_builder = register_component!(sim_builder, &mut init_configs, reclaimer_3);
+    sim_builder = register_component!(sim_builder, &mut init_configs, stacker);
+    sim_builder = register_component!(sim_builder, &mut init_configs, stockpile_1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, stockpile_2);
+    sim_builder = register_component!(sim_builder, &mut init_configs, stockpile_3);
+    sim_builder = register_component!(sim_builder, &mut init_configs, output_stockpile_1);
+    sim_builder = register_component!(sim_builder, &mut init_configs, output_stockpile_2);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_builder.init(start_time).unwrap().0;
-    simu.process_event(
-        VectorCombinerProcess::check_update_state,
-        NotificationMetadata {
-            time: start_time,
-            element_from: "Reclaimer 1".into(),
-            message: "Start".into(),
-        },
-        &reclaimer_1_addr,
-    ).unwrap();
-    simu.process_event(
-        VectorCombinerProcess::check_update_state,
-        NotificationMetadata {
-            time: start_time,
-            element_from: "Reclaimer 2".into(),
-            message: "Start".into(),
-        },
-        &reclaimer_2_addr,
-    ).unwrap();
-    simu.process_event(
-        VectorProcess::check_update_state,
-        NotificationMetadata {
-            time: start_time,
-            element_from: "Reclaimer 3".into(),
-            message: "Start".into(),
-        },
-        &reclaimer_3_addr,
-    ).unwrap();
-    simu.process_event(
-        VectorSplitterProcess::check_update_state,
-        NotificationMetadata {
-            time: start_time,
-            element_from: "Stacker".into(),
-            message: "Start".into(),
-        },
-        &stacker_addr,
-    ).unwrap();
 
+    init_configs.iter_mut().for_each(|init| {
+        init.initialise(&mut simu).unwrap();
+    });
+    
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 1))
         .unwrap();
 
-    std::fs::create_dir_all("outputs/material_blending").unwrap();
-    process_logger.write_csv("outputs/material_blending".into()).unwrap();
-    stock_logger.write_csv("outputs/material_blending".into()).unwrap();
+    let output_dir= "outputs/material_blending";
+    create_dir_all(output_dir).unwrap();
+    process_logger.write_csv(output_dir.into()).unwrap();
+    stock_logger.write_csv(output_dir.into()).unwrap();
 }
