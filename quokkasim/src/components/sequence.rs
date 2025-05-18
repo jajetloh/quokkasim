@@ -131,6 +131,13 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
         }
     }
 
+    fn emit_change<'a>(&'a mut self, payload: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+        async move {
+            self.state_emitter.send(payload).await;
+            self.log(cx.time(), "Emit Change".to_string()).await;
+        }
+    }
+
     fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
         async move {
             let log = SequenceStockLog {

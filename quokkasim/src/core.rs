@@ -95,9 +95,9 @@ pub trait StateEq {
  * W: Returned type to process when removing stock
  * C: Metric type for resource total
  */
-pub trait Stock<T: VectorArithmetic<U, V, C> + Clone + Debug, U: Clone + Send, V: Clone + Send, W: Clone + Send, C> where Self: Model {
+pub trait Stock<T: VectorArithmetic<U, V, C> + Clone + Debug + 'static, U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, C: 'static> where Self: Model {
 
-    type StockState: StateEq + Clone;
+    type StockState: StateEq + Clone + Debug;
     // type LogDetailsType;
 
     fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
@@ -119,14 +119,16 @@ pub trait Stock<T: VectorArithmetic<U, V, C> + Clone + Debug, U: Clone + Send, V
                     self.log(cx.time(), "StockAdd".into()).await;
                     if !ps.is_same_state(&current_state) {
                         self.log(cx.time(), "StateChange".into()).await;
+                        let notif_meta = NotificationMetadata {
+                            time: cx.time(),
+                            element_from: "X".into(),
+                            message: "X".into(),
+                        };
+                        // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
                         cx.schedule_event(
-                            cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x: NotificationMetadata, cx: &mut Context<Self>| async move {    
-                                // model.emit_change(x.clone(), cx);
-                            }, NotificationMetadata {
-                                time: cx.time(),
-                                element_from: "X".into(),
-                                message: "X".into(),
-                            }
+                            cx.time() + ::std::time::Duration::from_nanos(1),
+                            Self::emit_change,
+                            notif_meta,
                         ).unwrap();
                     } else {
                     }
@@ -135,10 +137,7 @@ pub trait Stock<T: VectorArithmetic<U, V, C> + Clone + Debug, U: Clone + Send, V
         }
     }
 
-    // TODO: Should be async. Haven't figured out a way to do this yet as it seemingly requires use
-    // of Self::emit_change in Self::post_add, but such a call in Self::post_add requires it being a
-    // concrete implementation instead of this... And trying to avoid that runs into lifetime issues.
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) {}
+    fn emit_change<'a>(&'a mut self, payload: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a;
 
     fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where U: 'static {
         async move {
@@ -167,14 +166,16 @@ pub trait Stock<T: VectorArithmetic<U, V, C> + Clone + Debug, U: Clone + Send, V
                     self.log(cx.time(), "StockRemove".into()).await;
                     if !ps.is_same_state(&current_state) {
                         self.log(cx.time(), "StateChange".into()).await;
+                        let notif_meta = NotificationMetadata {
+                            time: cx.time(),
+                            element_from: "X".into(),
+                            message: "X".into(),
+                        };
+                        // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
                         cx.schedule_event(
-                            cx.time() + ::std::time::Duration::from_nanos(1), |model: &mut Self, x, cx: &mut Context<Self>| {    
-                                model.emit_change(x, cx);
-                            }, NotificationMetadata {
-                                time: cx.time(),
-                                element_from: "X".into(),
-                                message: "X".into(),
-                            }
+                            cx.time() + ::std::time::Duration::from_nanos(1),
+                            Self::emit_change,
+                            notif_meta,
                         ).unwrap();
                     } else {
                     }

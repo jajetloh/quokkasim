@@ -1,8 +1,8 @@
-use futures::{future::join_all, lock};
+use futures::{future::join_all};
 use nexosim::{model::Model, ports::{EventQueue, Output, Requestor}};
 use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
-use std::{default, fmt::Debug, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 use crate::{core::{StateEq, Process, Stock}, prelude::{SubtractParts, Vector3, VectorArithmetic}};
 use crate::core::Logger;
@@ -117,10 +117,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> Stock<T, T, f64, T
         }
     }
 
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) {
-        // async move {
-        //     self.state_emitter.send(payload).await;
-        // }
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> + Send {
+        async move {
+            self.state_emitter.send(payload).await;
+            self.log(cx.time(), "Emit Change".to_string()).await;
+        }
     }
 
     fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output=()> + Send {

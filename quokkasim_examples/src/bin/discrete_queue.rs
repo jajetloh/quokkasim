@@ -57,7 +57,7 @@ fn main() {
 
     let mut process_1 = ComponentModel::SequenceProcessString(SequenceProcess::new()
         .with_name("Process1".into())
-        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 4. }).unwrap()),
+        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
 
