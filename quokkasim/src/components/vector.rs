@@ -711,7 +711,6 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                 },
                 None => {}
             }
-            println!("Combiner: {}, {:?}", self.element_name, self.process_state);
             match self.process_state {
                 None => {
                     let iterators = join_all(self.req_upstreams.iter_mut().map(|req| req.send(()))).await;
@@ -725,7 +724,6 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                         }));
                     }
                     let ds_state = self.req_downstream.send(()).await.next();
-                    println!("Combiner: {}, {:?} {:?} {:?}", self.element_name, us_states, ds_state, all_us_available);
                     match (all_us_available, ds_state) {
                         (
                             Some(true),
@@ -744,7 +742,6 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
                             self.log(time, VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
-                            println!("ttn: {:?}", self.time_to_next_event);
                         },
                         (Some(false), _) => {
                             self.log(time, VectorProcessLogType::ProcessFailure { reason: "At least one upstream is empty" }).await;
