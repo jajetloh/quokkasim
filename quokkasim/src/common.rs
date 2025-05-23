@@ -20,7 +20,7 @@ pub struct NotificationMetadata {
     pub message: String,
 }
 
-
+#[derive(Debug, Clone)]
 pub enum Distribution {
     Uniform(Uniform<f64>, SmallRng),
     Triangular(Triangular<f64>, SmallRng),

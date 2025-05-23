@@ -179,6 +179,10 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> VectorStock<T> whe
         }
     }
 
+    pub fn with_low_capacity_inplace(&mut self, low_capacity: f64) {
+        self.low_capacity = low_capacity;
+    }
+
     pub fn with_max_capacity(self, max_capacity: f64) -> Self {
         VectorStock {
             max_capacity,
