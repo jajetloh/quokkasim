@@ -227,6 +227,7 @@ define_model_enums! {
         IronOreStockLogger(IronOreStockLogger),
     }
     pub enum ComponentInit {}
+    pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {

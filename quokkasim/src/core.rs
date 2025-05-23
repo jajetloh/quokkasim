@@ -302,6 +302,22 @@ macro_rules! define_model_enums {
 
         $(#[$model_init_meta:meta])*
         pub enum $ModelInitName:ident {}
+
+        $(#[$sch_event_config_enum_meta:meta])*
+        pub enum $ScheduledEventConfig:ident {
+            $(
+                $(#[$sch_event_config_meta:meta])*
+                $W:ident $( ( $WT:ty ) )?
+            ),* $(,)?
+        }
+
+        $(#[$sch_event_enum_meta:meta])*
+        pub enum $ScheduledEvent:ident {
+            $(
+                $(#[$sch_event_meta:meta])*
+                $X:ident $( ( $XT:ty ) )?
+            ),* $(,)?
+        }
     ) => {
 
         use ::quokkasim::strum_macros::Display;
@@ -640,6 +656,22 @@ macro_rules! define_model_enums {
                 };
                 sim_init
             }
+
+            // pub fn create_scheduled_event(self, time: $crate::core::MonotonicTime, event: $ModelScheduledEventName) -> $ModelScheduledEventName {
+            //     use $crate::core::ScheduledEvent;
+            //     match event {
+            //         $(
+            //             $(#[$sch_event_meta])*
+            //             $W $( ( $WT ) )? => {
+            //                 $crate::nexosim::ScheduledEvent::new(time, self, event)
+            //             }
+            //         ),*
+            //         _ => {
+            //             panic!("Scheduled event type {} not implemented for creation", event);
+            //         }
+            //     }
+
+            // }
         }
 
         $(#[$logger_enum_meta])*
@@ -833,6 +865,53 @@ macro_rules! define_model_enums {
             }
         }
 
+        // pub enum $ModelScheduledEventName {
+        //     VectorStockF64LowCapacityChange($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>, $crate::nexosim::MonotonicTime, f64),
+        //     VectorStockF64MaxCapacityChange($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>, $crate::nexosim::MonotonicTime, f64),
+        //     VectorProcessF64ProcessQuantityChange($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>, $crate::nexosim::MonotonicTime, $crate::common::Distribution),
+        //     VectorProcessF64ProcessTimeChange($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>, $crate::nexosim::MonotonicTime, $crate::common::Distribution),
+        // }
+
+        pub enum $ScheduledEventConfig {
+            SetLowCapacity(f64),
+            SetMaxCapacity(f64),
+            SetProcessQuantity(DistributionConfig),
+            SetProcessTime(DistributionConfig),
+        }
+
+        pub enum $ScheduledEvent {
+            SetLowCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
+            SetMaxCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
+        }
+
+        // impl $ModelScheduledEventName {
+        //     pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler) -> Result<(), Box<dyn ::std::error::Error>> {
+        //         match self {
+        //             $ModelScheduledEventName::VectorStockF64LowCapacityChange(addr, time, low_capacity) => {
+        //                 scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity, low_capacity, addr);
+        //                 scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::update_state, $crate::core::NotificationMetadata {
+        //                     time,
+        //                     element_from: "Scheduler".into(),
+        //                     message: "Low capacity change".into(),
+        //                 }, addr);
+        //                 Ok(())
+        //             },
+        //             _ => {
+        //                 Err(format!("Scheduled event type {} not implemented for scheduling", self).into())
+        //             }
+        //             // $ModelScheduledEventName::VectorStockF64MaxCapacityChange(addr, time, max_capacity) => {
+        //             //     scheduler.schedule_event($crate::components::vector::VectorStock::<f64>::with_max_capacity, addr, component, max_capacity);
+        //             // },
+        //             // $ModelScheduledEventName::VectorProcessF64ProcessQuantityChange(addr, distribution) => {
+        //             //     scheduler.schedule_event($crate::components::vector::VectorProcess::<f64, f64, f64>::process_quantity_change, addr, distribution);
+        //             // },
+        //             // $ModelScheduledEventName::VectorProcessF64ProcessTimeChange(addr, distribution) => {
+        //             //     scheduler.schedule_event($crate::components::vector::VectorProcess::<f64, f64, f64>::process_time_change, addr, distribution);
+        //             // }
+        //         }
+        //     }
+        // }
+
         #[macro_export]
         macro_rules! connect_components {
             (&mut $a:ident, &mut $b:ident) => {
@@ -856,6 +935,12 @@ macro_rules! define_model_enums {
         macro_rules! register_component {
             ($sim_init:ident, &mut $init_configs:ident, $component:ident) => {
                 $ComponentsName::register_component($sim_init, &mut $init_configs, $component)
+            };
+        }
+
+        macro_rules! create_scheduled_event {
+            ($scheduler:ident, $event:ident, $component:ident) => {
+                scheduler.schedule_event($ModelScheduledEventName::schedule_event($sim, $event, $component))
             };
         }
     }

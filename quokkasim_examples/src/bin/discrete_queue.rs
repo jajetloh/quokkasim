@@ -6,6 +6,7 @@ define_model_enums! {
     pub enum ComponentModel {}
     pub enum ComponentLogger {}
     pub enum ComponentInit {}
+    pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -39,6 +40,9 @@ impl CustomInit for ComponentInit {
         }
     }
 }
+
+
+
 
 fn main() {
 
@@ -95,7 +99,9 @@ fn main() {
     sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
     sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
 
-    let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+    let (mut simu, mut scheduler) = sim_builder.init(MonotonicTime::EPOCH).unwrap();
+
+    scheduler.
 
     init_configs.iter_mut().for_each(|x| {
         x.initialise(&mut simu).unwrap();

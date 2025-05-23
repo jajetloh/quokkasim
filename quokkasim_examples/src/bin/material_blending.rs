@@ -7,6 +7,7 @@ define_model_enums! {
     pub enum ComponentModel {}
     pub enum ComponentLogger {}
     pub enum ComponentInit {}
+    pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -168,7 +169,9 @@ fn main() {
     sim_builder = register_component!(sim_builder, &mut init_configs, output_stockpile_2);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
-    let mut simu = sim_builder.init(start_time).unwrap().0;
+    let (mut simu, mut scheduler) = sim_builder.init(start_time).unwrap();
+
+    scheduler.schedule_event(start_time + Duration::from_secs(45 * 60), , arg, address)
 
     init_configs.iter_mut().for_each(|init| {
         init.initialise(&mut simu).unwrap();
