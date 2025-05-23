@@ -682,6 +682,7 @@ macro_rules! define_model_enums {
             // }
         }
 
+        #[derive(Display)]
         pub enum $ComponentsAddressName {
             VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
@@ -887,6 +888,7 @@ macro_rules! define_model_enums {
         //     VectorProcessF64ProcessTimeChange($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>, $crate::nexosim::MonotonicTime, $crate::common::Distribution),
         // }
 
+        #[derive(Display)]
         pub enum $ScheduledEventConfig {
             SetLowCapacity(f64),
             SetMaxCapacity(f64),
@@ -900,12 +902,27 @@ macro_rules! define_model_enums {
         }
 
         impl $ScheduledEventConfig {
-            pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentsAddressName) -> Result<(), Box<dyn ::std::error::Error>> {
+            pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentsAddressName, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentsAddressName::VectorStockF64(addr)) => {
-                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity, addr);
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity, addr.clone());
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, NotificationMetadata {
+                            time,
+                            element_from: "Scheduler".into(),
+                            message: "Low capacity change".into(),
+                        }, addr.clone());
                         Ok(())
                     },
+                    ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentsAddressName::VectorProcessF64(addr)) => {
+                        let distr_instance = df.create(distr)?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone());
+                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::update_state, NotificationMetadata {
+                            time,
+                            element_from: "Scheduler".into(),
+                            message: "Process quantity change".into(),
+                        }, addr.clone());
+                        Ok(())
+                    }
                     // $ScheduledEventConfig::VectorStockF64LowCapacityChange(addr, time, low_capacity) => {
                     //     scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity, low_capacity, addr);
                     //     scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::update_state, $crate::core::NotificationMetadata {
@@ -915,8 +932,8 @@ macro_rules! define_model_enums {
                     //     }, addr);
                     //     Ok(())
                     // },
-                    _ => {
-                        Err(format!("Scheduled event type {} not implemented for scheduling", self).into())
+                    (a, b) => {
+                        Err(format!("schedule_event not implemented for types ({}, {})", a, b).into())
                     }
                     // $ModelScheduledEventName::VectorStockF64MaxCapacityChange(addr, time, max_capacity) => {
                     //     scheduler.schedule_event($crate::components::vector::VectorStock::<f64>::with_max_capacity, addr, component, max_capacity);

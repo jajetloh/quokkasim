@@ -482,6 +482,10 @@ impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic<T, f64
         }
     }
 
+    pub fn with_process_quantity_distr_inplace(&mut self, process_quantity_distr: Distribution) {
+        self.process_quantity_distr = process_quantity_distr;
+    }
+
     pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
         VectorProcess {
             process_time_distr,
