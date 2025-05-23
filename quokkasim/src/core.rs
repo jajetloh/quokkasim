@@ -665,6 +665,16 @@ macro_rules! define_model_enums {
                 sim_init
             }
 
+            pub fn get_address(&self) -> $ComponentsAddressName {
+                match self {
+                    $ComponentsName::VectorStockF64(_, mb) => $ComponentsAddressName::VectorStockF64(mb.address()),
+                    $ComponentsName::VectorProcessF64(_, mb) => $ComponentsAddressName::VectorProcessF64(mb.address()),
+                    x => {
+                        panic!("Component type {} not implemented for address retrieval", x);
+                    }
+                }
+            }
+
             // pub fn create_scheduled_event(self, time: $crate::core::MonotonicTime, event: $ModelScheduledEventName) -> $ModelScheduledEventName {
             //     use $crate::core::ScheduledEvent;
             //     match event {
@@ -896,10 +906,10 @@ macro_rules! define_model_enums {
             SetProcessTime(DistributionConfig),
         }
 
-        pub enum $ScheduledEvent {
-            SetLowCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
-            SetMaxCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
-        }
+        // pub enum $ScheduledEvent {
+        //     SetLowCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
+        //     SetMaxCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
+        // }
 
         impl $ScheduledEventConfig {
             pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentsAddressName, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
@@ -978,8 +988,8 @@ macro_rules! define_model_enums {
             // ($scheduler:ident, $event:ident, $component:ident) => {
             //     scheduler.schedule_event($ModelScheduledEventName::schedule_event($sim, $event, $component))
             // };
-            ($scheduler:ident, $event_config:ident, $component_addr:ident) => {
-                scheduler.schedule_event($ScheduledEventConfig::schedule_event($event_config, $component_addr))
+            (&mut $scheduler:ident, $time:ident, $event_config:ident, $component_addr:ident, &mut $df:ident) => {
+                $ScheduledEventConfig::schedule_event($event_config, $time, &mut $scheduler, $component_addr, &mut $df);
             }
         }
     }

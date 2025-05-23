@@ -55,14 +55,16 @@ fn main() {
             .with_initial_vector(100.),
         Mailbox::new()
     );
+    let stock_1_addr = stock_1.get_address();
     let mut stock_2 = ComponentModel::VectorStockF64(
         VectorStock::new()
             .with_name("Stock 2".into())
             .with_low_capacity(50.)
             .with_max_capacity(101.)
-            .with_initial_vector(100.),
+            .with_initial_vector(0.),
         Mailbox::new()
     );
+    let stock_2_addr = stock_2.get_address();
     let mut process = ComponentModel::VectorProcessF64(
         VectorProcess::new()
             .with_name("Process".into())
@@ -70,6 +72,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
+    let process_addr = process.get_address();
 
     let mut process_logger = ComponentLogger::VectorProcessLoggerF64(VectorProcessLogger::new("ProcessLogger".into()));
     let mut stock_logger = ComponentLogger::VectorStockLoggerF64(VectorStockLogger::new("StockLogger".into()));
@@ -94,14 +97,35 @@ fn main() {
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let (mut simu, mut scheduler) = sim_builder.init(start_time.clone()).unwrap();
 
-    let scheduled_events = vec![
-        ScheduledEvent::VectorStockF64LowCapacityChange(
-            time: start_time.clone() + Duration::from_secs(60),
+    let capacity_change = ScheduledEventConfig::SetLowCapacity(10.);
+
+    let mut df = DistributionFactory {
+        base_seed: 1234,
+        next_seed: 0,
+    };
+
+    let event_time = start_time.clone() + Duration::from_secs(60);
+    
+    create_scheduled_event!(&mut scheduler, event_time, capacity_change, stock_1_addr, &mut df).unwrap();
+
+    simu.step_until(start_time + Duration::from_secs(120)).unwrap();
+    init_configs.iter_mut().for_each(|init| {
+        init.initialise(&mut simu).unwrap();
+    });
+
+    let output_dir = "outputs/scheduled_event";
+    create_dir_all(output_dir).unwrap();
+    stock_logger.write_csv(&output_dir).unwrap();
+    process_logger.write_csv(&output_dir).unwrap();
+
+    // let scheduled_events = vec![
+    //     ScheduledEvent::VectorStockF64LowCapacityChange(
+    //         time: start_time.clone() + Duration::from_secs(60),
 
 
-        )
-    ];
+    //     )
+    // ];
 
-    schedule_event!()
+    // schedule_event!()
 
 }
