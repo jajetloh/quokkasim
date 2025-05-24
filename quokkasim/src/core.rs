@@ -285,7 +285,7 @@ pub trait CustomInit {
 macro_rules! define_model_enums {
     (
         $(#[$components_enum_meta:meta])*
-        pub enum $ComponentsName:ident {
+        pub enum $ComponentModel:ident {
           $(
             $(#[$components_var_meta:meta])*
             $R:ident $( ( $RT:ty, $RT2:ty ) )?
@@ -293,7 +293,7 @@ macro_rules! define_model_enums {
         }
 
         $(#[$components_address_enum_meta:meta])*
-        pub enum $ComponentsAddressName:ident {
+        pub enum $ComponentModelAddress:ident {
           $(
             $(#[$components_address_var_meta:meta])*
             $Q:ident $( ( $QT:ty ) )?
@@ -301,7 +301,7 @@ macro_rules! define_model_enums {
         }
 
         $(#[$logger_enum_meta:meta])*
-        pub enum $LoggersName:ident {
+        pub enum $ComponentLogger:ident {
             $(
                 $(#[$logger_var_meta:meta])*
                 $U:ident $( ( $UT:ty ) )?
@@ -309,21 +309,13 @@ macro_rules! define_model_enums {
         }
 
         $(#[$model_init_meta:meta])*
-        pub enum $ModelInitName:ident {}
+        pub enum $ComponentInit:ident {}
 
         $(#[$sch_event_config_enum_meta:meta])*
         pub enum $ScheduledEventConfig:ident {
             $(
                 $(#[$sch_event_config_meta:meta])*
                 $W:ident $( ( $WT:ty ) )?
-            ),* $(,)?
-        }
-
-        $(#[$sch_event_enum_meta:meta])*
-        pub enum $ScheduledEvent:ident {
-            $(
-                $(#[$sch_event_meta:meta])*
-                $X:ident $( ( $XT:ty ) )?
             ),* $(,)?
         }
     ) => {
@@ -333,7 +325,7 @@ macro_rules! define_model_enums {
 
         $(#[$components_enum_meta])*
         #[derive(Display)]
-        pub enum $ComponentsName {
+        pub enum $ComponentModel {
             VectorStockF64($crate::components::vector::VectorStock<f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64($crate::components::vector::VectorProcess<f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorCombiner1F64($crate::components::vector::VectorCombiner<f64, f64, f64, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
@@ -366,33 +358,33 @@ macro_rules! define_model_enums {
             ),*
         }
   
-        impl $ComponentsName {
+        impl $ComponentModel {
             pub fn connect_components(
-                mut a: &mut $ComponentsName,
-                mut b: &mut $ComponentsName,
+                mut a: &mut $ComponentModel,
+                mut b: &mut $ComponentModel,
                 n: Option<usize>,
             ) -> Result<(), Box<dyn ::std::error::Error>>{
                 use $crate::core::CustomComponentConnection;
                 match (a, b, n) {
-                    ($ComponentsName::VectorStockF64(a, ad), $ComponentsName::VectorProcessF64(b, bd), _) => {
+                    ($ComponentModel::VectorStockF64(a, ad), $ComponentModel::VectorProcessF64(b, bd), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorProcessF64(a, ad), $ComponentsName::VectorStockF64(b, bd), _) => {
+                    ($ComponentModel::VectorProcessF64(a, ad), $ComponentModel::VectorStockF64(b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorStockVector3(a, ad), $ComponentsName::VectorProcessVector3(b, bd), _) => {
+                    ($ComponentModel::VectorStockVector3(a, ad), $ComponentModel::VectorProcessVector3(b, bd), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorProcessVector3(a, ad), $ComponentsName::VectorStockVector3(b, bd), _) => {
+                    ($ComponentModel::VectorProcessVector3(a, ad), $ComponentModel::VectorStockVector3(b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
@@ -400,65 +392,65 @@ macro_rules! define_model_enums {
                     },
 
                     // VectorCombiner1Vector3
-                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner1Vector3(b, bm), Some(n)) => {
+                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner1Vector3(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorCombiner1Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::VectorCombiner1Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
                     // VectorCombiner2Vector3
-                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner2Vector3(b, bm), Some(n)) => {
+                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner2Vector3(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorCombiner2Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::VectorCombiner2Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
                     // VectorCombiner3Vector3
-                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner3Vector3(b, bm), Some(n)) => {
+                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner3Vector3(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorCombiner3Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::VectorCombiner3Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
                     // VectorCombiner4Vector3
-                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner4Vector3(b, bm), Some(n)) => {
+                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner4Vector3(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorCombiner4Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::VectorCombiner4Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
                     // VectorCombiner5Vector3
-                    ($ComponentsName::VectorStockVector3(a, am), $ComponentsName::VectorCombiner5Vector3(b, bm), Some(n)) => {
+                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner5Vector3(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorCombiner5Vector3(a, am), $ComponentsName::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::VectorCombiner5Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
@@ -467,65 +459,65 @@ macro_rules! define_model_enums {
 
 
                     // VectorSplitter1Vector3
-                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter1Vector3(b, bmb), _) => {
+                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter1Vector3(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorSplitter1Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::VectorSplitter1Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
                     // VectorSplitter2Vector3
-                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter2Vector3(b, bmb), _) => {
+                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter2Vector3(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorSplitter2Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::VectorSplitter2Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
                     // VectorSplitter3Vector3
-                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter3Vector3(b, bmb), _) => {
+                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter3Vector3(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorSplitter3Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::VectorSplitter3Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
                     // VectorSplitter4Vector3
-                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter4Vector3(b, bmb), _) => {
+                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter4Vector3(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorSplitter4Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::VectorSplitter4Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
                     // VectorSplitter5Vector3
-                    ($ComponentsName::VectorStockVector3(a, amb), $ComponentsName::VectorSplitter5Vector3(b, bmb), _) => {
+                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter5Vector3(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentsName::VectorSplitter5Vector3(a, amb), $ComponentsName::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::VectorSplitter5Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
@@ -533,129 +525,129 @@ macro_rules! define_model_enums {
                     },
 
 
-                    ($ComponentsName::SequenceStockString(a, ad), $ComponentsName::SequenceProcessString(b, bd), _) => {
+                    ($ComponentModel::SequenceStockString(a, ad), $ComponentModel::SequenceProcessString(b, bd), _) => {
                         a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.address());
                         b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentsName::SequenceProcessString(a, ad), $ComponentsName::SequenceStockString(b, bd), _) => {
+                    ($ComponentModel::SequenceProcessString(a, ad), $ComponentModel::SequenceStockString(b, bd), _) => {
                         b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.address());
                         Ok(())
                     },
                     (a,b,n) => {
-                        <$ComponentsName as CustomComponentConnection>::connect_components(a, b, n)
+                        <$ComponentModel as CustomComponentConnection>::connect_components(a, b, n)
                     }
                 }
             }
 
-            pub fn register_component(mut sim_init: $crate::nexosim::SimInit, mut init_configs: &mut Vec<$ModelInitName>, component: Self) -> $crate::nexosim::SimInit {
+            pub fn register_component(mut sim_init: $crate::nexosim::SimInit, mut init_configs: &mut Vec<$ComponentInit>, component: Self) -> $crate::nexosim::SimInit {
                 
                 match component {
-                    $ComponentsName::VectorProcessF64(a, mb) => {
+                    $ComponentModel::VectorProcessF64(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorProcessF64(addr));
+                        init_configs.push($ComponentInit::VectorProcessF64(addr));
                     },
-                    $ComponentsName::VectorStockF64(a, mb) => {
+                    $ComponentModel::VectorStockF64(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorStockF64(addr));
+                        init_configs.push($ComponentInit::VectorStockF64(addr));
                     },
-                    $ComponentsName::VectorStockVector3(a, mb) => {
+                    $ComponentModel::VectorStockVector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorStockVector3(addr));
+                        init_configs.push($ComponentInit::VectorStockVector3(addr));
                     },
-                    $ComponentsName::VectorProcessVector3(a, mb) => {
+                    $ComponentModel::VectorProcessVector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorProcessVector3(addr));
+                        init_configs.push($ComponentInit::VectorProcessVector3(addr));
                     },
-                    $ComponentsName::VectorCombiner1Vector3(a, mb) => {
+                    $ComponentModel::VectorCombiner1Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorCombiner1Vector3(addr));
+                        init_configs.push($ComponentInit::VectorCombiner1Vector3(addr));
                     },
-                    $ComponentsName::VectorCombiner2Vector3(a, mb) => {
+                    $ComponentModel::VectorCombiner2Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorCombiner2Vector3(addr));
+                        init_configs.push($ComponentInit::VectorCombiner2Vector3(addr));
                     },
-                    $ComponentsName::VectorCombiner3Vector3(a, mb) => {
+                    $ComponentModel::VectorCombiner3Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorCombiner3Vector3(addr));
+                        init_configs.push($ComponentInit::VectorCombiner3Vector3(addr));
                     },
-                    $ComponentsName::VectorCombiner4Vector3(a, mb) => {
+                    $ComponentModel::VectorCombiner4Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorCombiner4Vector3(addr));
+                        init_configs.push($ComponentInit::VectorCombiner4Vector3(addr));
                     },
-                    $ComponentsName::VectorCombiner5Vector3(a, mb) => {
+                    $ComponentModel::VectorCombiner5Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorCombiner5Vector3(addr));
+                        init_configs.push($ComponentInit::VectorCombiner5Vector3(addr));
                     },
-                    $ComponentsName::VectorSplitter1Vector3(a, mb) => {
+                    $ComponentModel::VectorSplitter1Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorSplitter1Vector3(addr));
+                        init_configs.push($ComponentInit::VectorSplitter1Vector3(addr));
                     },
-                    $ComponentsName::VectorSplitter2Vector3(a, mb) => {
+                    $ComponentModel::VectorSplitter2Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorSplitter2Vector3(addr));
+                        init_configs.push($ComponentInit::VectorSplitter2Vector3(addr));
                     },
-                    $ComponentsName::VectorSplitter3Vector3(a, mb) => {
+                    $ComponentModel::VectorSplitter3Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorSplitter3Vector3(addr));
+                        init_configs.push($ComponentInit::VectorSplitter3Vector3(addr));
                     },
-                    $ComponentsName::VectorSplitter4Vector3(a, mb) => {
+                    $ComponentModel::VectorSplitter4Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorSplitter4Vector3(addr));
+                        init_configs.push($ComponentInit::VectorSplitter4Vector3(addr));
                     },
-                    $ComponentsName::VectorSplitter5Vector3(a, mb) => {
+                    $ComponentModel::VectorSplitter5Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::VectorSplitter5Vector3(addr));
+                        init_configs.push($ComponentInit::VectorSplitter5Vector3(addr));
                     },
-                    $ComponentsName::SequenceStockString(a, mb) => {
+                    $ComponentModel::SequenceStockString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::SequenceStockString(addr));
+                        init_configs.push($ComponentInit::SequenceStockString(addr));
                     },
-                    $ComponentsName::SequenceProcessString(a, mb) => {
+                    $ComponentModel::SequenceProcessString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        init_configs.push($ModelInitName::SequenceProcessString(addr));
+                        init_configs.push($ComponentInit::SequenceProcessString(addr));
                     },
                     $(
-                        $ComponentsName::$R(a, mb) => {
+                        $ComponentModel::$R(a, mb) => {
                             let name = a.element_name.clone();
                             let addr = mb.address();
                             sim_init = sim_init.add_model(a, mb, name);
-                            init_configs.push($ModelInitName::$R(addr));
+                            init_configs.push($ComponentInit::$R(addr));
                         }
                     ),*
                     _ => {
@@ -665,10 +657,10 @@ macro_rules! define_model_enums {
                 sim_init
             }
 
-            pub fn get_address(&self) -> $ComponentsAddressName {
+            pub fn get_address(&self) -> $ComponentModelAddress {
                 match self {
-                    $ComponentsName::VectorStockF64(_, mb) => $ComponentsAddressName::VectorStockF64(mb.address()),
-                    $ComponentsName::VectorProcessF64(_, mb) => $ComponentsAddressName::VectorProcessF64(mb.address()),
+                    $ComponentModel::VectorStockF64(_, mb) => $ComponentModelAddress::VectorStockF64(mb.address()),
+                    $ComponentModel::VectorProcessF64(_, mb) => $ComponentModelAddress::VectorProcessF64(mb.address()),
                     x => {
                         panic!("Component type {} not implemented for address retrieval", x);
                     }
@@ -693,7 +685,7 @@ macro_rules! define_model_enums {
         }
 
         #[derive(Display)]
-        pub enum $ComponentsAddressName {
+        pub enum $ComponentModelAddress {
             VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorStockVector3($crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
@@ -702,7 +694,7 @@ macro_rules! define_model_enums {
 
         $(#[$logger_enum_meta])*
         #[derive(Display)]
-        pub enum $LoggersName {
+        pub enum $ComponentLogger {
             VectorStockLoggerF64($crate::components::vector::VectorStockLogger<f64>),
             VectorProcessLoggerF64($crate::components::vector::VectorProcessLogger<f64>),
 
@@ -717,93 +709,93 @@ macro_rules! define_model_enums {
             ),*
         }
 
-        impl $LoggersName {
-            pub fn connect_logger(a: &mut $LoggersName, b: &mut $ComponentsName, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
+        impl $ComponentLogger {
+            pub fn connect_logger(a: &mut $ComponentLogger, b: &mut $ComponentModel, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
                 use $crate::core::CustomLoggerConnection;
                 match (a, b, n) {
-                    ($LoggersName::VectorStockLoggerF64(a), $ComponentsName::VectorStockF64(b, bd), _) => {
+                    ($ComponentLogger::VectorStockLoggerF64(a), $ComponentModel::VectorStockF64(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::VectorProcessLoggerF64(a), $ComponentsName::VectorProcessF64(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-
-                    ($LoggersName::VectorStockLoggerVector3(a), $ComponentsName::VectorStockVector3(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorProcessVector3(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner1Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner2Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner3Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner4Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorCombiner5Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter1Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter2Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter3Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter4Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($LoggersName::VectorProcessLoggerVector3(a), $ComponentsName::VectorSplitter5Vector3(b, bmb), _) => {
+                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::VectorProcessF64(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
 
-                    ($LoggersName::SequenceStockLoggerString(a), $ComponentsName::SequenceStockString(b, bd), _) => {
+                    ($ComponentLogger::VectorStockLoggerVector3(a), $ComponentModel::VectorStockVector3(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($LoggersName::SequenceProcessLoggerString(a), $ComponentsName::SequenceProcessString(b, bd), _) => {
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorProcessVector3(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    (a,b,n) => <$LoggersName as CustomLoggerConnection>::connect_logger(a, b, n)
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner1Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner2Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner3Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner4Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner5Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter1Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter2Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter3Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter4Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter5Vector3(b, bmb), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+
+                    ($ComponentLogger::SequenceStockLoggerString(a), $ComponentModel::SequenceStockString(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::SequenceProcessLoggerString(a), $ComponentModel::SequenceProcessString(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    (a,b,n) => <$ComponentLogger as CustomLoggerConnection>::connect_logger(a, b, n)
                 }
             }
 
             pub fn write_csv(mut self, dir: &str) -> Result<(), Box<dyn Error>> {
                 match self {
-                    $LoggersName::VectorStockLoggerF64(a) => { a.write_csv(dir.to_string()) },
-                    $LoggersName::VectorProcessLoggerF64(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::VectorStockLoggerF64(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::VectorProcessLoggerF64(a) => { a.write_csv(dir.to_string()) },
 
-                    $LoggersName::VectorStockLoggerVector3(a) => { a.write_csv(dir.to_string()) },
-                    $LoggersName::VectorProcessLoggerVector3(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::VectorStockLoggerVector3(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::VectorProcessLoggerVector3(a) => { a.write_csv(dir.to_string()) },
 
-                    $LoggersName::SequenceStockLoggerString(a) => { a.write_csv(dir.to_string()) },
-                    $LoggersName::SequenceProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::SequenceStockLoggerString(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::SequenceProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
 
                     $(
-                        $LoggersName::$U (a) => {
+                        $ComponentLogger::$U (a) => {
                             a.write_csv(dir.to_string())
                         }
                     ),*
@@ -814,7 +806,7 @@ macro_rules! define_model_enums {
             } 
         }
 
-        pub enum $ModelInitName {
+        pub enum $ComponentInit {
             VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
             VectorCombiner1F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
@@ -848,7 +840,7 @@ macro_rules! define_model_enums {
             ),*
         }
 
-        impl $ModelInitName {
+        impl $ComponentInit {
             fn initialise(&mut self, simu: &mut $crate::nexosim::Simulation) -> Result<(), $crate::nexosim::ExecutionError> {
                 let notif_meta = NotificationMetadata {
                     time: simu.time(),
@@ -856,34 +848,34 @@ macro_rules! define_model_enums {
                     message: "Init".into(),
                 }; 
                 match self {
-                    $ModelInitName::VectorStockF64(a) => { Ok(()) },
-                    $ModelInitName::VectorProcessF64(a) => { simu.process_event($crate::components::vector::VectorProcess::<f64, f64, f64>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner1F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 1>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner2F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 2>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner3F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 3>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner4F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 4>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner5F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 5>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter1F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 1>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter2F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 2>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter3F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 3>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter4F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 4>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter5F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 5>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorStockF64(a) => { Ok(()) },
+                    $ComponentInit::VectorProcessF64(a) => { simu.process_event($crate::components::vector::VectorProcess::<f64, f64, f64>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner1F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 1>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner2F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 2>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner3F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 3>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner4F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 4>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner5F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, f64, 5>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter1F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 1>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter2F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 2>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter3F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 3>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter4F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 4>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter5F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, 5>::update_state, notif_meta, a.clone()) },
 
-                    $ModelInitName::VectorStockVector3(a) => { Ok(()) },
-                    $ModelInitName::VectorProcessVector3(a) => { simu.process_event($crate::components::vector::VectorProcess::<Vector3, Vector3, f64>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner1Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 1>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner2Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 2>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner3Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 3>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner4Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 4>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorCombiner5Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter1Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 1>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter2Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 2>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter3Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 3>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter4Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 4>::update_state, notif_meta, a.clone()) },
-                    $ModelInitName::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorStockVector3(a) => { Ok(()) },
+                    $ComponentInit::VectorProcessVector3(a) => { simu.process_event($crate::components::vector::VectorProcess::<Vector3, Vector3, f64>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner1Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 1>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner2Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 2>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner3Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 3>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner4Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 4>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorCombiner5Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter1Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 1>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter2Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 2>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter3Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 3>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter4Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 4>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
 
-                    $ModelInitName::SequenceStockString(a) => { Ok(()) },
-                    $ModelInitName::SequenceProcessString(a) => { simu.process_event($crate::components::sequence::SequenceProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
+                    $ComponentInit::SequenceStockString(a) => { Ok(()) },
+                    $ComponentInit::SequenceProcessString(a) => { simu.process_event($crate::components::sequence::SequenceProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)
                     }
@@ -912,9 +904,9 @@ macro_rules! define_model_enums {
         // }
 
         impl $ScheduledEventConfig {
-            pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentsAddressName, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
+            pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
                 match (self, addr) {
-                    ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentsAddressName::VectorStockF64(addr)) => {
+                    ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::VectorStockF64(addr)) => {
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity, addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, NotificationMetadata {
                             time,
@@ -923,7 +915,7 @@ macro_rules! define_model_enums {
                         }, addr.clone())?;
                         Ok(())
                     },
-                    ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentsAddressName::VectorProcessF64(addr)) => {
+                    ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::VectorProcessF64(addr)) => {
                         let distr_instance = df.create(distr)?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::update_state, NotificationMetadata {
@@ -961,26 +953,26 @@ macro_rules! define_model_enums {
         #[macro_export]
         macro_rules! connect_components {
             (&mut $a:ident, &mut $b:ident) => {
-                $ComponentsName::connect_components(&mut $a, &mut $b, None)
+                $ComponentModel::connect_components(&mut $a, &mut $b, None)
             };
             (&mut $a:ident, &mut $b:ident, $n:expr) => {
-                $ComponentsName::connect_components(&mut $a, &mut $b, Some($n))
+                $ComponentModel::connect_components(&mut $a, &mut $b, Some($n))
             };
         }
 
         #[macro_export]
         macro_rules! connect_logger {
             (&mut $a:ident, &mut $b:ident) => {
-                $LoggersName::connect_logger(&mut $a, &mut $b, None)
+                $ComponentLogger::connect_logger(&mut $a, &mut $b, None)
             };
             (&mut $a:ident, &mut $b:ident, $n:expr) => {
-                $LoggersName::connect_logger(&mut $a, &mut $b, Some($n))
+                $ComponentLogger::connect_logger(&mut $a, &mut $b, Some($n))
             };
         }
 
         macro_rules! register_component {
             ($sim_init:ident, &mut $init_configs:ident, $component:ident) => {
-                $ComponentsName::register_component($sim_init, &mut $init_configs, $component)
+                $ComponentModel::register_component($sim_init, &mut $init_configs, $component)
             };
         }
 

@@ -9,7 +9,6 @@ define_model_enums! {
     pub enum ComponentLogger {}
     pub enum ComponentInit {}
     pub enum ScheduledEventConfig {}
-    pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {
