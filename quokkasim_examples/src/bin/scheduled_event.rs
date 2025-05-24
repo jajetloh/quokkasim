@@ -107,25 +107,13 @@ fn main() {
     let event_time = start_time.clone() + Duration::from_secs(60);
     
     create_scheduled_event!(&mut scheduler, event_time, capacity_change, stock_1_addr, &mut df).unwrap();
-
-    simu.step_until(start_time + Duration::from_secs(120)).unwrap();
     init_configs.iter_mut().for_each(|init| {
         init.initialise(&mut simu).unwrap();
     });
+    simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 
     let output_dir = "outputs/scheduled_event";
     create_dir_all(output_dir).unwrap();
     stock_logger.write_csv(&output_dir).unwrap();
     process_logger.write_csv(&output_dir).unwrap();
-
-    // let scheduled_events = vec![
-    //     ScheduledEvent::VectorStockF64LowCapacityChange(
-    //         time: start_time.clone() + Duration::from_secs(60),
-
-
-    //     )
-    // ];
-
-    // schedule_event!()
-
 }

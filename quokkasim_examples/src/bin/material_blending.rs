@@ -114,7 +114,7 @@ fn main() {
     );
 
     let mut reclaimer_3 = ComponentModel::VectorCombiner1Vector3(
-        VectorCombiner::new()
+        VectorCombiner::new() 
             .with_name("Reclaimer 3".into())
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(60.)),

@@ -915,22 +915,22 @@ macro_rules! define_model_enums {
             pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentsAddressName, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentsAddressName::VectorStockF64(addr)) => {
-                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity, addr.clone());
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity, addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, NotificationMetadata {
                             time,
                             element_from: "Scheduler".into(),
                             message: "Low capacity change".into(),
-                        }, addr.clone());
+                        }, addr.clone())?;
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentsAddressName::VectorProcessF64(addr)) => {
                         let distr_instance = df.create(distr)?;
-                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone());
+                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64>::update_state, NotificationMetadata {
                             time,
                             element_from: "Scheduler".into(),
                             message: "Process quantity change".into(),
-                        }, addr.clone());
+                        }, addr.clone())?;
                         Ok(())
                     }
                     // $ScheduledEventConfig::VectorStockF64LowCapacityChange(addr, time, low_capacity) => {
