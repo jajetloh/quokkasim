@@ -977,11 +977,8 @@ macro_rules! define_model_enums {
         }
 
         macro_rules! create_scheduled_event {
-            // ($scheduler:ident, $event:ident, $component:ident) => {
-            //     scheduler.schedule_event($ModelScheduledEventName::schedule_event($sim, $event, $component))
-            // };
             (&mut $scheduler:ident, $time:ident, $event_config:ident, $component_addr:ident, &mut $df:ident) => {
-                $ScheduledEventConfig::schedule_event($event_config, $time, &mut $scheduler, $component_addr, &mut $df);
+                $ScheduledEventConfig::schedule_event($event_config, $time, &mut $scheduler, $component_addr, &mut $df)
             }
         }
     }

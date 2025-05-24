@@ -63,7 +63,6 @@ fn main() {
             .with_initial_vector(0.),
         Mailbox::new()
     );
-    let stock_2_addr = stock_2.get_address();
     let mut process = ComponentModel::VectorProcessF64(
         VectorProcess::new()
             .with_name("Process".into())
@@ -71,19 +70,18 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
-    let process_addr = process.get_address();
 
     let mut process_logger = ComponentLogger::VectorProcessLoggerF64(VectorProcessLogger::new("ProcessLogger".into()));
     let mut stock_logger = ComponentLogger::VectorStockLoggerF64(VectorStockLogger::new("StockLogger".into()));
 
     // Connect components
-    connect_components!(&mut stock_1, &mut process);
-    connect_components!(&mut process, &mut stock_2);
+    connect_components!(&mut stock_1, &mut process).unwrap();
+    connect_components!(&mut process, &mut stock_2).unwrap();
 
     // Connect loggers
-    connect_logger!(&mut process_logger, &mut process);
-    connect_logger!(&mut stock_logger, &mut stock_1);
-    connect_logger!(&mut stock_logger, &mut stock_2);
+    connect_logger!(&mut process_logger, &mut process).unwrap();
+    connect_logger!(&mut stock_logger, &mut stock_1).unwrap();
+    connect_logger!(&mut stock_logger, &mut stock_2).unwrap();
 
     // Create simulation
     let mut sim_builder = SimInit::new();

@@ -3,7 +3,7 @@ use std::{error::Error, fs::create_dir_all, time::Duration};
 use quokkasim::nexosim::Mailbox;
 use quokkasim::prelude::*;
 use quokkasim::define_model_enums;
-use serde::{ser::SerializeStruct, Serialize};
+use serde::{Serialize, ser::SerializeStruct};
 
 /**
  * A representation of Iron Ore, primarily through iron content (Fe) and other elements.
@@ -45,7 +45,7 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.limonite += other.limonite;
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<IronOre, IronOre> {
+    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, IronOre> {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
         SubtractParts {
@@ -118,6 +118,7 @@ impl Serialize for IronOreProcessLog {
         state.end()
     }
 }
+
 impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     fn from(log: VectorProcessLog<IronOre>) -> Self {
         IronOreProcessLog {
@@ -131,27 +132,6 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     }
 }
 
-struct IronOreProcessLogger {
-    name: String,
-    buffer: EventQueue<IronOreProcessLog>
-}
-
-impl Logger for IronOreProcessLogger {
-    type RecordType = IronOreProcessLog;
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_buffer(self) -> EventQueue<Self::RecordType> {
-        self.buffer
-    }
-    fn new(name: String) -> Self {
-        IronOreProcessLogger {
-            name,
-            buffer: EventQueue::new(),
-        }
-    }
-}
-
 struct IronOreStockLog {
     time: String,
     event_id: u64,
@@ -161,13 +141,14 @@ struct IronOreStockLog {
     truck_id: Option<u32>,
     resource: IronOre,
 }
+
 impl Serialize for IronOreStockLog {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreStockLog", 12)?;
-        state.serialize_field("time", &self.time)?; 
+        let mut state = serializer.serialize_struct("IronOreStockLog", 13)?;
+        state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
@@ -183,6 +164,7 @@ impl Serialize for IronOreStockLog {
         state.end()
     }
 }
+
 impl From<VectorStockLog<IronOre>> for IronOreStockLog {
     fn from(log: VectorStockLog<IronOre>) -> Self {
         IronOreStockLog {
@@ -192,23 +174,54 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
             element_type: log.element_type,
             log_type: log.log_type,
             truck_id: None,
-            resource: log.vector
+            resource: log.vector,
+        }
+    }
+}
+
+//
+// Define logger types for the IronOre components
+//
+struct IronOreProcessLogger {
+    name: String,
+    buffer: EventQueue<IronOreProcessLog>,
+}
+
+impl Logger for IronOreProcessLogger {
+    type RecordType = IronOreProcessLog;
+
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
+        self.buffer
+    }
+
+    fn new(name: String) -> Self {
+        IronOreProcessLogger {
+            name,
+            buffer: EventQueue::new(),
         }
     }
 }
 
 struct IronOreStockLogger {
     name: String,
-    buffer: EventQueue<IronOreStockLog>
+    buffer: EventQueue<IronOreStockLog>,
 }
+
 impl Logger for IronOreStockLogger {
     type RecordType = IronOreStockLog;
+
     fn get_name(&self) -> &String {
         &self.name
     }
+
     fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
+
     fn new(name: String) -> Self {
         IronOreStockLogger {
             name,
@@ -217,17 +230,25 @@ impl Logger for IronOreStockLogger {
     }
 }
 
+//
+// Define the component and logger enums using the updated macro
+//
 define_model_enums! {
     pub enum ComponentModel {
         IronOreProcess(VectorProcess<IronOre, IronOre, f64>, Mailbox<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>),
+        IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>)
+    }
+    pub enum ComponentModelAddress {
+        IronOreProcess(Mailbox<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreStock(Mailbox<VectorStock<IronOre>>)
     }
     pub enum ComponentLogger {
         IronOreProcessLogger(IronOreProcessLogger),
-        IronOreStockLogger(IronOreStockLogger),
+        IronOreStockLogger(IronOreStockLogger)
     }
     pub enum ComponentInit {}
-    pub enum ScheduledEvent {}
+    pub enum ScheduledEventConfig {
+    }
 }
 
 impl CustomComponentConnection for ComponentModel {

@@ -5,6 +5,7 @@ use quokkasim::{define_model_enums, prelude::*};
 
 define_model_enums! {
     pub enum ComponentModel {}
+    pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
     pub enum ComponentInit {}
     pub enum ScheduledEvent {}
@@ -170,8 +171,6 @@ fn main() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let (mut simu, mut scheduler) = sim_builder.init(start_time).unwrap();
-
-    scheduler.schedule_event(start_time + Duration::from_secs(45 * 60), , arg, address)
 
     init_configs.iter_mut().for_each(|init| {
         init.initialise(&mut simu).unwrap();

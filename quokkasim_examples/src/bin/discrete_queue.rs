@@ -4,6 +4,7 @@ use quokkasim::{define_model_enums, prelude::*};
 
 define_model_enums! {
     pub enum ComponentModel {}
+    pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
     pub enum ComponentInit {}
     pub enum ScheduledEvent {}
@@ -99,9 +100,7 @@ fn main() {
     sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
     sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
 
-    let (mut simu, mut scheduler) = sim_builder.init(MonotonicTime::EPOCH).unwrap();
-
-    scheduler.
+    let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
     init_configs.iter_mut().for_each(|x| {
         x.initialise(&mut simu).unwrap();
