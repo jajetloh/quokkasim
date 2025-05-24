@@ -661,35 +661,65 @@ macro_rules! define_model_enums {
                 match self {
                     $ComponentModel::VectorStockF64(_, mb) => $ComponentModelAddress::VectorStockF64(mb.address()),
                     $ComponentModel::VectorProcessF64(_, mb) => $ComponentModelAddress::VectorProcessF64(mb.address()),
+                    $ComponentModel::VectorCombiner1F64(_, mb) => $ComponentModelAddress::VectorCombiner1F64(mb.address()),
+                    $ComponentModel::VectorCombiner2F64(_, mb) => $ComponentModelAddress::VectorCombiner2F64(mb.address()),
+                    $ComponentModel::VectorCombiner3F64(_, mb) => $ComponentModelAddress::VectorCombiner3F64(mb.address()),
+                    $ComponentModel::VectorCombiner4F64(_, mb) => $ComponentModelAddress::VectorCombiner4F64(mb.address()),
+                    $ComponentModel::VectorCombiner5F64(_, mb) => $ComponentModelAddress::VectorCombiner5F64(mb.address()),
+                    $ComponentModel::VectorSplitter1F64(_, mb) => $ComponentModelAddress::VectorSplitter1F64(mb.address()),
+                    $ComponentModel::VectorSplitter2F64(_, mb) => $ComponentModelAddress::VectorSplitter2F64(mb.address()),
+                    $ComponentModel::VectorSplitter3F64(_, mb) => $ComponentModelAddress::VectorSplitter3F64(mb.address()),
+                    $ComponentModel::VectorSplitter4F64(_, mb) => $ComponentModelAddress::VectorSplitter4F64(mb.address()),
+                    $ComponentModel::VectorSplitter5F64(_, mb) => $ComponentModelAddress::VectorSplitter5F64(mb.address()),
+                    $ComponentModel::VectorStockVector3(_, mb) => $ComponentModelAddress::VectorStockVector3(mb.address()),
+                    $ComponentModel::VectorProcessVector3(_, mb) => $ComponentModelAddress::VectorProcessVector3(mb.address()),
+                    $ComponentModel::VectorCombiner1Vector3(_, mb) => $ComponentModelAddress::VectorCombiner1Vector3(mb.address()),
+                    $ComponentModel::VectorCombiner2Vector3(_, mb) => $ComponentModelAddress::VectorCombiner2Vector3(mb.address()),
+                    $ComponentModel::VectorCombiner3Vector3(_, mb) => $ComponentModelAddress::VectorCombiner3Vector3(mb.address()),
+                    $ComponentModel::VectorCombiner4Vector3(_, mb) => $ComponentModelAddress::VectorCombiner4Vector3(mb.address()),
+                    $ComponentModel::VectorCombiner5Vector3(_, mb) => $ComponentModelAddress::VectorCombiner5Vector3(mb.address()),
+                    $ComponentModel::VectorSplitter1Vector3(_, mb) => $ComponentModelAddress::VectorSplitter1Vector3(mb.address()),
+                    $ComponentModel::VectorSplitter2Vector3(_, mb) => $ComponentModelAddress::VectorSplitter2Vector3(mb.address()),
+                    $ComponentModel::VectorSplitter3Vector3(_, mb) => $ComponentModelAddress::VectorSplitter3Vector3(mb.address()),
+                    $ComponentModel::VectorSplitter4Vector3(_, mb) => $ComponentModelAddress::VectorSplitter4Vector3(mb.address()),
+                    $ComponentModel::VectorSplitter5Vector3(_, mb) => $ComponentModelAddress::VectorSplitter5Vector3(mb.address()),
+                    $ComponentModel::SequenceStockString(_, mb) => $ComponentModelAddress::SequenceStockString(mb.address()),
+                    $ComponentModel::SequenceProcessString(_, mb) => $ComponentModelAddress::SequenceProcessString(mb.address()),
                     x => {
                         panic!("Component type {} not implemented for address retrieval", x);
                     }
                 }
             }
-
-            // pub fn create_scheduled_event(self, time: $crate::core::MonotonicTime, event: $ModelScheduledEventName) -> $ModelScheduledEventName {
-            //     use $crate::core::ScheduledEvent;
-            //     match event {
-            //         $(
-            //             $(#[$sch_event_meta])*
-            //             $W $( ( $WT ) )? => {
-            //                 $crate::nexosim::ScheduledEvent::new(time, self, event)
-            //             }
-            //         ),*
-            //         _ => {
-            //             panic!("Scheduled event type {} not implemented for creation", event);
-            //         }
-            //     }
-
-            // }
         }
 
         #[derive(Display)]
         pub enum $ComponentModelAddress {
             VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
             VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>),
+            VectorCombiner1F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 1>>),
+            VectorCombiner2F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 2>>),
+            VectorCombiner3F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 3>>),
+            VectorCombiner4F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 4>>),
+            VectorCombiner5F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, f64, 5>>),
+            VectorSplitter1F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 1>>),
+            VectorSplitter2F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 2>>),
+            VectorSplitter3F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 3>>),
+            VectorSplitter4F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 4>>),
+            VectorSplitter5F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, 5>>),
             VectorStockVector3($crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
             VectorProcessVector3($crate::nexosim::Address<$crate::components::vector::VectorProcess<Vector3, Vector3, f64>>),
+            VectorCombiner1Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 1>>),
+            VectorCombiner2Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 2>>),
+            VectorCombiner3Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 3>>),
+            VectorCombiner4Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 4>>),
+            VectorCombiner5Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<Vector3, Vector3, f64, 5>>),
+            VectorSplitter1Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 1>>),
+            VectorSplitter2Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 2>>),
+            VectorSplitter3Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>>),
+            VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
+            VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
+            SequenceStockString($crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
+            SequenceProcessString($crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
         }
 
         $(#[$logger_enum_meta])*
@@ -721,7 +751,6 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-
                     ($ComponentLogger::VectorStockLoggerVector3(a), $ComponentModel::VectorStockVector3(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
@@ -883,13 +912,6 @@ macro_rules! define_model_enums {
             }
         }
 
-        // pub enum $ModelScheduledEventName {
-        //     VectorStockF64LowCapacityChange($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>, $crate::nexosim::MonotonicTime, f64),
-        //     VectorStockF64MaxCapacityChange($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>, $crate::nexosim::MonotonicTime, f64),
-        //     VectorProcessF64ProcessQuantityChange($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>, $crate::nexosim::MonotonicTime, $crate::common::Distribution),
-        //     VectorProcessF64ProcessTimeChange($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64>>, $crate::nexosim::MonotonicTime, $crate::common::Distribution),
-        // }
-
         #[derive(Display)]
         pub enum $ScheduledEventConfig {
             SetLowCapacity(f64),
@@ -897,11 +919,6 @@ macro_rules! define_model_enums {
             SetProcessQuantity(DistributionConfig),
             SetProcessTime(DistributionConfig),
         }
-
-        // pub enum $ScheduledEvent {
-        //     SetLowCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
-        //     SetMaxCapacityVectorStockF64($ScheduledEventConfig, Address<$crate::components::vector::VectorStock<f64>>),
-        // }
 
         impl $ScheduledEventConfig {
             pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
@@ -925,27 +942,9 @@ macro_rules! define_model_enums {
                         }, addr.clone())?;
                         Ok(())
                     }
-                    // $ScheduledEventConfig::VectorStockF64LowCapacityChange(addr, time, low_capacity) => {
-                    //     scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity, low_capacity, addr);
-                    //     scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::update_state, $crate::core::NotificationMetadata {
-                    //         time,
-                    //         element_from: "Scheduler".into(),
-                    //         message: "Low capacity change".into(),
-                    //     }, addr);
-                    //     Ok(())
-                    // },
                     (a, b) => {
                         Err(format!("schedule_event not implemented for types ({}, {})", a, b).into())
                     }
-                    // $ModelScheduledEventName::VectorStockF64MaxCapacityChange(addr, time, max_capacity) => {
-                    //     scheduler.schedule_event($crate::components::vector::VectorStock::<f64>::with_max_capacity, addr, component, max_capacity);
-                    // },
-                    // $ModelScheduledEventName::VectorProcessF64ProcessQuantityChange(addr, distribution) => {
-                    //     scheduler.schedule_event($crate::components::vector::VectorProcess::<f64, f64, f64>::process_quantity_change, addr, distribution);
-                    // },
-                    // $ModelScheduledEventName::VectorProcessF64ProcessTimeChange(addr, distribution) => {
-                    //     scheduler.schedule_event($crate::components::vector::VectorProcess::<f64, f64, f64>::process_time_change, addr, distribution);
-                    // }
                 }
             }
         }
