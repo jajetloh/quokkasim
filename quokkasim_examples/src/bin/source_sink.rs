@@ -7,7 +7,6 @@ define_model_enums! {
     pub enum ComponentModel {}
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
-    pub enum ComponentInit {}
     pub enum ScheduledEventConfig {}
 }
 
@@ -46,70 +45,85 @@ impl CustomInit for ComponentModelAddress {
 fn main() {
     // Declarations
 
-    let mut stock_1 = ComponentModel::VectorStockF64(
+    let mut source = ComponentModel::VectorSourceVector3(
+        VectorSource::new()
+            .with_name("Source".into())
+            .with_process_quantity_distr(Distribution::Constant(1.))
+            .with_process_time_distr(Distribution::Constant(1.))
+            .with_source_vector([1., 4., 5.].into()),
+        Mailbox::new()
+    );
+    let mut source_addr = source.get_address();
+
+    let mut stock_1 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Stock 1".into())
             .with_low_capacity(50.)
             .with_max_capacity(101.)
-            .with_initial_vector(100.),
+            .with_initial_vector([0., 0., 0.].into()),
         Mailbox::new()
     );
-    let stock_1_addr = stock_1.get_address();
-    let mut stock_2 = ComponentModel::VectorStockF64(
-        VectorStock::new()
-            .with_name("Stock 2".into())
-            .with_low_capacity(50.)
-            .with_max_capacity(101.)
-            .with_initial_vector(0.),
-        Mailbox::new()
-    );
-    let mut process = ComponentModel::VectorProcessF64(
+    let mut process = ComponentModel::VectorProcessVector3(
         VectorProcess::new()
             .with_name("Process".into())
             .with_process_quantity_distr(Distribution::Constant(1.))
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
+    let mut process_addr = process.get_address();
+    let mut stock_2 = ComponentModel::VectorStockVector3(
+        VectorStock::new()
+            .with_name("Stock 2".into())
+            .with_low_capacity(50.)
+            .with_max_capacity(101.)
+            .with_initial_vector([0., 0., 0.].into()),
+        Mailbox::new()
+    );
 
-    let mut process_logger = ComponentLogger::VectorProcessLoggerF64(VectorProcessLogger::new("ProcessLogger".into()));
-    let mut stock_logger = ComponentLogger::VectorStockLoggerF64(VectorStockLogger::new("StockLogger".into()));
+    let mut sink = ComponentModel::VectorSinkVector3(
+        VectorSink::new()
+            .with_name("Sink".into())
+            .with_process_quantity_distr(Distribution::Constant(1.))
+            .with_process_time_distr(Distribution::Constant(2.)),
+        Mailbox::new()
+    );
+    let mut sink_addr = sink.get_address();
+
+    let mut process_logger = ComponentLogger::VectorProcessLoggerVector3(VectorProcessLogger::new("ProcessLogger".into()));
+    let mut stock_logger = ComponentLogger::VectorStockLoggerVector3(VectorStockLogger::new("StockLogger".into()));
 
     // Connect components
+    connect_components!(&mut source, &mut stock_1).unwrap();
     connect_components!(&mut stock_1, &mut process).unwrap();
     connect_components!(&mut process, &mut stock_2).unwrap();
+    connect_components!(&mut stock_2, &mut sink).unwrap();
 
     // Connect loggers
+    connect_logger!(&mut process_logger, &mut source).unwrap();
     connect_logger!(&mut process_logger, &mut process).unwrap();
+    connect_logger!(&mut process_logger, &mut sink).unwrap();
     connect_logger!(&mut stock_logger, &mut stock_1).unwrap();
     connect_logger!(&mut stock_logger, &mut stock_2).unwrap();
 
     // Create simulation
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
 
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock_2);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process);
+    sim_builder = register_component!(sim_builder, stock_1);
+    sim_builder = register_component!(sim_builder, stock_2);
+    sim_builder = register_component!(sim_builder, source);
+    sim_builder = register_component!(sim_builder, process);
+    sim_builder = register_component!(sim_builder, sink);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let (mut simu, mut scheduler) = sim_builder.init(start_time.clone()).unwrap();
 
-    let capacity_change = ScheduledEventConfig::SetLowCapacity(10.);
+    source_addr.initialise(&mut simu).unwrap();
+    process_addr.initialise(&mut simu).unwrap();
+    sink_addr.initialise(&mut simu).unwrap();
 
-    let mut df = DistributionFactory {
-        base_seed: 1234,
-        next_seed: 0,
-    };
-
-    let event_time = start_time.clone() + Duration::from_secs(60);
-    
-    create_scheduled_event!(&mut scheduler, event_time, capacity_change, stock_1_addr, &mut df).unwrap();
-    init_configs.iter_mut().for_each(|init| {
-        init.initialise(&mut simu).unwrap();
-    });
     simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 
-    let output_dir = "outputs/scheduled_event";
+    let output_dir = "outputs/source_sink";
     create_dir_all(output_dir).unwrap();
     stock_logger.write_csv(&output_dir).unwrap();
     process_logger.write_csv(&output_dir).unwrap();

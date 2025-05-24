@@ -239,14 +239,13 @@ define_model_enums! {
         IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>)
     }
     pub enum ComponentModelAddress {
-        IronOreProcess(Mailbox<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStock(Mailbox<VectorStock<IronOre>>)
+        IronOreProcess(Address<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreStock(Address<VectorStock<IronOre>>)
     }
     pub enum ComponentLogger {
         IronOreProcessLogger(IronOreProcessLogger),
         IronOreStockLogger(IronOreStockLogger)
     }
-    pub enum ComponentInit {}
     pub enum ScheduledEventConfig {
     }
 }
@@ -288,7 +287,7 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentInit {
+impl CustomInit for ComponentModelAddress {
     fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
         let notif_meta = NotificationMetadata {
             time: simu.time(),
@@ -296,11 +295,11 @@ impl CustomInit for ComponentInit {
             message: "Start".into(),
         };
         match self {
-            ComponentInit::IronOreProcess(addr) => {
+            ComponentModelAddress::IronOreProcess(addr) => {
                 simu.process_event(VectorProcess::<IronOre, IronOre, f64>::update_state, notif_meta, addr.clone())?;
                 Ok(())
             },
-            ComponentInit::IronOreStock(_) => {
+            ComponentModelAddress::IronOreStock(_) => {
                 // No init required for this stock
                 Ok(())
             },
@@ -334,6 +333,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(10.)),
         Mailbox::new(),
     );
+    let mut process1_addr = process1.get_address();
 
     let mut stock2 = ComponentModel::IronOreStock(
         VectorStock::new()
@@ -356,16 +356,13 @@ fn main() {
     connect_logger!(&mut stock_logger, &mut stock2).unwrap();
 
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock2);
+    sim_builder = register_component!(sim_builder, stock1);
+    sim_builder = register_component!(sim_builder, process1);
+    sim_builder = register_component!(sim_builder, stock2);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    init_configs.iter_mut().for_each(|x| {
-        x.initialise(&mut simu).unwrap();
-    });
+    process1_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 

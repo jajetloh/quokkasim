@@ -6,7 +6,7 @@ define_model_enums! {
     pub enum ComponentModel {}
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
-    pub enum ComponentInit {}
+    // pub enum ComponentInit {}
     pub enum ScheduledEvent {}
 }
 
@@ -27,7 +27,7 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentInit {
+impl CustomInit for ComponentModelAddress {
     fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
         let notif_meta = NotificationMetadata {
             time: simu.time(),
@@ -65,6 +65,7 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
+    let mut process_1_addr = process_1.get_address();
 
     let mut queue_2 = ComponentModel::SequenceStockString(SequenceStock::new()
         .with_name("Queue2".into())
@@ -79,6 +80,7 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 3., max: 7. }).unwrap()),
         Mailbox::new()
     );
+    let mut process_2_addr = process_2.get_address();
 
     connect_components!(&mut queue_1, &mut process_1).unwrap();
     connect_components!(&mut process_1, &mut queue_2).unwrap();
@@ -94,17 +96,24 @@ fn main() {
     connect_logger!(&mut process_logger, &mut process_2).unwrap();
 
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
-    sim_builder = register_component!(sim_builder, &mut init_configs, queue_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
+    // let mut init_configs: Vec<ComponentInit> = Vec::new();
+    // sim_builder = register_component!(sim_builder, &mut init_configs, queue_1);
+    // sim_builder = register_component!(sim_builder, &mut init_configs, process_1);
+    // sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
+    // sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
+    sim_builder = register_component!(sim_builder, queue_1);
+    sim_builder = register_component!(sim_builder, process_1);
+    sim_builder = register_component!(sim_builder, queue_2);
+    sim_builder = register_component!(sim_builder, process_2);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    init_configs.iter_mut().for_each(|x| {
-        x.initialise(&mut simu).unwrap();
-    });
+    process_1_addr.initialise(&mut simu).unwrap();
+    process_2_addr.initialise(&mut simu).unwrap();
+
+    // init_configs.iter_mut().for_each(|x| {
+    //     x.initialise(&mut simu).unwrap();
+    // });
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
