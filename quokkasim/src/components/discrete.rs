@@ -666,6 +666,23 @@ where
         }
     }
 
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+        async move {
+            self.set_previous_check_time(cx.time());
+            match self.time_to_next_event {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + time_until_next;
+                        cx.schedule_event(next_time, <Self as Process<ItemDeque<T>, Option<T>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                    };
+                }
+            };
+        }
+    }
+
     fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
         async move {
             let log = DiscreteProcessLog {

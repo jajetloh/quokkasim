@@ -119,10 +119,6 @@ fn main() {
     process_1_addr.initialise(&mut simu).unwrap();
     process_2_addr.initialise(&mut simu).unwrap();
 
-    // init_configs.iter_mut().for_each(|x| {
-    //     x.initialise(&mut simu).unwrap();
-    // });
-
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
     let output_dir = "outputs/discrete_queue";
