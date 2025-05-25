@@ -61,16 +61,19 @@ impl<T: Clone + Default + Send + 'static> Default for SequenceStock<T> {
     }
 }
 
+use std::ops::{Deref, DerefMut};
+
 #[derive(Debug, Clone)]
-pub struct SeqDeque<TT> {
-    pub deque: VecDeque<TT>,
-}
+
+pub struct SeqDeque<T>(VecDeque<T>);
+impl<T> Deref for SeqDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
+impl<T> DerefMut for SeqDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
 
 impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
     fn add(&mut self, other: Option<TT>) {
         match other { 
             Some(item) => {
-                self.deque.push_back(item);
+                self.push_back(item);
             },
             _ => {}
         };
@@ -79,15 +82,13 @@ impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
         todo!()
     }
     fn total(&self) -> u32 {
-        self.deque.len() as u32
+        self.len() as u32
     }
 }
 
 impl<TT: Default> Default for SeqDeque<TT> {
     fn default() -> Self {
-        SeqDeque {
-            deque: VecDeque::new(),
-        }
+        SeqDeque(VecDeque::new())
     }
 }
 
@@ -118,7 +119,7 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
             self.prev_state = Some(self.get_state());
             match payload.0 {
                 Some(ref item) => {
-                    self.sequence.deque.push_back(item.clone());
+                    self.sequence.push_back(item.clone());
                 }
                 None => {}
             }
@@ -127,7 +128,7 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
     fn remove_impl<'a>(&'a mut self, payload: &'a ((), NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = Option<T>> + 'a {
         async move {
             self.prev_state = Some(self.get_state());
-            self.sequence.deque.pop_front()
+            self.sequence.pop_front()
         }
     }
 
@@ -171,7 +172,7 @@ impl<T: Clone + Default + Debug + Send> SequenceStock<T> {
     }
 
     pub fn with_initial_contents(mut self, contents: Vec<T>) -> Self {
-        self.sequence.deque = contents.into_iter().collect();
+        self.sequence = SeqDeque(contents.into_iter().collect());
         self
     }
 
@@ -229,7 +230,7 @@ impl Serialize for SequenceStockLog<String> {
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("sequence", &format!("{:?}", self.sequence.deque))?;
+        state.serialize_field("sequence", &format!("{:?}", self.sequence))?;
         state.end()
     }
 }

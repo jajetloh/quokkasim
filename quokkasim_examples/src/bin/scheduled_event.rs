@@ -7,7 +7,6 @@ define_model_enums! {
     pub enum ComponentModel {}
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
-    pub enum ComponentInit {}
     pub enum ScheduledEventConfig {}
 }
 
@@ -70,6 +69,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
+    let mut process_addr = process.get_address();
 
     let mut process_logger = ComponentLogger::VectorProcessLoggerF64(VectorProcessLogger::new("ProcessLogger".into()));
     let mut stock_logger = ComponentLogger::VectorStockLoggerF64(VectorStockLogger::new("StockLogger".into()));
@@ -85,11 +85,10 @@ fn main() {
 
     // Create simulation
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
 
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock_2);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process);
+    sim_builder = register_component!(sim_builder, stock_1);
+    sim_builder = register_component!(sim_builder, process);
+    sim_builder = register_component!(sim_builder, stock_2);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let (mut simu, mut scheduler) = sim_builder.init(start_time.clone()).unwrap();
@@ -104,9 +103,7 @@ fn main() {
     let event_time = start_time.clone() + Duration::from_secs(60);
     
     create_scheduled_event!(&mut scheduler, event_time, capacity_change, stock_1_addr, &mut df).unwrap();
-    init_configs.iter_mut().for_each(|init| {
-        init.initialise(&mut simu).unwrap();
-    });
+    process_addr.initialise(&mut simu).unwrap();
     simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 
     let output_dir = "outputs/scheduled_event";
