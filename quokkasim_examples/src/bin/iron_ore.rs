@@ -45,25 +45,25 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.limonite += other.limonite;
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, IronOre> {
+    fn subtract(&mut self, quantity: f64) -> Self {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
-        SubtractParts {
-            remaining: IronOre {
-                fe: self.fe * proportion_remaining,
-                other_elements: self.other_elements * proportion_remaining,
-                magnetite: self.magnetite * proportion_remaining,
-                hematite: self.hematite * proportion_remaining,
-                limonite: self.limonite * proportion_remaining,
-            },
-            subtracted: IronOre {
-                fe: self.fe * proportion_removed,
-                other_elements: self.other_elements * proportion_removed,
-                magnetite: self.magnetite * proportion_removed,
-                hematite: self.hematite * proportion_removed,
-                limonite: self.limonite * proportion_removed,
-            },
-        }
+        
+        let removed = IronOre {
+            fe: self.fe * proportion_removed,
+            other_elements: self.other_elements * proportion_removed,
+            magnetite: self.magnetite * proportion_removed,
+            hematite: self.hematite * proportion_removed,
+            limonite: self.limonite * proportion_removed,
+        };
+
+        self.fe *= proportion_remaining;
+        self.other_elements *= proportion_remaining;
+        self.magnetite *= proportion_remaining;
+        self.hematite *= proportion_remaining;
+        self.limonite *= proportion_remaining;
+
+        removed
     }
 
     // We use the Fe + Other Elements as the 'source of truth' for the total mass

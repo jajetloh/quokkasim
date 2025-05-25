@@ -52,7 +52,7 @@ fn main() {
         next_seed: 0,
     };
 
-    let mut source = ComponentModel::Sequence
+    // let mut source = ComponentModel::Sequence
 
     let mut queue_1 = ComponentModel::SequenceStockString(DiscreteStock::new()
         .with_name("Queue1".into())

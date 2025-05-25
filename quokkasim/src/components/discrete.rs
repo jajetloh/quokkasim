@@ -69,12 +69,14 @@ pub struct SeqDeque<T>(VecDeque<T>);
 impl<T> Deref for SeqDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl<T> DerefMut for SeqDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
 
-impl<TT> VectorArithmetic<TT, (), u32> for SeqDeque<TT> {
-    fn add(&mut self, other: TT) {
-        self.push_back(other);
+impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
+    fn add(&mut self, other: Option<TT>) {
+        if let Some(item) = other {
+            self.push_back(item);
+        }
     }
-    fn subtract_parts(&self, _: ()) -> SubtractParts<Self, TT> {
-        todo!()
+    fn subtract(&mut self, _: ()) -> Option<TT> {
+        self.pop_front()
     }
     fn total(&self) -> u32 {
         self.len() as u32
@@ -87,7 +89,7 @@ impl<TT: Default> Default for SeqDeque<TT> {
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
+impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
     type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.resource.total();
@@ -109,7 +111,7 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, (), Option<T>, u32
     fn get_resource(&self) -> &SeqDeque<T> {
         &self.resource
     }
-    fn add_impl<'a>(&'a mut self, payload: &'a (T, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn add_impl<'a>(&'a mut self, payload: &'a (Option<T>, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.resource.add(payload.0.clone());
         }

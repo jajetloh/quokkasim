@@ -15,8 +15,9 @@ impl VectorArithmetic<f64, f64, f64> for f64 {
         *self += other;
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, f64> {
-        SubtractParts { remaining: self - quantity, subtracted: quantity }
+    fn subtract(&mut self, quantity: f64) -> f64 {
+        *self = *self - quantity;
+        quantity
     }
 
     fn total(&self) -> f64 {
@@ -36,8 +37,8 @@ impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
         self.values[2] += other.values[2];
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<Self, Vector3> {
-        let proportion_subtracted = quantity / self.total();
+    fn subtract(&mut self, arg: f64) -> Vector3 {
+        let proportion_subtracted = arg / self.total();
         let proportion_remaining = 1.0 - proportion_subtracted;
         let remaining = Vector3 {
             values: [
@@ -53,7 +54,8 @@ impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
                 self.values[2] * proportion_subtracted,
             ],
         };
-        SubtractParts { remaining , subtracted }
+        *self = remaining;
+        subtracted
     }
 
     fn total(&self) -> f64 {
@@ -79,8 +81,8 @@ impl Default for Vector3 {
  * C: Metric type for total
  */
 pub trait VectorArithmetic<A, B, C> where Self: Sized {
-    fn add(&mut self, other: A);
-    fn subtract_parts(&self, quantity: B) -> SubtractParts<Self, A>;
+    fn add(&mut self, arg: A);
+    fn subtract(&mut self, arg: B) -> A;
     fn total(&self) -> C;
     fn multiply(&mut self, factor: f64) {}
 }

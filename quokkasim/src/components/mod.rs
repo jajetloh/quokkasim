@@ -1,3 +1,3 @@
 pub mod vector;
-pub mod sequence;
+pub mod discrete;
 // pub mod vector_packet;

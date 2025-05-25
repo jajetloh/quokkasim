@@ -921,8 +921,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     
                         let split_resources = self.split_ratios.iter().map(|ratio| {
                             let quantity = resource.total() * ratio;
-                            let parts = resource.clone().subtract_parts(quantity);
-                            parts.subtracted
+                            resource.clone().subtract(quantity)
                         }).collect::<Vec<_>>();
                         
                         self.log(time, VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
