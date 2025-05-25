@@ -1055,5 +1055,11 @@ macro_rules! define_model_enums {
                 $ComponentModel::register_component($sim_init, $component)
             };
         }
+
+        macro_rules! create_scheduled_event {
+            (&mut $scheduler:ident, $time:ident, $event_config:ident, $component_addr:ident, &mut $df:ident) => {
+                $ScheduledEventConfig::schedule_event($event_config, $time, &mut $scheduler, $component_addr, &mut $df)
+            }
+        }
     }
 }

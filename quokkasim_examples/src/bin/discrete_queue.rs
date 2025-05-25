@@ -90,7 +90,6 @@ fn main() {
     connect_components!(&mut queue_1, &mut process_1).unwrap();
     connect_components!(&mut process_1, &mut queue_2).unwrap();
     connect_components!(&mut queue_2, &mut sink).unwrap();
-    // connect_components!(&mut process_2, &mut queue_1).unwrap();
 
     let mut queue_logger = ComponentLogger::DiscreteStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
     let mut process_logger = ComponentLogger::DiscreteProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
