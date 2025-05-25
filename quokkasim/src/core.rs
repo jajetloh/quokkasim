@@ -359,7 +359,8 @@ macro_rules! define_model_enums {
             VectorSplitter5Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
             DiscreteProcessString($crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
-            DiscreteSourceString($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
+            DiscreteSourceString($crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
+            // DiscreteSinkString($crate::components::discrete::DiscreteSink<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<String>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
@@ -564,7 +565,7 @@ macro_rules! define_model_enums {
                         Ok(())
                     },
 
-
+                    // Discrete
                     ($ComponentModel::DiscreteStockString(a, ad), $ComponentModel::DiscreteProcessString(b, bd), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, ad.address());
@@ -577,6 +578,20 @@ macro_rules! define_model_enums {
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bd.address());
                         Ok(())
                     },
+                    // a:DiscreteSource<String> | am:MB<left>    |||    b:DiscreteStock<String> | bm:MB<right>
+                    ($ComponentModel::DiscreteSourceString(a, am), $ComponentModel::DiscreteStockString(b, bm), _) => {
+                        // b.state_emitter: Output<NotificationMetadata>, 
+                        b.state_emitter.connect($crate::components::discrete::DiscreteSource::update_state, am.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        Ok(())
+                    },
+                    // ($ComponentModel::DiscreteStockString(a, am), $ComponentModel::DiscreteSinkString(b, bm), _) => {
+                    //     a.state_emitter.connect($crate::components::discrete::DiscreteSink::update_state, bm.address());
+                    //     b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
+                    //     b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
+                    //     Ok(())
+                    // },
                     (a,b,n) => {
                         <$ComponentModel as CustomComponentConnection>::connect_components(a, b, n)
                     }
@@ -590,129 +605,113 @@ macro_rules! define_model_enums {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorProcessF64(addr));
                     },
                     $ComponentModel::VectorStockF64(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorStockF64(addr));
                     },
                     $ComponentModel::VectorSourceF64(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorSourceF64(addr));
                     },
                     $ComponentModel::VectorSinkF64(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorSinkF64(addr));
                     },
                     // TODO: Add combiners and splitters for f64
                     $ComponentModel::VectorStockVector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorStockVector3(addr));
                     },
                     $ComponentModel::VectorProcessVector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorProcessVector3(addr));
                     },
                     $ComponentModel::VectorSourceVector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorSourceVector3(addr));
                     },
                     $ComponentModel::VectorSinkVector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorSinkVector3(addr));
                     },
                     $ComponentModel::VectorCombiner1Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorCombiner1Vector3(addr));
                     },
                     $ComponentModel::VectorCombiner2Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentModelAddress::VectorCombiner2Vector3(addr));
                     },
                     $ComponentModel::VectorCombiner3Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorCombiner3Vector3(addr));
                     },
                     $ComponentModel::VectorCombiner4Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorCombiner4Vector3(addr));
                     },
                     $ComponentModel::VectorCombiner5Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorCombiner5Vector3(addr));
                     },
                     $ComponentModel::VectorSplitter1Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorSplitter1Vector3(addr));
                     },
                     $ComponentModel::VectorSplitter2Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorSplitter2Vector3(addr));
                     },
                     $ComponentModel::VectorSplitter3Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorSplitter3Vector3(addr));
                     },
                     $ComponentModel::VectorSplitter4Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorSplitter4Vector3(addr));
                     },
                     $ComponentModel::VectorSplitter5Vector3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::VectorSplitter5Vector3(addr));
                     },
                     $ComponentModel::DiscreteStockString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::DiscreteStockString(addr));
                     },
                     $ComponentModel::DiscreteProcessString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::DiscreteProcessString(addr));
+                    },
+                    $ComponentModel::DiscreteSourceString(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
                     },
                     $(
                         $ComponentModel::$R(a, mb) => {
                             let name = a.element_name.clone();
                             let addr = mb.address();
                             sim_init = sim_init.add_model(a, mb, name);
-                            // init_configs.push($ComponentInit::$R(addr));
                         }
                     ),*
                     _ => {
@@ -754,6 +753,8 @@ macro_rules! define_model_enums {
                     $ComponentModel::VectorSplitter5Vector3(_, mb) => $ComponentModelAddress::VectorSplitter5Vector3(mb.address()),
                     $ComponentModel::DiscreteStockString(_, mb) => $ComponentModelAddress::DiscreteStockString(mb.address()),
                     $ComponentModel::DiscreteProcessString(_, mb) => $ComponentModelAddress::DiscreteProcessString(mb.address()),
+                    $ComponentModel::DiscreteSourceString(_, mb) => $ComponentModelAddress::DiscreteSourceString(mb.address()),
+                    // $ComponentModel::DiscreteSinkString(_, mb) => $ComponentModelAddress::DiscreteSinkString(mb.address()),
                     x => {
                         panic!("Component type {} not implemented for address retrieval", x);
                     }
@@ -793,6 +794,8 @@ macro_rules! define_model_enums {
             VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
             DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
+            DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
+            // DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<String>>),
             $(
                 $Q $( ($QT) )?
             ),*
@@ -901,6 +904,10 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
+                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteSourceString(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
                     (a,b,n) => <$ComponentLogger as CustomLoggerConnection>::connect_logger(a, b, n)
                 }
             }
@@ -1002,6 +1009,7 @@ macro_rules! define_model_enums {
 
                     $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
                     $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<Option<String>, StringItemFactory>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)
                     }

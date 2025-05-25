@@ -527,27 +527,33 @@ impl ItemFactory<String> for StringItemFactory {
     }
 }
 
+impl ItemFactory<Option<String>> for StringItemFactory {
+    fn create_item(&mut self) -> Option<String> {
+        Some(self.create_item())
+    }
+}
+
 pub struct DiscreteSource<
     T: Clone + Send + 'static,
-    U: Clone + Send + 'static,
+    // U: Clone + Send + 'static,
     TF: ItemFactory<T>,
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
-    pub push_downstream: Output<(U, NotificationMetadata)>,
+    pub push_downstream: Output<(T, NotificationMetadata)>,
     pub process_state: Option<(Duration, T)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<DiscreteProcessLog<U>>,
+    pub log_emitter: Output<DiscreteProcessLog<T>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
     pub item_factory: TF,
 }
 
-impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for DiscreteSource<T, U, TF> {
+impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for DiscreteSource<T, TF> {
     fn default() -> Self {
         DiscreteSource {
             element_name: "DiscreteSource".to_string(),
@@ -567,7 +573,7 @@ impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + 
     }
 }
 
-impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, U, TF> {
+impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, TF> {
     pub fn new() -> Self {
         DiscreteSource::default()
     }
@@ -586,14 +592,14 @@ impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFac
 }
 
 
-impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, U, TF> {}
+impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, TF> {}
 
-impl<U: Clone + Debug + Send + 'static, UF: ItemFactory<U> + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteSource<U, Option<U>, UF>
+impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process<ItemDeque<T>, Option<T>, (), u32> for DiscreteSource<T, TF>
 where
     Self: Model,
-    ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+    ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
 {
-    type LogDetailsType = DiscreteProcessLogType<Option<U>>;
+    type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event
@@ -616,8 +622,8 @@ where
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: Some(resource.clone()) }).await;
-                        self.push_downstream.send((Some(resource.clone()), NotificationMetadata {
+                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
+                        self.push_downstream.send((resource.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
                             message: "ProcessStart".into(),
@@ -640,7 +646,7 @@ where
                             let next_item = self.item_factory.create_item();
 
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), next_item.clone()));
-                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: Some(next_item.clone()) }).await;
+                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: next_item.clone() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         Some(DiscreteStockState::Full { .. }) => {

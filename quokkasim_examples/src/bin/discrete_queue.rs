@@ -52,9 +52,10 @@ fn main() {
         next_seed: 0,
     };
 
-    // let mut source = ComponentModel
+    let mut source = ComponentModel::DiscreteSourceString(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
+    let mut source_addr = source.get_address();
 
-    let mut queue_1 = ComponentModel::SequenceStockString(DiscreteStock::new()
+    let mut queue_1 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue1".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -63,14 +64,14 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_1 = ComponentModel::SequenceProcessString(DiscreteProcess::new()
+    let mut process_1 = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
         .with_name("Process1".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
     let mut process_1_addr = process_1.get_address();
 
-    let mut queue_2 = ComponentModel::SequenceStockString(DiscreteStock::new()
+    let mut queue_2 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue2".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -78,23 +79,25 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_2 = ComponentModel::SequenceProcessString(DiscreteProcess::new()
+    let mut process_2 = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
         .with_name("Process2".into())
         .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 3., max: 7. }).unwrap()),
         Mailbox::new()
     );
     let mut process_2_addr = process_2.get_address();
 
+    connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();
     connect_components!(&mut process_1, &mut queue_2).unwrap();
     connect_components!(&mut queue_2, &mut process_2).unwrap();
-    connect_components!(&mut process_2, &mut queue_1).unwrap();
+    // connect_components!(&mut process_2, &mut queue_1).unwrap();
 
-    let mut queue_logger = ComponentLogger::SequenceStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
-    let mut process_logger = ComponentLogger::SequenceProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
+    let mut queue_logger = ComponentLogger::DiscreteStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
+    let mut process_logger = ComponentLogger::DiscreteProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
+    connect_logger!(&mut process_logger, &mut source).unwrap();
     connect_logger!(&mut process_logger, &mut process_1).unwrap();
     connect_logger!(&mut process_logger, &mut process_2).unwrap();
 
@@ -104,6 +107,7 @@ fn main() {
     // sim_builder = register_component!(sim_builder, &mut init_configs, process_1);
     // sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
     // sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
+    sim_builder = register_component!(sim_builder, source);
     sim_builder = register_component!(sim_builder, queue_1);
     sim_builder = register_component!(sim_builder, process_1);
     sim_builder = register_component!(sim_builder, queue_2);
@@ -111,6 +115,7 @@ fn main() {
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
+    source_addr.initialise(&mut simu).unwrap();
     process_1_addr.initialise(&mut simu).unwrap();
     process_2_addr.initialise(&mut simu).unwrap();
 
