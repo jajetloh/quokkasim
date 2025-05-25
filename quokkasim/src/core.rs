@@ -359,6 +359,7 @@ macro_rules! define_model_enums {
             VectorSplitter5Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
             DiscreteProcessString($crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
+            DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<Option<String>, (), Option<String>>>),
             DiscreteSourceString($crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
             DiscreteSinkString($crate::components::discrete::DiscreteSink<Option<String>, ()>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<Option<String>, ()>>),
             $(
@@ -578,9 +579,20 @@ macro_rules! define_model_enums {
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bd.address());
                         Ok(())
                     },
-                    // a:DiscreteSource<String> | am:MB<left>    |||    b:DiscreteStock<String> | bm:MB<right>
+                    ($ComponentModel::DiscreteStockString(a, am), $ComponentModel::DiscreteParallelProcessString(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteParallelProcessString(a, am), $ComponentModel::DiscreteStockString(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, am.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        Ok(())
+                    },
+                    
                     ($ComponentModel::DiscreteSourceString(a, am), $ComponentModel::DiscreteStockString(b, bm), _) => {
-                        // b.state_emitter: Output<NotificationMetadata>, 
                         b.state_emitter.connect($crate::components::discrete::DiscreteSource::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
@@ -702,6 +714,11 @@ macro_rules! define_model_enums {
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
+                    $ComponentModel::DiscreteParallelProcessString(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
                     $ComponentModel::DiscreteSourceString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
@@ -758,6 +775,7 @@ macro_rules! define_model_enums {
                     $ComponentModel::VectorSplitter5Vector3(_, mb) => $ComponentModelAddress::VectorSplitter5Vector3(mb.address()),
                     $ComponentModel::DiscreteStockString(_, mb) => $ComponentModelAddress::DiscreteStockString(mb.address()),
                     $ComponentModel::DiscreteProcessString(_, mb) => $ComponentModelAddress::DiscreteProcessString(mb.address()),
+                    $ComponentModel::DiscreteParallelProcessString(_, mb) => $ComponentModelAddress::DiscreteParallelProcessString(mb.address()),
                     $ComponentModel::DiscreteSourceString(_, mb) => $ComponentModelAddress::DiscreteSourceString(mb.address()),
                     $ComponentModel::DiscreteSinkString(_, mb) => $ComponentModelAddress::DiscreteSinkString(mb.address()),
                     x => {
@@ -799,6 +817,7 @@ macro_rules! define_model_enums {
             VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
             DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
+            DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<Option<String>, (), Option<String>>>),
             DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<Option<String>, ()>>),
             $(
@@ -909,6 +928,10 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
+                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteParallelProcessString(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
                     ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteSourceString(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
@@ -984,6 +1007,7 @@ macro_rules! define_model_enums {
 
                     $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
                     $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<Option<String>, StringItemFactory>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::DiscreteSinkString(a) => { simu.process_event($crate::components::discrete::DiscreteSink::<Option<String>, ()>::update_state, notif_meta, a.clone()) },
                     a => {
