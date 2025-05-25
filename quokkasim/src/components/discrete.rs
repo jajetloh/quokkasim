@@ -2,7 +2,7 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 
 use crate::prelude::*;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 use std::time::Duration;
 use std::fmt::Debug;
 
@@ -37,7 +37,7 @@ impl StateEq for DiscreteStockState {
 pub struct DiscreteStock<T> where T: Clone + Default + Send + 'static {
     pub element_name: String,
     pub element_type: String,
-    pub resource: SeqDeque<T>,
+    pub resource: ItemDeque<T>,
     pub log_emitter: Output<DiscreteStockLog<T>>,
     pub state_emitter: Output<NotificationMetadata>,
     pub low_capacity: u32,
@@ -50,7 +50,7 @@ impl<T: Clone + Default + Send + 'static> Default for DiscreteStock<T> {
         DiscreteStock {
             element_name: "DiscreteStock".to_string(),
             element_type: "DiscreteStock".to_string(),
-            resource: SeqDeque::default(),
+            resource: ItemDeque::default(),
             log_emitter: Output::new(),
             state_emitter: Output::new(),
             low_capacity: 0,
@@ -65,11 +65,11 @@ use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone)]
 
-pub struct SeqDeque<T>(VecDeque<T>);
-impl<T> Deref for SeqDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
-impl<T> DerefMut for SeqDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
+pub struct ItemDeque<T>(VecDeque<T>);
+impl<T> Deref for ItemDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
+impl<T> DerefMut for ItemDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
 
-impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
+impl<TT> VectorArithmetic<Option<TT>, (), u32> for ItemDeque<TT> {
     fn add(&mut self, other: Option<TT>) {
         if let Some(item) = other {
             self.push_back(item);
@@ -83,13 +83,43 @@ impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
     }
 }
 
-impl<TT: Default> Default for SeqDeque<TT> {
+impl<TT: Default> Default for ItemDeque<TT> {
     fn default() -> Self {
-        SeqDeque(VecDeque::new())
+        ItemDeque(VecDeque::new())
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
+pub trait HasUniqueKey<S> {
+    fn get_key(&self) -> S;
+}
+
+pub struct ItemMap<S, T: HasUniqueKey<S>>(HashMap<S, T>);
+impl<S, T: HasUniqueKey<S>> Deref for ItemMap<S, T> { type Target = HashMap<S, T>; fn deref(&self) -> &Self::Target { &self.0 } }
+impl<S, T: HasUniqueKey<S>> DerefMut for ItemMap<S, T> { fn deref_mut(&mut self) -> &mut HashMap<S, T> { &mut self.0 } }
+
+impl<S, T: HasUniqueKey<S>> VectorArithmetic<Option<T>, (), u32> for ItemMap<S, T>
+where
+    S: Eq + std::hash::Hash,
+{
+    fn add(&mut self, other: Option<T>) {
+        if let Some(item) = other {
+            self.insert(item.get_key(), item);
+        }
+    }
+    fn subtract(&mut self, _: ()) -> Option<T> {
+        if let Some((_, item)) = self.iter_mut().next() {
+            let key = item.get_key();
+            let item = self.remove(&key);
+            return item;
+        }
+        None
+    }
+    fn total(&self) -> u32 {
+        self.len() as u32
+    }
+}
+
+impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, Option<T>, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
     type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.resource.total();
@@ -108,7 +138,7 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
     fn set_previous_state(&mut self) {
         self.prev_state = Some(self.get_state());
     }
-    fn get_resource(&self) -> &SeqDeque<T> {
+    fn get_resource(&self) -> &ItemDeque<T> {
         &self.resource
     }
     fn add_impl<'a>(&'a mut self, payload: &'a (Option<T>, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
@@ -163,7 +193,7 @@ impl<T: Clone + Default + Debug + Send> DiscreteStock<T> {
     }
 
     pub fn with_initial_contents(mut self, contents: Vec<T>) -> Self {
-        self.resource = SeqDeque(contents.into_iter().collect());
+        self.resource = ItemDeque(contents.into_iter().collect());
         self
     }
 
@@ -207,7 +237,7 @@ pub struct DiscreteStockLog<T> {
     pub element_type: String,
     pub log_type: String,
     pub state: DiscreteStockState,
-    pub resource: SeqDeque<T>,
+    pub resource: ItemDeque<T>,
 }
 
 impl Serialize for DiscreteStockLog<String> {
@@ -288,10 +318,10 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteProcess<U, V, W> {}
 
-impl<U: Clone + Debug + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for DiscreteProcess<Option<U>, (), Option<U>>
+impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteProcess<Option<U>, (), Option<U>>
 where
     Self: Model,
-    SeqDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+    ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
 {
     type LogDetailsType = DiscreteProcessLogType<Option<U>>;
 
@@ -384,7 +414,7 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<SeqDeque<U>, Option<U>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process<ItemDeque<U>, Option<U>, (), u32>>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -558,10 +588,10 @@ impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFac
 
 impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, U, TF> {}
 
-impl<U: Clone + Debug + Send + 'static, UF: ItemFactory<U> + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for DiscreteSource<U, Option<U>, UF>
+impl<U: Clone + Debug + Send + 'static, UF: ItemFactory<U> + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteSource<U, Option<U>, UF>
 where
     Self: Model,
-    SeqDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+    ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
 {
     type LogDetailsType = DiscreteProcessLogType<Option<U>>;
 
