@@ -778,6 +778,12 @@ macro_rules! define_model_enums {
                     $ComponentModel::DiscreteParallelProcessString(_, mb) => $ComponentModelAddress::DiscreteParallelProcessString(mb.address()),
                     $ComponentModel::DiscreteSourceString(_, mb) => $ComponentModelAddress::DiscreteSourceString(mb.address()),
                     $ComponentModel::DiscreteSinkString(_, mb) => $ComponentModelAddress::DiscreteSinkString(mb.address()),
+                    $(
+                        $(#[$components_var_meta])*
+                        $ComponentModel::$R(_, mb) => {
+                            $ComponentModelAddress::$R(mb.address())
+                        }
+                    ),*
                     x => {
                         panic!("Component type {} not implemented for address retrieval", x);
                     }
