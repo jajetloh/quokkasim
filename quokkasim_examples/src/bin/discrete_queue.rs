@@ -79,17 +79,17 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_2 = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
-        .with_name("Process2".into())
-        .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 3., max: 7. }).unwrap()),
+    let mut sink = ComponentModel::DiscreteSinkString(DiscreteSink::new()
+        .with_name("Sink".into())
+        .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
-    let mut process_2_addr = process_2.get_address();
+    let mut sink_addr = sink.get_address();
 
     connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();
     connect_components!(&mut process_1, &mut queue_2).unwrap();
-    connect_components!(&mut queue_2, &mut process_2).unwrap();
+    connect_components!(&mut queue_2, &mut sink).unwrap();
     // connect_components!(&mut process_2, &mut queue_1).unwrap();
 
     let mut queue_logger = ComponentLogger::DiscreteStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
@@ -99,7 +99,7 @@ fn main() {
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
     connect_logger!(&mut process_logger, &mut source).unwrap();
     connect_logger!(&mut process_logger, &mut process_1).unwrap();
-    connect_logger!(&mut process_logger, &mut process_2).unwrap();
+    connect_logger!(&mut process_logger, &mut sink).unwrap();
 
     let mut sim_builder = SimInit::new();
     // let mut init_configs: Vec<ComponentInit> = Vec::new();
@@ -111,13 +111,13 @@ fn main() {
     sim_builder = register_component!(sim_builder, queue_1);
     sim_builder = register_component!(sim_builder, process_1);
     sim_builder = register_component!(sim_builder, queue_2);
-    sim_builder = register_component!(sim_builder, process_2);
+    sim_builder = register_component!(sim_builder, sink);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
     source_addr.initialise(&mut simu).unwrap();
     process_1_addr.initialise(&mut simu).unwrap();
-    process_2_addr.initialise(&mut simu).unwrap();
+    sink_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
