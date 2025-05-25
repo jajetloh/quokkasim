@@ -3,6 +3,7 @@ use serde::Serialize;
 
 use crate::prelude::*;
 use std::collections::{VecDeque, HashMap};
+use std::os::windows::process;
 use std::time::Duration;
 use std::fmt::Debug;
 
@@ -840,6 +841,194 @@ where
     }
 
     fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+        async move {
+            let log = DiscreteProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                event_id: self.next_event_id,
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                event: details,
+            };
+            self.next_event_id += 1;
+            self.log_emitter.send(log).await;
+        }
+    }
+}
+
+pub struct DiscreteParallelProcess<
+    U: Clone + Send + 'static,
+    V: Clone + Send + 'static,
+    W: Clone + Send + 'static,
+> {
+    pub element_name: String,
+    pub element_type: String,
+    pub req_upstream: Requestor<(), DiscreteStockState>,
+    pub req_downstream: Requestor<(), DiscreteStockState>,
+    pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
+    pub push_downstream: Output<(U, NotificationMetadata)>,
+    pub processes_in_progress: Vec<(Duration, U)>,
+    pub processes_complete: Vec<U>,
+    pub process_time_distr: Option<Distribution>,
+    pub process_quantity_distr: Option<Distribution>,
+    pub log_emitter: Output<DiscreteProcessLog<U>>,
+    time_to_next_event: Option<Duration>,
+    next_event_id: u64,
+    pub previous_check_time: MonotonicTime,
+}
+
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Default for DiscreteParallelProcess<U, V, W> {
+    fn default() -> Self {
+        DiscreteParallelProcess {
+            element_name: "DiscreteParallelProcess".to_string(),
+            element_type: "DiscreteParallelProcess".to_string(),
+            req_upstream: Requestor::new(),
+            req_downstream: Requestor::new(),
+            withdraw_upstream: Requestor::new(),
+            push_downstream: Output::new(),
+            processes_in_progress: Vec::new(),
+            processes_complete: Vec::new(),
+            process_time_distr: None,
+            process_quantity_distr: None,
+            log_emitter: Output::new(),
+            time_to_next_event: None,
+            next_event_id: 0,
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+}
+
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> DiscreteParallelProcess<U, V, W> {
+    pub fn new() -> Self {
+        DiscreteParallelProcess::default()
+    }
+    pub fn with_name(mut self, name: String) -> Self {
+        self.element_name = name;
+        self
+    }
+    pub fn with_type(mut self, type_: String) -> Self {
+        self.element_type = type_;
+        self
+    }
+
+    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
+        self.process_time_distr = Some(distr);
+        self
+    }
+}
+
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteParallelProcess<U, V, W> {}
+
+impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteParallelProcess<Option<U>, (), Option<U>>
+where
+    Self: Model,
+    ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+{
+    type LogDetailsType = DiscreteProcessLogType<Option<U>>;
+
+    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
+        &self.time_to_next_event
+    }
+
+    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
+        self.time_to_next_event = time;
+    }
+
+    fn set_previous_check_time(&mut self, time: MonotonicTime) {
+        self.previous_check_time = time;
+    }
+
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> where Self: Model {
+        async move {
+            // First resolve any completed processes
+
+            let time = cx.time();
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+            self.processes_in_progress.retain_mut(|(process_time_left, item)| {
+                *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    self.processes_complete.push(item.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+            let mut processes_complete = std::mem::take(&mut self.processes_complete);
+            for item in processes_complete.iter_mut() {
+                let ds_state = self.req_downstream.send(()).await.next();
+                match &ds_state {
+                    Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                        self.push_downstream.send((item.clone(), NotificationMetadata {
+                            time,
+                            element_from: self.element_name.clone(),
+                            message: "ProcessComplete".into(),
+                        })).await;
+                    },
+                    Some(DiscreteStockState::Full { .. }) => {
+                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                        break;
+                    },
+                    None => {
+                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                        break;
+                    }
+                }
+            }
+            self.processes_complete = processes_complete;
+
+            // Then check for any processes to start
+
+            loop {
+                let us_state = self.req_upstream.send(()).await.next();
+                match &us_state {
+                    Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                        let item = self.withdraw_upstream.send(((), NotificationMetadata {
+                            time,
+                            element_from: self.element_name.clone(),
+                            message: "Withdraw request".into(),
+                        })).await.next().unwrap();
+                        if let Some(item) = item {
+                            self.push_downstream.send((Some(item.clone()), NotificationMetadata {
+                                time,
+                                element_from: self.element_name.clone(),
+                                message: "Push request".into(),
+                            })).await;
+                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: Some(item) }).await;
+                        } else {
+                            break;
+                        }
+                    },
+                    Some(DiscreteStockState::Full { .. }) => {
+                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is full" }).await;
+                        break;
+                    },
+                    None => {
+                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                        break;
+                    }
+                }
+            }
+
+        }
+    }
+
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+        async move {
+            self.set_previous_check_time(cx.time());
+            match self.time_to_next_event {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + time_until_next;
+                        cx.schedule_event(next_time, <Self as Process<ItemDeque<U>, Option<U>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                    };
+                }
+            };
+        }
+    }
+
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
