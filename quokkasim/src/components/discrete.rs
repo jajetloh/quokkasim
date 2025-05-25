@@ -37,7 +37,7 @@ impl StateEq for DiscreteStockState {
 pub struct DiscreteStock<T> where T: Clone + Default + Send + 'static {
     pub element_name: String,
     pub element_type: String,
-    pub sequence: SeqDeque<T>,
+    pub resource: SeqDeque<T>,
     pub log_emitter: Output<DiscreteStockLog<T>>,
     pub state_emitter: Output<NotificationMetadata>,
     pub low_capacity: u32,
@@ -48,9 +48,9 @@ pub struct DiscreteStock<T> where T: Clone + Default + Send + 'static {
 impl<T: Clone + Default + Send + 'static> Default for DiscreteStock<T> {
     fn default() -> Self {
         DiscreteStock {
-            element_name: "SequenceStock".to_string(),
-            element_type: "SequenceStock".to_string(),
-            sequence: SeqDeque::default(),
+            element_name: "DiscreteStock".to_string(),
+            element_type: "DiscreteStock".to_string(),
+            resource: SeqDeque::default(),
             log_emitter: Output::new(),
             state_emitter: Output::new(),
             low_capacity: 0,
@@ -90,11 +90,11 @@ impl<TT: Default> Default for SeqDeque<TT> {
 impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
     type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
-        let occupied = self.sequence.total();
+        let occupied = self.resource.total();
         let empty = self.max_capacity.saturating_sub(occupied); // If occupied beyond capacity, just say no empty space
-        if self.sequence.total() <= self.low_capacity {
+        if self.resource.total() <= self.low_capacity {
             DiscreteStockState::Empty { occupied, empty }
-        } else if self.sequence.total() >= self.max_capacity {
+        } else if self.resource.total() >= self.max_capacity {
             DiscreteStockState::Full { occupied, empty }
         } else {
             DiscreteStockState::Normal { occupied, empty }
@@ -107,19 +107,17 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, (), Option<T>, u32
         self.prev_state = Some(self.get_state());
     }
     fn get_resource(&self) -> &SeqDeque<T> {
-        &self.sequence
+        &self.resource
     }
     fn add_impl<'a>(&'a mut self, payload: &'a (T, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
-            // self.prev_state = Some(self.get_state());
-            // self.sequence.push_back(payload.0.clone());
-            self.sequence.add(payload.0.clone());
+            self.resource.add(payload.0.clone());
         }
     }
     fn remove_impl<'a>(&'a mut self, payload: &'a ((), NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = Option<T>> + 'a {
         async move {
             self.prev_state = Some(self.get_state());
-            self.sequence.pop_front()
+            self.resource.pop_front()
         }
     }
 
@@ -139,7 +137,7 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, (), Option<T>, u32
                 element_type: self.element_type.clone(),
                 log_type,
                 state: self.get_state(),
-                sequence: self.sequence.clone(),
+                resource: self.resource.clone(),
             };
             self.log_emitter.send(log).await;
             self.next_event_id += 1;
@@ -163,7 +161,7 @@ impl<T: Clone + Default + Debug + Send> DiscreteStock<T> {
     }
 
     pub fn with_initial_contents(mut self, contents: Vec<T>) -> Self {
-        self.sequence = SeqDeque(contents.into_iter().collect());
+        self.resource = SeqDeque(contents.into_iter().collect());
         self
     }
 
@@ -207,21 +205,21 @@ pub struct DiscreteStockLog<T> {
     pub element_type: String,
     pub log_type: String,
     pub state: DiscreteStockState,
-    pub sequence: SeqDeque<T>,
+    pub resource: SeqDeque<T>,
 }
 
 impl Serialize for DiscreteStockLog<String> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
-        let mut state = serializer.serialize_struct("SequenceStockLog", 6)?;
+        let mut state = serializer.serialize_struct("ResourceStockLog", 6)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("sequence", &format!("{:?}", self.sequence))?;
+        state.serialize_field("resource", &format!("{:?}", self.resource))?;
         state.end()
     }
 }
@@ -427,7 +425,7 @@ impl Serialize for DiscreteProcessLog<Option<String>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
-        let mut state = serializer.serialize_struct("SequenceProcessLog", 7)?;
+        let mut state = serializer.serialize_struct("DiscreteProcessLog", 7)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
@@ -497,7 +495,7 @@ impl ItemFactory<String> for StringItemFactory {
     }
 }
 
-pub struct SequenceSource<
+pub struct DiscreteSource<
     T: Clone + Send + 'static,
     U: Clone + Send + 'static,
     TF: ItemFactory<T>,
@@ -517,11 +515,11 @@ pub struct SequenceSource<
     pub item_factory: TF,
 }
 
-impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for SequenceSource<T, U, TF> {
+impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for DiscreteSource<T, U, TF> {
     fn default() -> Self {
-        SequenceSource {
-            element_name: "SequenceSource".to_string(),
-            element_type: "SequenceSource".to_string(),
+        DiscreteSource {
+            element_name: "DiscreteSource".to_string(),
+            element_type: "DiscreteSource".to_string(),
             req_upstream: Requestor::new(),
             req_downstream: Requestor::new(),
             push_downstream: Output::new(),
@@ -537,9 +535,9 @@ impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + 
     }
 }
 
-impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFactory<T> + Default> SequenceSource<T, U, TF> {
+impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, U, TF> {
     pub fn new() -> Self {
-        SequenceSource::default()
+        DiscreteSource::default()
     }
     pub fn with_name(mut self, name: String) -> Self {
         self.element_name = name;
@@ -556,9 +554,9 @@ impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFac
 }
 
 
-impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for SequenceSource<T, U, TF> {}
+impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, U, TF> {}
 
-impl<U: Clone + Debug + Send + 'static, UF: ItemFactory<U> + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for SequenceSource<U, Option<U>, UF>
+impl<U: Clone + Debug + Send + 'static, UF: ItemFactory<U> + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for DiscreteSource<U, Option<U>, UF>
 where
     Self: Model,
     SeqDeque<U>: VectorArithmetic<Option<U>, (), u32>,
