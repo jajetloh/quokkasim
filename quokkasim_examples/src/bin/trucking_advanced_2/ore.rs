@@ -41,7 +41,7 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.limonite += other.limonite;
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<IronOre, IronOre> {
+    fn subtract(&self, quantity: f64) -> SubtractParts<IronOre, IronOre> {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
         SubtractParts {

@@ -111,9 +111,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> Stock<T, T, f64, T
     ) -> impl Future<Output=T> + 'a {
         async move {
             self.prev_state = Some(self.get_state());
-            let SubtractParts { subtracted, remaining } = self.vector.subtract_parts(data.0.clone());
-            self.vector = remaining;
-            subtracted
+            self.vector.subtract(data.0.clone())
         }
     }
 

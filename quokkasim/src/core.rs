@@ -357,9 +357,9 @@ macro_rules! define_model_enums {
             VectorSplitter3Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>>),
             VectorSplitter4Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
             VectorSplitter5Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
-            SequenceStockString($crate::components::sequence::SequenceStock<String>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceStock<String>>),
-            SequenceProcessString($crate::components::sequence::SequenceProcess<String, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceProcess<String, (), Option<String>>>),
-            SequenceSourceString($crate::components::sequence::SequenceSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceSource<String, String, StringItemFactory>>),
+            DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
+            DiscreteProcessString($crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
+            DiscreteSourceString($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
@@ -565,16 +565,16 @@ macro_rules! define_model_enums {
                     },
 
 
-                    ($ComponentModel::SequenceStockString(a, ad), $ComponentModel::SequenceProcessString(b, bd), _) => {
-                        a.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, bd.address());
-                        b.req_upstream.connect($crate::components::sequence::SequenceStock::get_state_async, ad.address());
-                        b.withdraw_upstream.connect($crate::components::sequence::SequenceStock::remove, ad.address());
+                    ($ComponentModel::DiscreteStockString(a, ad), $ComponentModel::DiscreteProcessString(b, bd), _) => {
+                        a.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, bd.address());
+                        b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, ad.address());
+                        b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentModel::SequenceProcessString(a, ad), $ComponentModel::SequenceStockString(b, bd), _) => {
-                        b.state_emitter.connect($crate::components::sequence::SequenceProcess::update_state, ad.address());
-                        a.req_downstream.connect($crate::components::sequence::SequenceStock::get_state_async, bd.address());
-                        a.push_downstream.connect($crate::components::sequence::SequenceStock::add, bd.address());
+                    ($ComponentModel::DiscreteProcessString(a, ad), $ComponentModel::DiscreteStockString(b, bd), _) => {
+                        b.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, ad.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bd.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bd.address());
                         Ok(())
                     },
                     (a,b,n) => {
@@ -695,17 +695,17 @@ macro_rules! define_model_enums {
                         sim_init = sim_init.add_model(a, mb, name);
                         // init_configs.push($ComponentInit::VectorSplitter5Vector3(addr));
                     },
-                    $ComponentModel::SequenceStockString(a, mb) => {
+                    $ComponentModel::DiscreteStockString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::SequenceStockString(addr));
+                        // init_configs.push($ComponentInit::DiscreteStockString(addr));
                     },
-                    $ComponentModel::SequenceProcessString(a, mb) => {
+                    $ComponentModel::DiscreteProcessString(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
-                        // init_configs.push($ComponentInit::SequenceProcessString(addr));
+                        // init_configs.push($ComponentInit::DiscreteProcessString(addr));
                     },
                     $(
                         $ComponentModel::$R(a, mb) => {
@@ -752,8 +752,8 @@ macro_rules! define_model_enums {
                     $ComponentModel::VectorSplitter3Vector3(_, mb) => $ComponentModelAddress::VectorSplitter3Vector3(mb.address()),
                     $ComponentModel::VectorSplitter4Vector3(_, mb) => $ComponentModelAddress::VectorSplitter4Vector3(mb.address()),
                     $ComponentModel::VectorSplitter5Vector3(_, mb) => $ComponentModelAddress::VectorSplitter5Vector3(mb.address()),
-                    $ComponentModel::SequenceStockString(_, mb) => $ComponentModelAddress::SequenceStockString(mb.address()),
-                    $ComponentModel::SequenceProcessString(_, mb) => $ComponentModelAddress::SequenceProcessString(mb.address()),
+                    $ComponentModel::DiscreteStockString(_, mb) => $ComponentModelAddress::DiscreteStockString(mb.address()),
+                    $ComponentModel::DiscreteProcessString(_, mb) => $ComponentModelAddress::DiscreteProcessString(mb.address()),
                     x => {
                         panic!("Component type {} not implemented for address retrieval", x);
                     }
@@ -791,8 +791,8 @@ macro_rules! define_model_enums {
             VectorSplitter3Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 3>>),
             VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
             VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
-            SequenceStockString($crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
-            SequenceProcessString($crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
+            DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
+            DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
             $(
                 $Q $( ($QT) )?
             ),*
@@ -807,8 +807,8 @@ macro_rules! define_model_enums {
             VectorStockLoggerVector3($crate::components::vector::VectorStockLogger<Vector3>),
             VectorProcessLoggerVector3($crate::components::vector::VectorProcessLogger<Vector3>),
 
-            SequenceStockLoggerString($crate::components::sequence::SequenceStockLogger<String>),
-            SequenceProcessLoggerString($crate::components::sequence::SequenceProcessLogger<Option<String>>),
+            DiscreteStockLoggerString($crate::components::discrete::DiscreteStockLogger<String>),
+            DiscreteProcessLoggerString($crate::components::discrete::DiscreteProcessLogger<Option<String>>),
             $(
                 $(#[$logger_var_meta])*
                 $U $( ( $UT ) )?
@@ -893,11 +893,11 @@ macro_rules! define_model_enums {
                         Ok(())
                     },
 
-                    ($ComponentLogger::SequenceStockLoggerString(a), $ComponentModel::SequenceStockString(b, bd), _) => {
+                    ($ComponentLogger::DiscreteStockLoggerString(a), $ComponentModel::DiscreteStockString(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::SequenceProcessLoggerString(a), $ComponentModel::SequenceProcessString(b, bd), _) => {
+                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteProcessString(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
@@ -913,8 +913,8 @@ macro_rules! define_model_enums {
                     $ComponentLogger::VectorStockLoggerVector3(a) => { a.write_csv(dir.to_string()) },
                     $ComponentLogger::VectorProcessLoggerVector3(a) => { a.write_csv(dir.to_string()) },
 
-                    $ComponentLogger::SequenceStockLoggerString(a) => { a.write_csv(dir.to_string()) },
-                    $ComponentLogger::SequenceProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::DiscreteStockLoggerString(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::DiscreteProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
 
                     $(
                         $ComponentLogger::$U (a) => {
@@ -955,8 +955,8 @@ macro_rules! define_model_enums {
         //     VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
         //     VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),            
 
-        //     SequenceStockString($crate::nexosim::Address<$crate::components::sequence::SequenceStock<String>>),
-        //     SequenceProcessString($crate::nexosim::Address<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
+        //     DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
+        //     DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
         //     $(
         //         $R $( ( $crate::nexosim::Address<$RT> ) )?
         //     ),*
@@ -1000,8 +1000,8 @@ macro_rules! define_model_enums {
                     $ComponentModelAddress::VectorSplitter4Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 4>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
 
-                    $ComponentModelAddress::SequenceStockString(a) => { Ok(()) },
-                    $ComponentModelAddress::SequenceProcessString(a) => { simu.process_event($crate::components::sequence::SequenceProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
+                    $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)
                     }
