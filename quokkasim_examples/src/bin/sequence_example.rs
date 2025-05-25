@@ -24,28 +24,28 @@ impl<'a> CustomLoggerConnection<'a> for ComponentLogger<'a> {
 }
 
 fn main() {
-    let mut stock1: SequenceStock<String> = SequenceStock::<String>::new()
+    let mut stock1: DiscreteStock<String> = DiscreteStock::<String>::new()
         .with_name("Stock1".into())
         .with_type("SequenceStockString".into())
         .with_initial_contents((0..10).map(|x| format!("Item_{:0>4}", x)).collect())
         .with_low_capacity(0)
         .with_max_capacity(10);
-    let stock1_mbox: Mailbox<SequenceStock<String>> = Mailbox::new();
+    let stock1_mbox: Mailbox<DiscreteStock<String>> = Mailbox::new();
     let mut stock1_addr = stock1_mbox.address();
 
-    let mut process1: SequenceProcess<Option<String>, (), Option<String>> = SequenceProcess::new()
+    let mut process1: DiscreteProcess<Option<String>, (), Option<String>> = DiscreteProcess::new()
         .with_name("Process1".into())
         .with_type("SequenceProcess".into())
         .with_process_time_distr(Distribution::Constant(7.));
-    let process1_mbox: Mailbox<SequenceProcess<Option<String>, (), Option<String>>> = Mailbox::new();
+    let process1_mbox: Mailbox<DiscreteProcess<Option<String>, (), Option<String>>> = Mailbox::new();
     let mut process1_addr = process1_mbox.address();
 
-    let mut stock2: SequenceStock<String> = SequenceStock::<String>::new()
+    let mut stock2: DiscreteStock<String> = DiscreteStock::<String>::new()
         .with_name("Stock2".into())
         .with_type("SequenceStockString".into())
         .with_low_capacity(0)
         .with_max_capacity(10);
-    let stock2_mbox: Mailbox<SequenceStock<String>> = Mailbox::new();
+    let stock2_mbox: Mailbox<DiscreteStock<String>> = Mailbox::new();
     let mut stock2_addr = stock2_mbox.address();
 
     ComponentModel::connect_components(
@@ -57,8 +57,8 @@ fn main() {
         ComponentModel::SequenceStockString(&mut stock2, &mut stock2_addr),
     ).unwrap();
 
-    let mut process_logger: SequenceProcessLogger<Option<String>> = SequenceProcessLogger::new("ProcessLogger".into());
-    let mut stock_logger: SequenceStockLogger<String> = SequenceStockLogger::new("StockLogger".into());
+    let mut process_logger: DiscreteProcessLogger<Option<String>> = DiscreteProcessLogger::new("ProcessLogger".into());
+    let mut stock_logger: DiscreteStockLogger<String> = DiscreteStockLogger::new("StockLogger".into());
 
     ComponentLogger::connect_logger(
         ComponentLogger::SequenceProcessLoggerString(&mut process_logger),
@@ -78,7 +78,7 @@ fn main() {
         .add_model(process1, process1_mbox, "Process1")
         .add_model(stock2, stock2_mbox, "Stock2");
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
-    simu.process_event(SequenceProcess::<Option<String>, (), Option<String>>::update_state,
+    simu.process_event(DiscreteProcess::<Option<String>, (), Option<String>>::update_state,
         NotificationMetadata { time: MonotonicTime::EPOCH, element_from: "Init".into(), message: "Start".into() }, &process1_addr).unwrap();
     
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(60)).unwrap();

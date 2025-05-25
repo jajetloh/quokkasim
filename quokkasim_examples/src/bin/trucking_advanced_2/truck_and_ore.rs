@@ -13,11 +13,11 @@ pub struct TruckAndOre {
 pub struct LoadingProcess {
     pub element_name: String,
     pub element_type: String,
-    pub req_upstream_trucks: Requestor<(), SequenceStockState>,
+    pub req_upstream_trucks: Requestor<(), DiscreteStockState>,
     pub req_upstream_ore: Requestor<(), VectorStockState>,
     pub withdraw_upstream_trucks: Requestor<(TruckAndOre, NotificationMetadata), ()>,
     pub withdraw_upstream_ore: Requestor<(IronOre, NotificationMetadata), f64>,
-    pub req_downstream: Requestor<(), SequenceStockState>,
+    pub req_downstream: Requestor<(), DiscreteStockState>,
     pub push_downstream: Output<(TruckAndOre, NotificationMetadata)>,
     
     pub process_state: Option<(Duration, TruckAndOre)>,
@@ -25,7 +25,7 @@ pub struct LoadingProcess {
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<SequenceStockLog<TruckAndOre>>,
+    pub log_emitter: Output<DiscreteStockLog<TruckAndOre>>,
     pub previous_check_time: MonotonicTime,
 }
 

@@ -7,47 +7,47 @@ use std::time::Duration;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
-pub enum SequenceStockState {
+pub enum DiscreteStockState {
     Empty { occupied: u32, empty: u32 },
     Normal { occupied: u32, empty: u32 },
     Full { occupied: u32, empty: u32 },
 }
 
-impl SequenceStockState {
+impl DiscreteStockState {
     pub fn get_name(&self) -> String {
         match self {
-            SequenceStockState::Empty { .. } => "Empty".to_string(),
-            SequenceStockState::Normal { .. } => "Normal".to_string(),
-            SequenceStockState::Full { .. } => "Full".to_string(),
+            DiscreteStockState::Empty { .. } => "Empty".to_string(),
+            DiscreteStockState::Normal { .. } => "Normal".to_string(),
+            DiscreteStockState::Full { .. } => "Full".to_string(),
         }
     }
 }
 
-impl StateEq for SequenceStockState {
+impl StateEq for DiscreteStockState {
     fn is_same_state(&self, other: &Self) -> bool {
         match (self, other) {
-            (SequenceStockState::Empty { .. }, SequenceStockState::Empty { ..  }) => true,
-            (SequenceStockState::Normal { .. }, SequenceStockState::Normal { .. }) => true,
-            (SequenceStockState::Full { .. }, SequenceStockState::Full { .. }) => true,
+            (DiscreteStockState::Empty { .. }, DiscreteStockState::Empty { ..  }) => true,
+            (DiscreteStockState::Normal { .. }, DiscreteStockState::Normal { .. }) => true,
+            (DiscreteStockState::Full { .. }, DiscreteStockState::Full { .. }) => true,
             _ => false,
         }
     }
 }
 
-pub struct SequenceStock<T> where T: Clone + Default + Send + 'static {
+pub struct DiscreteStock<T> where T: Clone + Default + Send + 'static {
     pub element_name: String,
     pub element_type: String,
     pub sequence: SeqDeque<T>,
-    pub log_emitter: Output<SequenceStockLog<T>>,
+    pub log_emitter: Output<DiscreteStockLog<T>>,
     pub state_emitter: Output<NotificationMetadata>,
     pub low_capacity: u32,
     pub max_capacity: u32,
-    pub prev_state: Option<SequenceStockState>,
+    pub prev_state: Option<DiscreteStockState>,
     next_event_id: u64,
 }
-impl<T: Clone + Default + Send + 'static> Default for SequenceStock<T> {
+impl<T: Clone + Default + Send + 'static> Default for DiscreteStock<T> {
     fn default() -> Self {
-        SequenceStock {
+        DiscreteStock {
             element_name: "SequenceStock".to_string(),
             element_type: "SequenceStock".to_string(),
             sequence: SeqDeque::default(),
@@ -69,16 +69,11 @@ pub struct SeqDeque<T>(VecDeque<T>);
 impl<T> Deref for SeqDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl<T> DerefMut for SeqDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
 
-impl<TT> VectorArithmetic<Option<TT>, (), u32> for SeqDeque<TT> {
-    fn add(&mut self, other: Option<TT>) {
-        match other { 
-            Some(item) => {
-                self.push_back(item);
-            },
-            _ => {}
-        };
+impl<TT> VectorArithmetic<TT, (), u32> for SeqDeque<TT> {
+    fn add(&mut self, other: TT) {
+        self.push_back(other);
     }
-    fn subtract_parts(&self, _: ()) -> SubtractParts<Self, Option<TT>> {
+    fn subtract_parts(&self, _: ()) -> SubtractParts<Self, TT> {
         todo!()
     }
     fn total(&self) -> u32 {
@@ -92,17 +87,17 @@ impl<TT: Default> Default for SeqDeque<TT> {
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option<T>, u32> for SequenceStock<T> where Self: Model {
-    type StockState = SequenceStockState;
+impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, T, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
+    type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.sequence.total();
         let empty = self.max_capacity.saturating_sub(occupied); // If occupied beyond capacity, just say no empty space
         if self.sequence.total() <= self.low_capacity {
-            SequenceStockState::Empty { occupied, empty }
+            DiscreteStockState::Empty { occupied, empty }
         } else if self.sequence.total() >= self.max_capacity {
-            SequenceStockState::Full { occupied, empty }
+            DiscreteStockState::Full { occupied, empty }
         } else {
-            SequenceStockState::Normal { occupied, empty }
+            DiscreteStockState::Normal { occupied, empty }
         }
     }
     fn get_previous_state(&mut self) -> &Option<Self::StockState> {
@@ -114,15 +109,11 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
     fn get_resource(&self) -> &SeqDeque<T> {
         &self.sequence
     }
-    fn add_impl<'a>(&'a mut self, payload: &'a (Option<T>, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn add_impl<'a>(&'a mut self, payload: &'a (T, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
-            self.prev_state = Some(self.get_state());
-            match payload.0 {
-                Some(ref item) => {
-                    self.sequence.push_back(item.clone());
-                }
-                None => {}
-            }
+            // self.prev_state = Some(self.get_state());
+            // self.sequence.push_back(payload.0.clone());
+            self.sequence.add(payload.0.clone());
         }
     }
     fn remove_impl<'a>(&'a mut self, payload: &'a ((), NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = Option<T>> + 'a {
@@ -141,7 +132,7 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
 
     fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
         async move {
-            let log = SequenceStockLog {
+            let log = DiscreteStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 event_id: self.next_event_id,
                 element_name: self.element_name.clone(),
@@ -156,11 +147,11 @@ impl<T: Clone + Debug + Default + Send> Stock<SeqDeque<T>, Option<T>, (), Option
     }
 }
 
-impl<T: Clone + Default + Send> Model for SequenceStock<T> {}
+impl<T: Clone + Default + Send> Model for DiscreteStock<T> {}
 
-impl<T: Clone + Default + Debug + Send> SequenceStock<T> {
+impl<T: Clone + Default + Debug + Send> DiscreteStock<T> {
     pub fn new() -> Self {
-        SequenceStock::default()
+        DiscreteStock::default()
     }
     pub fn with_name(mut self, name: String) -> Self {
         self.element_name = name;
@@ -187,13 +178,13 @@ impl<T: Clone + Default + Debug + Send> SequenceStock<T> {
     }
 }
 
-pub struct SequenceStockLogger<T> where T: Send {
+pub struct DiscreteStockLogger<T> where T: Send {
     pub name: String,
-    pub buffer: EventQueue<SequenceStockLog<T>>,
+    pub buffer: EventQueue<DiscreteStockLog<T>>,
 }
 
-impl<T> Logger for SequenceStockLogger<T> where SequenceStockLog<T>: Serialize, T: Send + 'static {
-    type RecordType = SequenceStockLog<T>;
+impl<T> Logger for DiscreteStockLogger<T> where DiscreteStockLog<T>: Serialize, T: Send + 'static {
+    type RecordType = DiscreteStockLog<T>;
     fn get_name(&self) -> &String {
         &self.name
     }
@@ -201,7 +192,7 @@ impl<T> Logger for SequenceStockLogger<T> where SequenceStockLog<T>: Serialize, 
         self.buffer
     }
     fn new(name: String) -> Self {
-        SequenceStockLogger {
+        DiscreteStockLogger {
             name,
             buffer: EventQueue::new(),
         }
@@ -209,17 +200,17 @@ impl<T> Logger for SequenceStockLogger<T> where SequenceStockLog<T>: Serialize, 
 }
 
 #[derive(Debug, Clone)]
-pub struct SequenceStockLog<T> {
+pub struct DiscreteStockLog<T> {
     pub time: String,
     pub event_id: u64,
     pub element_name: String,
     pub element_type: String,
     pub log_type: String,
-    pub state: SequenceStockState,
+    pub state: DiscreteStockState,
     pub sequence: SeqDeque<T>,
 }
 
-impl Serialize for SequenceStockLog<String> {
+impl Serialize for DiscreteStockLog<String> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
@@ -240,26 +231,26 @@ impl Serialize for SequenceStockLog<String> {
  * V: Parameter type requested from upstream stock
  * W: Parameter type received from upstream stock
  */
-pub struct SequenceProcess<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> where  {
+pub struct DiscreteProcess<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
-    pub req_upstream: Requestor<(), SequenceStockState>,
-    pub req_downstream: Requestor<(), SequenceStockState>,
+    pub req_upstream: Requestor<(), DiscreteStockState>,
+    pub req_downstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
     pub process_state: Option<(Duration, W)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<SequenceProcessLog<U>>,
+    pub log_emitter: Output<DiscreteProcessLog<U>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
 }
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Default for SequenceProcess<U, V, W> {
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Default for DiscreteProcess<U, V, W> {
     fn default() -> Self {
-        SequenceProcess {
-            element_name: "SequenceProcess".to_string(),
-            element_type: "SequenceProcess".to_string(),
+        DiscreteProcess {
+            element_name: "DiscreteProcess".to_string(),
+            element_type: "DiscreteProcess".to_string(),
             req_upstream: Requestor::new(),
             req_downstream: Requestor::new(),
             withdraw_upstream: Requestor::new(),
@@ -275,9 +266,9 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> SequenceProcess<U, V, W> {
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> DiscreteProcess<U, V, W> {
     pub fn new() -> Self {
-        SequenceProcess::default()
+        DiscreteProcess::default()
     }
     pub fn with_name(mut self, name: String) -> Self {
         self.element_name = name;
@@ -295,14 +286,14 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 }
 
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for SequenceProcess<U, V, W> {}
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteProcess<U, V, W> {}
 
-impl<U: Clone + Debug + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for SequenceProcess<Option<U>, (), Option<U>>
+impl<U: Clone + Debug + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for DiscreteProcess<Option<U>, (), Option<U>>
 where
     Self: Model,
     SeqDeque<U>: VectorArithmetic<Option<U>, (), u32>,
 {
-    type LogDetailsType = SequenceProcessLogType<Option<U>>;
+    type LogDetailsType = DiscreteProcessLogType<Option<U>>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event
@@ -325,7 +316,7 @@ where
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, SequenceProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
+                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
                         self.push_downstream.send((resource.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
@@ -343,8 +334,8 @@ where
                     let ds_state = self.req_downstream.send(()).await.next();
                     match (&us_state, &ds_state) {
                         (
-                            Some(SequenceStockState::Normal { .. } | SequenceStockState::Full { .. }),
-                            Some(SequenceStockState::Empty { .. } | SequenceStockState::Normal { .. }),
+                            Some(DiscreteStockState::Normal { .. } | DiscreteStockState::Full { .. }),
+                            Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }),
                         ) => {
                             let moved = self.withdraw_upstream.send(((), NotificationMetadata {
                                 time,
@@ -355,23 +346,23 @@ where
                                 panic!("Process time distribution not set for process {}", self.element_name);
                             }).sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
-                            self.log(time, SequenceProcessLogType::ProcessStart { resource: moved.clone() }).await;
+                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: moved.clone() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
-                        (Some(SequenceStockState::Empty { .. }), _ ) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                        (Some(DiscreteStockState::Empty { .. }), _ ) => {
+                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
-                        (_, Some(SequenceStockState::Full { .. })) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                        (_, Some(DiscreteStockState::Full { .. })) => {
+                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            self.log(time, SequenceProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         }
                     }
@@ -400,9 +391,9 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: SequenceProcessLogType<Option<U>>) -> impl Future<Output = ()> + Send {
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: DiscreteProcessLogType<Option<U>>) -> impl Future<Output = ()> + Send {
         async move {
-            let log = SequenceProcessLog {
+            let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 event_id: self.next_event_id,
                 element_name: self.element_name.clone(),
@@ -416,7 +407,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum SequenceProcessLogType<T> {
+pub enum DiscreteProcessLogType<T> {
     ProcessStart { resource: T },
     ProcessSuccess { resource: T },
     ProcessFailure { reason: &'static str },
@@ -424,15 +415,15 @@ pub enum SequenceProcessLogType<T> {
 
 
 #[derive(Debug, Clone)]
-pub struct SequenceProcessLog<T> {
+pub struct DiscreteProcessLog<T> {
     pub time: String,
     pub event_id: u64,
     pub element_name: String,
     pub element_type: String,
-    pub event: SequenceProcessLogType<T>,
+    pub event: DiscreteProcessLogType<T>,
 }
 
-impl Serialize for SequenceProcessLog<Option<String>> {
+impl Serialize for DiscreteProcessLog<Option<String>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
@@ -442,9 +433,9 @@ impl Serialize for SequenceProcessLog<Option<String>> {
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         let (event_type, item, reason): (String, Option<&str>, Option<&str>) = match &self.event {
-            SequenceProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), resource.as_deref(), None),
-            SequenceProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), resource.as_deref(), None),
-            SequenceProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
+            DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), resource.as_deref(), None),
+            DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), resource.as_deref(), None),
+            DiscreteProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
         };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("item", &item)?;
@@ -453,13 +444,13 @@ impl Serialize for SequenceProcessLog<Option<String>> {
     }
 }
 
-pub struct SequenceProcessLogger<T> where T: Send {
+pub struct DiscreteProcessLogger<T> where T: Send {
     pub name: String,
-    pub buffer: EventQueue<SequenceProcessLog<T>>,
+    pub buffer: EventQueue<DiscreteProcessLog<T>>,
 }
 
-impl<T> Logger for SequenceProcessLogger<T> where SequenceProcessLog<T>: Serialize, T: Send + 'static {
-    type RecordType = SequenceProcessLog<T>;
+impl<T> Logger for DiscreteProcessLogger<T> where DiscreteProcessLog<T>: Serialize, T: Send + 'static {
+    type RecordType = DiscreteProcessLog<T>;
     fn get_name(&self) -> &String {
         &self.name
     }
@@ -467,10 +458,189 @@ impl<T> Logger for SequenceProcessLogger<T> where SequenceProcessLog<T>: Seriali
         self.buffer
     }
     fn new(name: String) -> Self {
-        SequenceProcessLogger {
+        DiscreteProcessLogger {
             name,
             buffer: EventQueue::new(),
         }
     }
 }
 
+/**
+ * Source
+ */
+
+pub trait ItemFactory<U> {
+    fn create_item(&mut self) -> U;
+}
+
+pub struct StringItemFactory {
+    pub prefix: String,
+    pub next_index: u64,
+    pub num_digits: usize,
+}
+
+impl Default for StringItemFactory {
+    fn default() -> Self {
+        StringItemFactory {
+            prefix: "Item".to_string(),
+            next_index: 0,
+            num_digits: 4,
+        }
+    }
+}
+
+impl ItemFactory<String> for StringItemFactory {
+    fn create_item(&mut self) -> String {
+        let item = format!("{}_{:0>width$}", self.prefix, self.next_index, width = self.num_digits);
+        self.next_index += 1;
+        String::from(item)
+    }
+}
+
+pub struct SequenceSource<
+    T: Clone + Send + 'static,
+    U: Clone + Send + 'static,
+    TF: ItemFactory<T>,
+> {
+    pub element_name: String,
+    pub element_type: String,
+    pub req_upstream: Requestor<(), DiscreteStockState>,
+    pub req_downstream: Requestor<(), DiscreteStockState>,
+    pub push_downstream: Output<(U, NotificationMetadata)>,
+    pub process_state: Option<(Duration, T)>,
+    pub process_time_distr: Option<Distribution>,
+    pub process_quantity_distr: Option<Distribution>,
+    pub log_emitter: Output<DiscreteProcessLog<U>>,
+    time_to_next_event: Option<Duration>,
+    next_event_id: u64,
+    pub previous_check_time: MonotonicTime,
+    pub item_factory: TF,
+}
+
+impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for SequenceSource<T, U, TF> {
+    fn default() -> Self {
+        SequenceSource {
+            element_name: "SequenceSource".to_string(),
+            element_type: "SequenceSource".to_string(),
+            req_upstream: Requestor::new(),
+            req_downstream: Requestor::new(),
+            push_downstream: Output::new(),
+            process_state: None,
+            process_time_distr: None,
+            process_quantity_distr: None,
+            log_emitter: Output::new(),
+            time_to_next_event: None,
+            next_event_id: 0,
+            previous_check_time: MonotonicTime::EPOCH,
+            item_factory: TF::default(),
+        }
+    }
+}
+
+impl<T: Clone + Send + 'static, U: Clone + Send + Default + 'static, TF: ItemFactory<T> + Default> SequenceSource<T, U, TF> {
+    pub fn new() -> Self {
+        SequenceSource::default()
+    }
+    pub fn with_name(mut self, name: String) -> Self {
+        self.element_name = name;
+        self
+    }
+    pub fn with_type(mut self, type_: String) -> Self {
+        self.element_type = type_;
+        self
+    }
+    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
+        self.process_time_distr = Some(distr);
+        self
+    }
+}
+
+
+impl<T: Clone + Send + 'static, U: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for SequenceSource<T, U, TF> {}
+
+impl<U: Clone + Debug + Send + 'static, UF: ItemFactory<U> + Send + 'static> Process<SeqDeque<U>, Option<U>, (), u32> for SequenceSource<U, Option<U>, UF>
+where
+    Self: Model,
+    SeqDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+{
+    type LogDetailsType = DiscreteProcessLogType<Option<U>>;
+
+    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
+        &self.time_to_next_event
+    }
+
+    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
+        self.time_to_next_event = time;
+    }
+
+    fn set_previous_check_time(&mut self, time: MonotonicTime) {
+        self.previous_check_time = time;
+    }
+
+    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+        async move {
+            let time = cx.time();
+
+            match self.process_state.take() {
+                Some((mut process_time_left, resource)) => {
+                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                    if process_time_left.is_zero() {
+                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: Some(resource.clone()) }).await;
+                        self.push_downstream.send((Some(resource.clone()), NotificationMetadata {
+                            time,
+                            element_from: self.element_name.clone(),
+                            message: "ProcessStart".into(),
+                        })).await;
+                    } else {
+                        self.process_state = Some((process_time_left, resource));
+                    }
+                }
+                None => {}
+            }
+            match self.process_state {
+                None => {
+                    let ds_state = self.req_downstream.send(()).await.next();
+                    match &ds_state {
+                        Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                            let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                panic!("Process time distribution not set for source {}", self.element_name);
+                            }).sample();
+
+                            let next_item = self.item_factory.create_item();
+
+                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), next_item.clone()));
+                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: Some(next_item.clone()) }).await;
+                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                        },
+                        Some(DiscreteStockState::Full { .. }) => {
+                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            self.time_to_next_event = None;
+                        },
+                        None => {
+                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            self.time_to_next_event = None;
+                        }
+                    }
+                },
+                Some((time, _)) => {
+                    self.time_to_next_event = Some(time);
+                }
+            }
+        }
+    }
+
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+        async move {
+            let log = DiscreteProcessLog {
+                time: time.to_chrono_date_time(0).unwrap().to_string(),
+                event_id: self.next_event_id,
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                event: details,
+            };
+            self.next_event_id += 1;
+            self.log_emitter.send(log).await;
+        }
+    }
+}

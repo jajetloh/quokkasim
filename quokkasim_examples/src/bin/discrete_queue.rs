@@ -52,22 +52,25 @@ fn main() {
         next_seed: 0,
     };
 
-    let mut queue_1 = ComponentModel::SequenceStockString(SequenceStock::new()
+    let mut source = ComponentModel::Sequence
+
+    let mut queue_1 = ComponentModel::SequenceStockString(DiscreteStock::new()
         .with_name("Queue1".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
-        .with_initial_contents((0..12).into_iter().map(|i| format!("Person_{:0>2}", i)).collect()),
+        // .with_initial_contents((0..12).into_iter().map(|i| format!("Person_{:0>2}", i)).collect()),
+        .with_initial_contents(Vec::new()),
         Mailbox::new()
     );
 
-    let mut process_1 = ComponentModel::SequenceProcessString(SequenceProcess::new()
+    let mut process_1 = ComponentModel::SequenceProcessString(DiscreteProcess::new()
         .with_name("Process1".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
     let mut process_1_addr = process_1.get_address();
 
-    let mut queue_2 = ComponentModel::SequenceStockString(SequenceStock::new()
+    let mut queue_2 = ComponentModel::SequenceStockString(DiscreteStock::new()
         .with_name("Queue2".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -75,7 +78,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_2 = ComponentModel::SequenceProcessString(SequenceProcess::new()
+    let mut process_2 = ComponentModel::SequenceProcessString(DiscreteProcess::new()
         .with_name("Process2".into())
         .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 3., max: 7. }).unwrap()),
         Mailbox::new()
@@ -87,8 +90,8 @@ fn main() {
     connect_components!(&mut queue_2, &mut process_2).unwrap();
     connect_components!(&mut process_2, &mut queue_1).unwrap();
 
-    let mut queue_logger = ComponentLogger::SequenceStockLoggerString(SequenceStockLogger::new("QueueLogger".into()));
-    let mut process_logger = ComponentLogger::SequenceProcessLoggerString(SequenceProcessLogger::new("ProcessLogger".into()));
+    let mut queue_logger = ComponentLogger::SequenceStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
+    let mut process_logger = ComponentLogger::SequenceProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();

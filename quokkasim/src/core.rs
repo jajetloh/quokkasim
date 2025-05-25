@@ -356,7 +356,8 @@ macro_rules! define_model_enums {
             VectorSplitter4Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
             VectorSplitter5Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             SequenceStockString($crate::components::sequence::SequenceStock<String>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceStock<String>>),
-            SequenceProcessString($crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceProcess<Option<String>, (), Option<String>>>),
+            SequenceProcessString($crate::components::sequence::SequenceProcess<String, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceProcess<String, (), Option<String>>>),
+            SequenceSourceString($crate::components::sequence::SequenceSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::sequence::SequenceSource<String, String, StringItemFactory>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
