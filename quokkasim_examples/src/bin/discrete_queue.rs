@@ -4,8 +4,10 @@ use quokkasim::{define_model_enums, prelude::*};
 
 define_model_enums! {
     pub enum ComponentModel {}
+    pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
-    pub enum ComponentInit {}
+    // pub enum ComponentInit {}
+    pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -25,7 +27,7 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentInit {
+impl CustomInit for ComponentModelAddress {
     fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
         let notif_meta = NotificationMetadata {
             time: simu.time(),
@@ -40,6 +42,9 @@ impl CustomInit for ComponentInit {
     }
 }
 
+
+
+
 fn main() {
 
     let mut df = DistributionFactory {
@@ -47,21 +52,25 @@ fn main() {
         next_seed: 0,
     };
 
-    let mut queue_1 = ComponentModel::SequenceStockString(SequenceStock::new()
+    let mut source = ComponentModel::DiscreteSourceString(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
+    let mut source_addr = source.get_address();
+
+    let mut queue_1 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue1".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
-        .with_initial_contents((0..12).into_iter().map(|i| format!("Person_{:0>2}", i)).collect()),
+        .with_initial_contents(Vec::new()),
         Mailbox::new()
     );
 
-    let mut process_1 = ComponentModel::SequenceProcessString(SequenceProcess::new()
+    let mut process_1 = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
         .with_name("Process1".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
+    let mut process_1_addr = process_1.get_address();
 
-    let mut queue_2 = ComponentModel::SequenceStockString(SequenceStock::new()
+    let mut queue_2 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue2".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -69,37 +78,61 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_2 = ComponentModel::SequenceProcessString(SequenceProcess::new()
+    let mut process_par = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
         .with_name("Process2".into())
-        .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 3., max: 7. }).unwrap()),
+        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
+        Mailbox::new()
+    );
+    let mut process_par_addr = process_par.get_address();
+
+    let mut queue_3 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+        .with_name("Queue3".into())
+        .with_low_capacity(0)
+        .with_max_capacity(10)
+        .with_initial_contents(Vec::new()),
         Mailbox::new()
     );
 
+    let mut sink = ComponentModel::DiscreteSinkString(DiscreteSink::new()
+        .with_name("Sink".into())
+        .with_process_time_distr(Distribution::Constant(1.)),
+        Mailbox::new()
+    );
+    let mut sink_addr = sink.get_address();
+
+    connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();
     connect_components!(&mut process_1, &mut queue_2).unwrap();
-    connect_components!(&mut queue_2, &mut process_2).unwrap();
-    connect_components!(&mut process_2, &mut queue_1).unwrap();
+    connect_components!(&mut queue_2, &mut process_par).unwrap();
+    connect_components!(&mut process_par, &mut queue_3).unwrap();
+    connect_components!(&mut queue_3, &mut sink).unwrap();
 
-    let mut queue_logger = ComponentLogger::SequenceStockLoggerString(SequenceStockLogger::new("QueueLogger".into()));
-    let mut process_logger = ComponentLogger::SequenceProcessLoggerString(SequenceProcessLogger::new("ProcessLogger".into()));
+    let mut queue_logger = ComponentLogger::DiscreteStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
+    let mut process_logger = ComponentLogger::DiscreteProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
+    connect_logger!(&mut queue_logger, &mut queue_3).unwrap();
+    connect_logger!(&mut process_logger, &mut source).unwrap();
     connect_logger!(&mut process_logger, &mut process_1).unwrap();
-    connect_logger!(&mut process_logger, &mut process_2).unwrap();
+    connect_logger!(&mut process_logger, &mut process_par).unwrap();
+    connect_logger!(&mut process_logger, &mut sink).unwrap();
 
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
-    sim_builder = register_component!(sim_builder, &mut init_configs, queue_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, queue_2);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process_2);
+    sim_builder = register_component!(sim_builder, source);
+    sim_builder = register_component!(sim_builder, queue_1);
+    sim_builder = register_component!(sim_builder, process_1);
+    sim_builder = register_component!(sim_builder, queue_2);
+    sim_builder = register_component!(sim_builder, process_par);
+    sim_builder = register_component!(sim_builder, queue_3);
+    sim_builder = register_component!(sim_builder, sink);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    init_configs.iter_mut().for_each(|x| {
-        x.initialise(&mut simu).unwrap();
-    });
+    source_addr.initialise(&mut simu).unwrap();
+    process_1_addr.initialise(&mut simu).unwrap();
+    process_par_addr.initialise(&mut simu).unwrap();
+    sink_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 

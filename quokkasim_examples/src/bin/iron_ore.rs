@@ -3,7 +3,7 @@ use std::{error::Error, fs::create_dir_all, time::Duration};
 use quokkasim::nexosim::Mailbox;
 use quokkasim::prelude::*;
 use quokkasim::define_model_enums;
-use serde::{ser::SerializeStruct, Serialize};
+use serde::{Serialize, ser::SerializeStruct};
 
 /**
  * A representation of Iron Ore, primarily through iron content (Fe) and other elements.
@@ -45,25 +45,25 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.limonite += other.limonite;
     }
 
-    fn subtract_parts(&self, quantity: f64) -> SubtractParts<IronOre, IronOre> {
+    fn subtract(&mut self, quantity: f64) -> Self {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
-        SubtractParts {
-            remaining: IronOre {
-                fe: self.fe * proportion_remaining,
-                other_elements: self.other_elements * proportion_remaining,
-                magnetite: self.magnetite * proportion_remaining,
-                hematite: self.hematite * proportion_remaining,
-                limonite: self.limonite * proportion_remaining,
-            },
-            subtracted: IronOre {
-                fe: self.fe * proportion_removed,
-                other_elements: self.other_elements * proportion_removed,
-                magnetite: self.magnetite * proportion_removed,
-                hematite: self.hematite * proportion_removed,
-                limonite: self.limonite * proportion_removed,
-            },
-        }
+        
+        let removed = IronOre {
+            fe: self.fe * proportion_removed,
+            other_elements: self.other_elements * proportion_removed,
+            magnetite: self.magnetite * proportion_removed,
+            hematite: self.hematite * proportion_removed,
+            limonite: self.limonite * proportion_removed,
+        };
+
+        self.fe *= proportion_remaining;
+        self.other_elements *= proportion_remaining;
+        self.magnetite *= proportion_remaining;
+        self.hematite *= proportion_remaining;
+        self.limonite *= proportion_remaining;
+
+        removed
     }
 
     // We use the Fe + Other Elements as the 'source of truth' for the total mass
@@ -118,6 +118,7 @@ impl Serialize for IronOreProcessLog {
         state.end()
     }
 }
+
 impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     fn from(log: VectorProcessLog<IronOre>) -> Self {
         IronOreProcessLog {
@@ -131,27 +132,6 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     }
 }
 
-struct IronOreProcessLogger {
-    name: String,
-    buffer: EventQueue<IronOreProcessLog>
-}
-
-impl Logger for IronOreProcessLogger {
-    type RecordType = IronOreProcessLog;
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_buffer(self) -> EventQueue<Self::RecordType> {
-        self.buffer
-    }
-    fn new(name: String) -> Self {
-        IronOreProcessLogger {
-            name,
-            buffer: EventQueue::new(),
-        }
-    }
-}
-
 struct IronOreStockLog {
     time: String,
     event_id: u64,
@@ -161,13 +141,14 @@ struct IronOreStockLog {
     truck_id: Option<u32>,
     resource: IronOre,
 }
+
 impl Serialize for IronOreStockLog {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreStockLog", 12)?;
-        state.serialize_field("time", &self.time)?; 
+        let mut state = serializer.serialize_struct("IronOreStockLog", 13)?;
+        state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
@@ -183,6 +164,7 @@ impl Serialize for IronOreStockLog {
         state.end()
     }
 }
+
 impl From<VectorStockLog<IronOre>> for IronOreStockLog {
     fn from(log: VectorStockLog<IronOre>) -> Self {
         IronOreStockLog {
@@ -192,23 +174,54 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
             element_type: log.element_type,
             log_type: log.log_type,
             truck_id: None,
-            resource: log.vector
+            resource: log.vector,
+        }
+    }
+}
+
+//
+// Define logger types for the IronOre components
+//
+struct IronOreProcessLogger {
+    name: String,
+    buffer: EventQueue<IronOreProcessLog>,
+}
+
+impl Logger for IronOreProcessLogger {
+    type RecordType = IronOreProcessLog;
+
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
+        self.buffer
+    }
+
+    fn new(name: String) -> Self {
+        IronOreProcessLogger {
+            name,
+            buffer: EventQueue::new(),
         }
     }
 }
 
 struct IronOreStockLogger {
     name: String,
-    buffer: EventQueue<IronOreStockLog>
+    buffer: EventQueue<IronOreStockLog>,
 }
+
 impl Logger for IronOreStockLogger {
     type RecordType = IronOreStockLog;
+
     fn get_name(&self) -> &String {
         &self.name
     }
+
     fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
+
     fn new(name: String) -> Self {
         IronOreStockLogger {
             name,
@@ -217,16 +230,24 @@ impl Logger for IronOreStockLogger {
     }
 }
 
+//
+// Define the component and logger enums using the updated macro
+//
 define_model_enums! {
     pub enum ComponentModel {
         IronOreProcess(VectorProcess<IronOre, IronOre, f64>, Mailbox<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>),
+        IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>)
+    }
+    pub enum ComponentModelAddress {
+        IronOreProcess(Address<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreStock(Address<VectorStock<IronOre>>)
     }
     pub enum ComponentLogger {
         IronOreProcessLogger(IronOreProcessLogger),
-        IronOreStockLogger(IronOreStockLogger),
+        IronOreStockLogger(IronOreStockLogger)
     }
-    pub enum ComponentInit {}
+    pub enum ScheduledEventConfig {
+    }
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -266,7 +287,7 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentInit {
+impl CustomInit for ComponentModelAddress {
     fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
         let notif_meta = NotificationMetadata {
             time: simu.time(),
@@ -274,11 +295,11 @@ impl CustomInit for ComponentInit {
             message: "Start".into(),
         };
         match self {
-            ComponentInit::IronOreProcess(addr) => {
+            ComponentModelAddress::IronOreProcess(addr) => {
                 simu.process_event(VectorProcess::<IronOre, IronOre, f64>::update_state, notif_meta, addr.clone())?;
                 Ok(())
             },
-            ComponentInit::IronOreStock(_) => {
+            ComponentModelAddress::IronOreStock(_) => {
                 // No init required for this stock
                 Ok(())
             },
@@ -312,6 +333,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(10.)),
         Mailbox::new(),
     );
+    let mut process1_addr = process1.get_address();
 
     let mut stock2 = ComponentModel::IronOreStock(
         VectorStock::new()
@@ -334,16 +356,13 @@ fn main() {
     connect_logger!(&mut stock_logger, &mut stock2).unwrap();
 
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, process1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stock2);
+    sim_builder = register_component!(sim_builder, stock1);
+    sim_builder = register_component!(sim_builder, process1);
+    sim_builder = register_component!(sim_builder, stock2);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    init_configs.iter_mut().for_each(|x| {
-        x.initialise(&mut simu).unwrap();
-    });
+    process1_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 

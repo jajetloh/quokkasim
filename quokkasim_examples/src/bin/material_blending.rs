@@ -5,8 +5,9 @@ use quokkasim::{define_model_enums, prelude::*};
 
 define_model_enums! {
     pub enum ComponentModel {}
+    pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
-    pub enum ComponentInit {}
+    pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {
@@ -26,7 +27,7 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentInit {
+impl CustomInit for ComponentModelAddress {
     fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
         let notif_meta = NotificationMetadata {
             time: simu.time(),
@@ -85,6 +86,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
     );
+    let mut reclaimer_1_addr = reclaimer_1.get_address();
 
     let mut output_stockpile_1 = ComponentModel::VectorStockVector3(
         VectorStock::new()
@@ -95,7 +97,7 @@ fn main() {
         Mailbox::new()
     );
 
-        let mut output_stockpile_2 = ComponentModel::VectorStockVector3(
+    let mut output_stockpile_2 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Output Stockpile 2".into())
             .with_low_capacity(100.)
@@ -111,14 +113,16 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
     );
+    let mut reclaimer_2_addr = reclaimer_2.get_address();
 
     let mut reclaimer_3 = ComponentModel::VectorCombiner1Vector3(
-        VectorCombiner::new()
+        VectorCombiner::new() 
             .with_name("Reclaimer 3".into())
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(60.)),
         Mailbox::new()
     );
+    let mut reclaimer_3_addr = reclaimer_3.get_address();
 
     let mut stacker = ComponentModel::VectorSplitter2Vector3(
         VectorSplitter::new()
@@ -127,6 +131,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(360.)),
         Mailbox::new()
     );
+    let mut stacker_addr = stacker.get_address();
 
     connect_components!(&mut stockpile_1, &mut reclaimer_1, 0).unwrap();
     connect_components!(&mut stockpile_2, &mut reclaimer_1, 1).unwrap();
@@ -155,25 +160,25 @@ fn main() {
     connect_logger!(&mut stock_logger, &mut output_stockpile_2).unwrap();
 
     let mut sim_builder = SimInit::new();
-    let mut init_configs: Vec<ComponentInit> = Vec::new();
 
-    sim_builder = register_component!(sim_builder, &mut init_configs, reclaimer_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, reclaimer_2);
-    sim_builder = register_component!(sim_builder, &mut init_configs, reclaimer_3);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stacker);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stockpile_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stockpile_2);
-    sim_builder = register_component!(sim_builder, &mut init_configs, stockpile_3);
-    sim_builder = register_component!(sim_builder, &mut init_configs, output_stockpile_1);
-    sim_builder = register_component!(sim_builder, &mut init_configs, output_stockpile_2);
+    sim_builder = register_component!(sim_builder, reclaimer_1);
+    sim_builder = register_component!(sim_builder, reclaimer_2);
+    sim_builder = register_component!(sim_builder, reclaimer_3);
+    sim_builder = register_component!(sim_builder, stacker);
+    sim_builder = register_component!(sim_builder, stockpile_1);
+    sim_builder = register_component!(sim_builder, stockpile_2);
+    sim_builder = register_component!(sim_builder, stockpile_3);
+    sim_builder = register_component!(sim_builder, output_stockpile_1);
+    sim_builder = register_component!(sim_builder, output_stockpile_2);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
-    let mut simu = sim_builder.init(start_time).unwrap().0;
+    let (mut simu, mut scheduler) = sim_builder.init(start_time).unwrap();
 
-    init_configs.iter_mut().for_each(|init| {
-        init.initialise(&mut simu).unwrap();
-    });
-    
+    reclaimer_1_addr.initialise(&mut simu).unwrap();
+    reclaimer_2_addr.initialise(&mut simu).unwrap();
+    reclaimer_3_addr.initialise(&mut simu).unwrap();
+    stacker_addr.initialise(&mut simu).unwrap();
+
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 1))
         .unwrap();
 
