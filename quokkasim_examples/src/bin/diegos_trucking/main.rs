@@ -246,6 +246,22 @@ impl CustomLoggerConnection for ComponentLogger {
     type ComponentType = ComponentModel;
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b, n) {
+            (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::LoadingProcess(process, _), _) => {
+                process.log_emitter.connect_sink(&logger.buffer); 
+                Ok(())
+            },
+            (ComponentLogger::IronOreStockLogger(logger), ComponentModel::IronOreStock(stock, _), _) => {
+                stock.log_emitter.connect_sink(&logger.buffer);
+                Ok(())
+            },
+            (ComponentLogger::TruckStockLogger(logger), ComponentModel::DiscreteStockTruck(stock, _), _) => {
+                stock.log_emitter.connect_sink(&logger.buffer);
+                Ok(())
+            },
+            (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::DiscreteParallelProcessTruck(process, _), _) => {
+                // TODO: Implement properly
+                Ok(())
+            },
             (a, b, _) => Err(format!("No logger connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }
@@ -344,7 +360,16 @@ fn main() {
     connect_components!(&mut trucks_loaded, &mut loaded_truck_movements).unwrap();
     connect_components!(&mut loaded_truck_movements, &mut ready_to_dump).unwrap();
 
-    // Connect loggers
+    let mut ore_stock_logger = ComponentLogger::IronOreStockLogger(VectorStockLogger::new("OreStockLogger".into()));
+    let mut truck_stock_logger = ComponentLogger::TruckStockLogger(DiscreteStockLogger::new("TruckStockLogger".into()));
+    let mut truck_process_logger = ComponentLogger::TruckingProcessLogger(TruckingProcessLogger::new("TruckProcessLogger".into()));
+
+    connect_logger!(&mut ore_stock_logger, &mut source_sp).unwrap();
+    connect_logger!(&mut truck_stock_logger, &mut trucks_ready_to_load).unwrap();
+    connect_logger!(&mut truck_stock_logger, &mut trucks_loaded).unwrap();
+    connect_logger!(&mut truck_stock_logger, &mut ready_to_dump).unwrap();
+    connect_logger!(&mut truck_process_logger, &mut loading_process).unwrap();
+    connect_logger!(&mut truck_process_logger, &mut loaded_truck_movements).unwrap();
 
     let mut sim_builder = SimInit::new();
     sim_builder = register_component!(sim_builder, source_sp);
@@ -364,5 +389,9 @@ fn main() {
 
     let output_dir = "outputs/diegos_trucking";
     create_dir_all(output_dir).unwrap();
+
+    // ore_stock_logger.write_csv(output_dir.into()).unwrap();
+    // truck_stock_logger.write_csv(output_dir.into()).unwrap();
+    // truck_process_logger.write_csv(output_dir.into()).unwrap();
 
 }

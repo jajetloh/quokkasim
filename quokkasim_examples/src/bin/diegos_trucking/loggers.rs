@@ -4,11 +4,11 @@ use csv::WriterBuilder;
 use quokkasim::prelude::*;
 use serde::{ser::SerializeStruct, Serialize};
 
-use crate::iron_ore::IronOre;
+use crate::{iron_ore::IronOre, truck::Truck};
 
 pub struct TruckingProcessLogger {
-    name: String,
-    buffer: EventQueue<TruckingProcessLog>,
+    pub name: String,
+    pub buffer: EventQueue<TruckingProcessLog>,
 }
 
 impl Logger for TruckingProcessLogger {
@@ -66,12 +66,68 @@ impl Serialize for TruckingProcessLog {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("TruckingProcessLog", 5)?;
+        let mut state = serializer.serialize_struct("TruckingProcessLog", 15)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        // state.serialize_field("event", &self.event)?;
+
+        let (event_type, truck_id, total, fe, other_elements, fe_pc, magnetite, hematite, limonite, message) = match &self.event {
+            TruckingProcessLogType::LoadingStart { truck_id, quantity, ore: vector } => {
+                ("ProcessStart", Some(truck_id.clone()), Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
+            },
+            TruckingProcessLogType::LoadingSuccess { truck_id, quantity, ore: vector } => {
+                ("ProcessSuccess", Some(truck_id.clone()), Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
+            },
+            TruckingProcessLogType::LoadingFailure { reason, .. } => {
+                ("ProcessFailure", None, None, None, None, None, None, None, None, Some(reason))
+            },
+            _ => {
+                unimplemented!()
+            }
+        };
+        state.serialize_field("event_type", &event_type)?;
+        state.serialize_field("truck_id", &truck_id)?;
+        state.serialize_field("total", &total)?;
+        state.serialize_field("fe", &fe)?;
+        state.serialize_field("other_elements", &other_elements)?;
+        state.serialize_field("fe_%", &fe_pc)?;
+        state.serialize_field("magnetite", &magnetite)?;
+        state.serialize_field("hematite", &hematite)?;
+        state.serialize_field("limonite", &limonite)?;
+        state.serialize_field("message", &message)?;
+        state.end()
+    }
+}
+
+pub struct TruckingStockLog {
+    pub time: String,
+    pub event_id: u64,
+    pub element_name: String,
+    pub element_type: String,
+    pub log_type: String,
+    pub state: DiscreteStockState,
+    pub resource: ItemDeque<Truck>,
+}
+
+impl Serialize for TruckingStockLog {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("TruckingStockLog", 7)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        state.serialize_field("log_type", &self.log_type)?;
+        state.serialize_field("state", match self.state {
+            DiscreteStockState::Empty { .. } => "Empty",
+            DiscreteStockState::Normal { .. } => "Normal",
+            DiscreteStockState::Full { .. } => "Full",
+        })?;
+        state.serialize_field("num_trucks", &self.resource.total())?;
+        state.serialize_field("trucks", &self.resource.iter().map(|truck| truck.truck_id.clone()).collect::<Vec<String>>().join("|"))?;
         state.end()
     }
 }

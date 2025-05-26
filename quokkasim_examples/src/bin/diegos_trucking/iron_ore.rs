@@ -1,4 +1,5 @@
 use quokkasim::prelude::*;
+use serde::{ser::SerializeStruct, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct IronOre {
@@ -7,6 +8,21 @@ pub struct IronOre {
     pub magnetite: f64,
     pub hematite: f64,
     pub limonite: f64,
+}
+
+impl Serialize for IronOre {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("IronOre", 5)?;
+        state.serialize_field("fe", &self.fe)?;
+        state.serialize_field("other_elements", &self.other_elements)?;
+        state.serialize_field("magnetite", &self.magnetite)?;
+        state.serialize_field("hematite", &self.hematite)?;
+        state.serialize_field("limonite", &self.limonite)?;
+        state.end()
+    }
 }
 
 impl Default for IronOre {

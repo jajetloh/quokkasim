@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Debug, fs::File, time::Duration};
 use crate::common::{NotificationMetadata};
 use csv::WriterBuilder;
 use nexosim::{model::{Context, Model}, ports::EventQueue, simulation::ExecutionError};
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 
 pub struct SubtractParts<T, U> {
@@ -28,6 +28,19 @@ impl VectorArithmetic<f64, f64, f64> for f64 {
 #[derive(Debug, Clone)]
 pub struct Vector3 {
     pub values: [f64; 3],
+}
+
+impl Serialize for Vector3 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Vector3", 3)?;
+        state.serialize_field("x", &self.values[0])?;
+        state.serialize_field("y", &self.values[1])?;
+        state.serialize_field("z", &self.values[2])?;
+        state.end()
+    }
 }
 
 impl VectorArithmetic<Vector3, f64, f64> for Vector3 {

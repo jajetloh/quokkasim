@@ -214,60 +214,93 @@ pub struct VectorStockLog<T> {
     pub vector: T,
 }
 
-impl Serialize for VectorStockLog<f64> {
+// impl Serialize for VectorStockLog<f64> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         let mut state = serializer.serialize_struct("VectorStockLog", 6)?;
+//         state.serialize_field("time", &self.time)?;
+//         state.serialize_field("event_id", &self.event_id)?;
+//         state.serialize_field("element_name", &self.element_name)?;
+//         state.serialize_field("element_type", &self.element_type)?;
+//         state.serialize_field("log_type", &self.log_type)?;
+//         state.serialize_field("state", &self.state.get_name())?;
+//         state.serialize_field("value", &self.vector)?;
+//         state.end()
+//     }
+// }
+
+// impl Serialize for VectorStockLog<Vector3> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         let mut state = serializer.serialize_struct("VectorStockLog", 6)?;
+//         state.serialize_field("time", &self.time)?;
+//         state.serialize_field("event_id", &self.event_id)?;
+//         state.serialize_field("element_name", &self.element_name)?;
+//         state.serialize_field("element_type", &self.element_type)?;
+//         state.serialize_field("log_type", &self.log_type)?;
+//         state.serialize_field("state", &self.state.get_name())?;
+//         state.serialize_field("x0", &self.vector.values[0])?;
+//         state.serialize_field("x1", &self.vector.values[1])?;
+//         state.serialize_field("x2", &self.vector.values[2])?;
+//         state.end()
+//     }
+// }
+
+impl<T: Serialize> Serialize for VectorStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("VectorStockLog", 6)?;
+        let mut state = serializer.serialize_struct("VectorStockLog", 7)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("value", &self.vector)?;
+        state.serialize_field("vector", &self.vector)?;
         state.end()
     }
 }
 
-impl Serialize for VectorStockLog<Vector3> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("VectorStockLog", 6)?;
-        state.serialize_field("time", &self.time)?;
-        state.serialize_field("event_id", &self.event_id)?;
-        state.serialize_field("element_name", &self.element_name)?;
-        state.serialize_field("element_type", &self.element_type)?;
-        state.serialize_field("log_type", &self.log_type)?;
-        state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("x0", &self.vector.values[0])?;
-        state.serialize_field("x1", &self.vector.values[1])?;
-        state.serialize_field("x2", &self.vector.values[2])?;
-        state.end()
-    }
-}
+// impl Logger for VectorStockLogger<f64> {
+//     type RecordType = VectorStockLog<f64>;
+//     fn get_name(&self) -> &String {
+//         &self.name
+//     }
+//     fn get_buffer(self) -> EventQueue<Self::RecordType> {
+//         self.buffer
+//     }
+//     fn new(name: String) -> Self {
+//         VectorStockLogger {
+//             name,
+//             buffer: EventQueue::new(),
+//         }
+//     }
+// }
 
-impl Logger for VectorStockLogger<f64> {
-    type RecordType = VectorStockLog<f64>;
-    fn get_name(&self) -> &String {
-        &self.name
-    }
-    fn get_buffer(self) -> EventQueue<Self::RecordType> {
-        self.buffer
-    }
-    fn new(name: String) -> Self {
-        VectorStockLogger {
-            name,
-            buffer: EventQueue::new(),
-        }
-    }
-}
+// impl Logger for VectorStockLogger<Vector3> {
+//     type RecordType = VectorStockLog<Vector3>;
+//     fn get_name(&self) -> &String {
+//         &self.name
+//     }
+//     fn get_buffer(self) -> EventQueue<Self::RecordType> {
+//         self.buffer
+//     }
+//     fn new(name: String) -> Self {
+//         VectorStockLogger {
+//             name,
+//             buffer: EventQueue::new(),
+//         }
+//     }
+// }
 
-impl Logger for VectorStockLogger<Vector3> {
-    type RecordType = VectorStockLog<Vector3>;
+impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
+    type RecordType = VectorStockLog<T>;
     fn get_name(&self) -> &String {
         &self.name
     }

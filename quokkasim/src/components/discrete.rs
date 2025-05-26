@@ -240,18 +240,36 @@ pub struct DiscreteStockLog<T> {
     pub resource: ItemDeque<T>,
 }
 
-impl Serialize for DiscreteStockLog<String> {
+// impl Serialize for DiscreteStockLog<String> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//         where
+//             S: serde::Serializer {
+//         let mut state = serializer.serialize_struct("ResourceStockLog", 6)?;
+//         state.serialize_field("time", &self.time)?;
+//         state.serialize_field("event_id", &self.event_id)?;
+//         state.serialize_field("element_name", &self.element_name)?;
+//         state.serialize_field("element_type", &self.element_type)?;
+//         state.serialize_field("log_type", &self.log_type)?;
+//         state.serialize_field("state", &self.state.get_name())?;
+//         state.serialize_field("resource", &format!("{:?}", self.resource))?;
+//         state.end()
+//     }
+// }
+
+impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
-        let mut state = serializer.serialize_struct("ResourceStockLog", 6)?;
+        let mut state = serializer.serialize_struct("DiscreteStockLog", 6)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("resource", &format!("{:?}", self.resource))?;
+        let resource_str: String = serde_json::to_string(&self.resource.0)
+            .map_err(|e| serde::ser::Error::custom(format!("Failed to serialize resource: {}", e)))?;
+        state.serialize_field("resource", &resource_str)?;
         state.end()
     }
 }
