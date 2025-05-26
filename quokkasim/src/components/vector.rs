@@ -4,7 +4,7 @@ use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{core::{StateEq, Process, Stock}, prelude::{SubtractParts, Vector3, VectorArithmetic}};
+use crate::{core::{StateEq, Process, Stock}, prelude::{Vector3, VectorArithmetic}};
 use crate::core::Logger;
 use crate::common::{Distribution, NotificationMetadata};
 
