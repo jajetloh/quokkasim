@@ -310,10 +310,6 @@ macro_rules! define_model_enums {
 
         $(#[$components_address_enum_meta:meta])*
         pub enum $ComponentModelAddress:ident {
-          $(
-            $(#[$components_address_var_meta:meta])*
-            $Q:ident $( ( $QT:ty ) )?
-          ),* $(,)?
         }
 
         $(#[$logger_enum_meta:meta])*
@@ -323,9 +319,6 @@ macro_rules! define_model_enums {
                 $U:ident $( ( $UT:ty ) )?
             ),* $(,)?
         }
-
-        // $(#[$model_init_meta:meta])*
-        // pub enum $ComponentInit:ident {}
 
         $(#[$sch_event_config_enum_meta:meta])*
         pub enum $ScheduledEventConfig:ident {
@@ -840,7 +833,7 @@ macro_rules! define_model_enums {
             DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<Option<String>, ()>>),
             $(
-                $Q $( ($QT) )?
+                $R $( ($crate::nexosim::Address<$RT>) )?
             ),*
         }
 

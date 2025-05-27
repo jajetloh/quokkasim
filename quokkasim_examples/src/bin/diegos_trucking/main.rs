@@ -22,12 +22,7 @@ define_model_enums! {
         LoadingProcess(LoadingProcess, Mailbox<LoadingProcess>),
         DiscreteParallelProcessTruck(DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>, Mailbox<DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>>),
     }
-    pub enum ComponentModelAddress {
-        IronOreStock(Address<VectorStock<IronOre>>),
-        DiscreteStockTruck(Address<DiscreteStock<Truck>>),
-        LoadingProcess(Address<LoadingProcess>),
-        DiscreteParallelProcessTruck(Address<DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>>),
-    }
+    pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
         TruckingProcessLogger(TruckingProcessLogger),
         TruckStockLogger(DiscreteStockLogger<Truck>),

@@ -238,10 +238,7 @@ define_model_enums! {
         IronOreProcess(VectorProcess<IronOre, IronOre, f64>, Mailbox<VectorProcess<IronOre, IronOre, f64>>),
         IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>)
     }
-    pub enum ComponentModelAddress {
-        IronOreProcess(Address<VectorProcess<IronOre, IronOre, f64>>),
-        IronOreStock(Address<VectorStock<IronOre>>)
-    }
+    pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
         IronOreProcessLogger(IronOreProcessLogger),
         IronOreStockLogger(IronOreStockLogger)
