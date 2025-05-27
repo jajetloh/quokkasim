@@ -214,42 +214,6 @@ pub struct VectorStockLog<T> {
     pub vector: T,
 }
 
-// impl Serialize for VectorStockLog<f64> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         let mut state = serializer.serialize_struct("VectorStockLog", 6)?;
-//         state.serialize_field("time", &self.time)?;
-//         state.serialize_field("event_id", &self.event_id)?;
-//         state.serialize_field("element_name", &self.element_name)?;
-//         state.serialize_field("element_type", &self.element_type)?;
-//         state.serialize_field("log_type", &self.log_type)?;
-//         state.serialize_field("state", &self.state.get_name())?;
-//         state.serialize_field("value", &self.vector)?;
-//         state.end()
-//     }
-// }
-
-// impl Serialize for VectorStockLog<Vector3> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         let mut state = serializer.serialize_struct("VectorStockLog", 6)?;
-//         state.serialize_field("time", &self.time)?;
-//         state.serialize_field("event_id", &self.event_id)?;
-//         state.serialize_field("element_name", &self.element_name)?;
-//         state.serialize_field("element_type", &self.element_type)?;
-//         state.serialize_field("log_type", &self.log_type)?;
-//         state.serialize_field("state", &self.state.get_name())?;
-//         state.serialize_field("x0", &self.vector.values[0])?;
-//         state.serialize_field("x1", &self.vector.values[1])?;
-//         state.serialize_field("x2", &self.vector.values[2])?;
-//         state.end()
-//     }
-// }
-
 impl<T: Serialize> Serialize for VectorStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -262,42 +226,11 @@ impl<T: Serialize> Serialize for VectorStockLog<T> {
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("vector", &self.vector)?;
+        let vector_json = serde_json::to_string(&self.vector).map_err(serde::ser::Error::custom)?;
+        state.serialize_field("vector", &vector_json)?;
         state.end()
     }
 }
-
-// impl Logger for VectorStockLogger<f64> {
-//     type RecordType = VectorStockLog<f64>;
-//     fn get_name(&self) -> &String {
-//         &self.name
-//     }
-//     fn get_buffer(self) -> EventQueue<Self::RecordType> {
-//         self.buffer
-//     }
-//     fn new(name: String) -> Self {
-//         VectorStockLogger {
-//             name,
-//             buffer: EventQueue::new(),
-//         }
-//     }
-// }
-
-// impl Logger for VectorStockLogger<Vector3> {
-//     type RecordType = VectorStockLog<Vector3>;
-//     fn get_name(&self) -> &String {
-//         &self.name
-//     }
-//     fn get_buffer(self) -> EventQueue<Self::RecordType> {
-//         self.buffer
-//     }
-//     fn new(name: String) -> Self {
-//         VectorStockLogger {
-//             name,
-//             buffer: EventQueue::new(),
-//         }
-//     }
-// }
 
 impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
     type RecordType = VectorStockLog<T>;
@@ -318,8 +251,6 @@ impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
 /**
  * Process
  */
-
-
 
  /**
   * T: Resource type of upstream stock
@@ -568,63 +499,86 @@ pub struct VectorProcessLog<T> {
     pub event: VectorProcessLogType<T>,
 }
 
-impl Serialize for VectorProcessLog<f64> {
+impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send + 'static {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("VectorProcessLog", 8)?;
+        let mut state = serializer.serialize_struct("VectorProcessLog", 9)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let (event_type, total, parts, reason): (&str, Option<f64>, Option<Vec<f64>>, Option<&str>) = match &self.event {
-            VectorProcessLogType::ProcessStart { quantity, .. } => ("ProcessStart", Some(*quantity), None, None),
-            VectorProcessLogType::ProcessSuccess { quantity, .. } => ("ProcessSuccess", Some(*quantity), None, None),
-            VectorProcessLogType::ProcessFailure { reason, .. } => ("ProcessFailure", None, None, Some(*reason)),
-            VectorProcessLogType::CombineStart { quantity, vectors, .. } => ("CombineStart", Some(*quantity), Some(vectors.clone()), None),
-            VectorProcessLogType::CombineSuccess { quantity, vector, .. } => ("CombineSuccess", Some(*quantity), None, None),
-            VectorProcessLogType::CombineFailure { reason, .. } => ("CombineFailure", None, None, Some(*reason)),
-            VectorProcessLogType::SplitStart { quantity, vector } => ("SplitStart", Some(*quantity), None, None),
-            VectorProcessLogType::SplitSuccess { quantity, vectors } => ("SplitSuccess", Some(*quantity), Some(vectors.clone()), None),
-            VectorProcessLogType::SplitFailure { reason, .. } => ("SplitFailure", None, None, Some(*reason)),
-        };
+        let (event_type, total, inflows, outflows, reason): (&str, Option<f64>, Option<String>, Option<String>, Option<String>);
+        match &self.event {
+            VectorProcessLogType::ProcessStart { quantity, vector } => {
+                event_type = "ProcessStart";
+                total = Some(*quantity);
+                inflows = Some(serde_json::to_string(&vec![vector]).map_err(|e| serde::ser::Error::custom(e.to_string()))?);
+                outflows = None;
+                reason = None;
+            },
+            VectorProcessLogType::ProcessSuccess { quantity, vector } => {
+                event_type = "ProcessSuccess";
+                total = Some(*quantity);
+                inflows = None;
+                outflows = Some(serde_json::to_string(&vec![vector]).map_err(|e| serde::ser::Error::custom(e.to_string()))?);
+                reason = None;
+            },
+            VectorProcessLogType::ProcessFailure { reason: r } => {
+                event_type = "ProcessFailure";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = Some(r.to_string());
+            },
+            VectorProcessLogType::CombineStart { quantity, vectors } => {
+                event_type = "CombineStart";
+                total = Some(*quantity);
+                inflows = Some(serde_json::to_string(vectors).map_err(|e| serde::ser::Error::custom(e.to_string()))?);
+                outflows = None;
+                reason = None;
+            },
+            VectorProcessLogType::CombineSuccess { quantity, vector } => {
+                event_type = "CombineSuccess";
+                total = Some(*quantity);
+                inflows = None;
+                outflows = Some(serde_json::to_string(&vec![vector]).map_err(|e| serde::ser::Error::custom(e.to_string()))?);
+                reason = None;
+            },
+            VectorProcessLogType::CombineFailure { reason: r } => {
+                event_type = "CombineFailure";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = Some(r.to_string());
+            },
+            VectorProcessLogType::SplitStart { quantity, vector } => {
+                event_type = "SplitStart";
+                total = Some(*quantity);
+                inflows = Some(serde_json::to_string(&vec![vector]).map_err(|e| serde::ser::Error::custom(e.to_string()))?);
+                outflows = None;
+                reason = None;
+            },
+            VectorProcessLogType::SplitSuccess { quantity, vectors } => {
+                event_type = "SplitSuccess";
+                total = Some(*quantity);
+                inflows = None;
+                outflows = Some(serde_json::to_string(vectors).map_err(|e| serde::ser::Error::custom(e.to_string()))?);
+                reason = None;
+            },
+            VectorProcessLogType::SplitFailure { reason: r } => {
+                event_type = "SplitFailure";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = Some(r.to_string());
+            },
+        }
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
-        state.serialize_field("parts", &parts)?;
-        state.serialize_field("reason", &reason)?;
-        state.end()
-    }
-}
-
-impl Serialize for VectorProcessLog<Vector3> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("VectorProcessLog", 11)?;
-        state.serialize_field("time", &self.time)?;
-        state.serialize_field("event_id", &self.event_id)?;
-        state.serialize_field("element_name", &self.element_name)?;
-        state.serialize_field("element_type", &self.element_type)?;
-        let (event_type, total, x0, x1, x2, parts, reason): (&str, Option<f64>, Option<f64>, Option<f64>, Option<f64>, Option<Vec<[f64; 3]>>, Option<&str>) = match &self.event {
-            VectorProcessLogType::ProcessStart { quantity, vector } => ("ProcessStart", Some(*quantity), Some(vector.values[0]), Some(vector.values[1]), Some(vector.values[2]), None, None),
-            VectorProcessLogType::ProcessSuccess { quantity, vector } => ("ProcessSuccess", Some(*quantity), Some(vector.values[0]), Some(vector.values[1]), Some(vector.values[2]), None, None),
-            VectorProcessLogType::ProcessFailure { reason, .. } => ("ProcessFailure", None, None, None, None, None, Some(reason)),
-            VectorProcessLogType::CombineStart { quantity, vectors, .. } => ("CombineStart", Some(*quantity), None, None, None, Some(vectors.iter().map(|x| x.values).collect()), None),
-            VectorProcessLogType::CombineSuccess { quantity, vector: vectors, .. } => ("CombineSuccess", Some(*quantity), Some(vectors.values[0]), Some(vectors.values[1]), Some(vectors.values[2]), None, None),
-            VectorProcessLogType::CombineFailure { reason, .. } => ("CombineFailure", None, None, None, None, None, Some(reason)),
-            VectorProcessLogType::SplitStart { quantity, vector } => ("SplitStart", Some(*quantity), Some(vector.values[0]), Some(vector.values[1]), Some(vector.values[2]), None, None),
-            VectorProcessLogType::SplitSuccess { quantity, vectors } => ("SplitSuccess", Some(*quantity), None, None, None, Some(vectors.iter().map(|x| x.values).collect()), None),
-            VectorProcessLogType::SplitFailure { reason, .. } => ("SplitFailure", None, None, None, None, None, Some(reason)),
-        };
-        state.serialize_field("event_type", &event_type)?;
-        state.serialize_field("total", &total)?;
-        state.serialize_field("x0", &x0)?;
-        state.serialize_field("x1", &x1)?;
-        state.serialize_field("x2", &x2)?;
-        let parts_str = parts.as_ref().map(|vs| serde_json::to_string(vs).unwrap());
-        state.serialize_field("parts", &parts_str)?;
+        state.serialize_field("inflows", &inflows)?;
+        state.serialize_field("outflows", &outflows)?;
         state.serialize_field("reason", &reason)?;
         state.end()
     }

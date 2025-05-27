@@ -6,7 +6,6 @@ define_model_enums! {
     pub enum ComponentModel {}
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {}
-    // pub enum ComponentInit {}
     pub enum ScheduledEvent {}
 }
 
