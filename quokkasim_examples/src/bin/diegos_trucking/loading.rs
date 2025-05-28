@@ -139,7 +139,7 @@ impl LoadingProcess {
                                     self.process_state = Some((Duration::from_secs_f64(process_duration), Truck { ore: None, truck_id: truck_id.clone() }, ore.clone()));
 
                                     self.log(time, TruckingProcessLogType::LoadingStart { truck_id, quantity: ore.total(), ore: ore.clone() }).await;
-                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration)); // Retry after 1 second
+                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration));
                                 },
                                 Some(Truck { ore: Some(_), .. }) => {
                                     // Truck already has ore - how did we get here?
@@ -178,7 +178,7 @@ impl LoadingProcess {
                                 element_from: self.element_name.clone(),
                                 message: "Scheduling next loading process check".into(),
                             };
-                            cx.schedule_event(next_time, Self::update_state, notif_meta);
+                            cx.schedule_event(next_time, Self::update_state, notif_meta).unwrap();
                         }
                         _ => {
                             // No further events scheduled

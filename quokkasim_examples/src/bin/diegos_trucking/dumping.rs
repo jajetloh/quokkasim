@@ -13,13 +13,11 @@ pub struct DumpingProcess {
     pub req_downstream_trucks: Requestor<(), DiscreteStockState>,
     pub req_downstream_ore: Requestor<(), VectorStockState>,
 
-
     pub withdraw_upstream_trucks: Requestor<((), NotificationMetadata), Option<Truck>>,
     pub push_downstream_trucks: Output<(Option<Truck>, NotificationMetadata)>,
-    pub push_downstream_ore: Output<(f64, NotificationMetadata)>,
+    pub push_downstream_ore: Output<(IronOre, NotificationMetadata)>,
 
-
-    pub process_state: Option<(Duration, Truck, IronOre)>,
+    pub process_state: Option<(Duration, Truck)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
@@ -86,29 +84,41 @@ impl DumpingProcess {
                     let duration_since_prev_check = time.duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: ore.total(), ore: ore.clone() }).await;
-                        match truck.ore {
-                            Some(_) => {
-                                truck.ore = None; // dumpin'
+                        let ore = truck.ore.take();
+                        match ore {
+                            Some(ore) => {
+                                self.push_downstream_trucks.send((Some(truck.clone()), NotificationMetadata {
+                                    time,
+                                    element_from: self.element_name.clone(),
+                                    message: "Dumped truck without ore".into(),
+                                })).await;
+
+                                // send ore to ore stock - silly question, do we send all of it "at once"
+                                // This bit runs at the after the dumping duration is passed, so yes at this point we send it all
+                                self.push_downstream_ore.send((ore.clone(), NotificationMetadata {
+                                    time,
+                                    element_from: self.element_name.clone(),
+                                    message: "Ore received at destination stock".into(),
+                                })).await;
+                                self.log(time, TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: ore.total(), ore: ore.clone() }).await;
+
                             },
                             None => {
-                                panic!("Hold on a second! Truck already dumped, cannot dump again!"); // dumped already
+                                panic!("Hold on a second! Truck has no ore to dump!"); // no ore to dump
                             }
                         }
+                        // Don't need this part as truck.take() before already cleaned truck.ore up
+                        // match truck.ore {
+                        //     Some(_) => {
+                        //         truck.ore = None; // dumpin'
+                        //     },
+                        //     None => {
+                        //         panic!("Hold on a second! Truck already dumped, cannot dump again!"); // dumped already
+                        //     }
+                        // }
                         
                         // send empty truck to truck stock
-                        self.push_downstream_trucks.send((Some(truck), NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "Dumped truck without ore".into(),
-                        })).await;
 
-                        // send ore to ore stock - silly question, do we send all of it "at once"
-                        self.push_downstream_ore.send((Some(truck.ore), NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "Ore received at destination stock".into(),
-                        })).await;
                     }
                 }
                 None => {}
@@ -144,10 +154,10 @@ impl DumpingProcess {
                                     // Truck already dumped - how did we get here? No idea.
                                     panic!("Truck has already been dumped, cannot dump again");
                                 },
-                                Some(Truck { ore: Some(_), truck_id }) => {
+                                Some(truck) => {
                                     // There's some ore in the truck - woop woop - let's DUMP
-                                    let process_quantity = self.process_quantity_distr.sample();
-
+                                    // let process_quantity = self.process_quantity_distr.sample();
+                                    let ore = truck.ore.clone().unwrap();
 
                                     // No need to send upstream withdraw request 
 
@@ -160,9 +170,9 @@ impl DumpingProcess {
 
                                     // not sure if this is the correct way to manage dumping
                                     let process_duration = self.process_time_distr.sample();
-                                    self.process_state = Some((Duration::from_secs_f64(process_duration), Truck { ore: ore, truck_id: truck_id.clone() }));
+                                    self.process_state = Some((Duration::from_secs_f64(process_duration), truck.clone()));
 
-                                    self.log(time, TruckingProcessLogType::DumpingStart { truck_id, quantity: ore.total(), ore: ore.clone() }).await;
+                                    self.log(time, TruckingProcessLogType::DumpingStart { truck_id: truck.truck_id, quantity: ore.total(), ore: ore.clone() }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration)); // Retry after 1 second
                                 }
                                 None => {

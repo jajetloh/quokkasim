@@ -80,7 +80,7 @@ impl CustomComponentConnection for ComponentModel {
                 truck_stock.state_emitter.connect(DumpingProcess::update_state, dump_process_mbox.address());
                 Ok(())
             },
-            (ComponentModel::DumpingProcess(dump_process, dump_process_mbox), ComponentModel::DiscreteStockTruck(ore_stock, ore_stock_mbox)) => {
+            (ComponentModel::DumpingProcess(dump_process, dump_process_mbox), ComponentModel::IronOreStock(ore_stock, ore_stock_mbox)) => {
                 dump_process.req_downstream_ore.connect(VectorStock::<IronOre>::get_state_async, ore_stock_mbox.address());
                 dump_process.push_downstream_ore.connect(VectorStock::<IronOre>::add, ore_stock_mbox.address());
                 ore_stock.state_emitter.connect(DumpingProcess::update_state, dump_process_mbox.address());
@@ -108,7 +108,26 @@ impl CustomLoggerConnection for ComponentLogger {
                 Ok(())
             },
             (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::DiscreteParallelProcessTruck(process, _), _) => {
-                // TODO: Implement properly
+                // process.log_emitter.connect_sink(&logger.buffer);
+                process.log_emitter.filter_map_connect_sink(|x| {
+                    let event = match &x.event {
+                        DiscreteProcessLogType::ProcessStart { resource } => TruckingProcessLogType::TruckMovementStart { truck_id: resource.clone().unwrap().truck_id },
+                        DiscreteProcessLogType::ProcessSuccess { resource } => TruckingProcessLogType::TruckMovementSuccess { truck_id: resource.clone().unwrap().truck_id },
+                        DiscreteProcessLogType::ProcessFailure { reason } => TruckingProcessLogType::TruckMovementFailure { reason },
+                    };
+                    Some(TruckingProcessLog {
+                        element_name: x.element_name.clone(),
+                        element_type: x.element_type.clone(),
+                        event_id: x.event_id,
+                        time: x.time.clone(),
+                        event,
+                    })
+                }, &logger.buffer);
+                // TODO: Implement logging for DiscreteParallelProcess
+                Ok(())
+            },
+            (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::DumpingProcess(process, _), _) => {
+                process.log_emitter.connect_sink(&logger.buffer);
                 Ok(())
             },
             (a, b, _) => Err(format!("No logger connection defined from {} to {} (n={:?})", a, b, n).into()),
@@ -130,6 +149,10 @@ impl CustomInit for ComponentModelAddress {
             },
             ComponentModelAddress::DiscreteParallelProcessTruck(addr) => {
                 simu.process_event(DiscreteParallelProcess::update_state, notif_meta.clone(), addr.clone())?;
+                Ok(())
+            },
+            ComponentModelAddress::DumpingProcess(addr) => {
+                simu.process_event(DumpingProcess::update_state, notif_meta.clone(), addr.clone())?;
                 Ok(())
             },
             x => {
@@ -158,8 +181,8 @@ fn main() {
         .with_type("TruckStock".into())
         .with_initial_contents(vec![
             Truck { ore: None, truck_id: "Truck_01".into() },
-            Truck { ore: None, truck_id: "Truck_02".into() },
-            Truck { ore: None, truck_id: "Truck_03".into() },
+            // Truck { ore: None, truck_id: "Truck_02".into() },
+            // Truck { ore: None, truck_id: "Truck_03".into() },
         ])
         .with_low_capacity(0)
         .with_max_capacity(10),
@@ -239,7 +262,6 @@ fn main() {
 
     // Connect components
 
-    // TODO: connect components for remaining stocks/processes
     connect_components!(&mut source_sp, &mut loading_process).unwrap();
     connect_components!(&mut trucks_ready_to_load, &mut loading_process).unwrap();
     connect_components!(&mut loading_process, &mut trucks_loaded).unwrap();
@@ -255,7 +277,6 @@ fn main() {
     let mut truck_stock_logger = ComponentLogger::TruckStockLogger(DiscreteStockLogger::new("TruckStockLogger".into()));
     let mut truck_process_logger = ComponentLogger::TruckingProcessLogger(TruckingProcessLogger::new("TruckProcessLogger".into()));
 
-    // TODO: connect loggers for remaining stocks/processes
     connect_logger!(&mut ore_stock_logger, &mut source_sp).unwrap();
     connect_logger!(&mut ore_stock_logger, &mut destination_sp).unwrap();
     connect_logger!(&mut truck_stock_logger, &mut trucks_ready_to_load).unwrap();
@@ -267,7 +288,6 @@ fn main() {
     connect_logger!(&mut truck_process_logger, &mut dumping_process).unwrap();
     connect_logger!(&mut truck_process_logger, &mut dumped_truck_movements).unwrap();
 
-    // TODO: register components for remaining stocks/processes
     let mut sim_builder = SimInit::new();
     sim_builder = register_component!(sim_builder, source_sp);
     sim_builder = register_component!(sim_builder, trucks_ready_to_load);
@@ -287,6 +307,8 @@ fn main() {
 
     loading_process_addr.initialise(&mut simu).unwrap();
     loaded_truck_movements_addr.initialise(&mut simu).unwrap();
+    dumping_process_addr.initialise(&mut simu).unwrap();
+    dumped_truck_movements_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(start_time + Duration::from_secs(600)).unwrap();
 

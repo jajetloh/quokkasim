@@ -61,6 +61,9 @@ pub enum TruckingProcessLogType {
     DumpingStart { truck_id: String, quantity: f64, ore: IronOre },
     DumpingSuccess { truck_id: String, quantity: f64, ore: IronOre },
     DumpingFailure { reason: &'static str },
+    TruckMovementStart { truck_id: String },
+    TruckMovementSuccess { truck_id: String },
+    TruckMovementFailure { reason: &'static str },
 }
 
 impl Serialize for TruckingProcessLog {
