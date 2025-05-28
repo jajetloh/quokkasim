@@ -12,6 +12,9 @@ use truck::*;
 mod loading;
 use loading::*;
 
+mod dumping; 
+use dumping::*;
+
 mod loggers;
 use loggers::*;
 
@@ -20,6 +23,7 @@ define_model_enums! {
         IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>),
         DiscreteStockTruck(DiscreteStock<Truck>, Mailbox<DiscreteStock<Truck>>),
         LoadingProcess(LoadingProcess, Mailbox<LoadingProcess>),
+        DumpingProcess(DumpingProcess, Mailbox<DumpingProcess>),
         DiscreteParallelProcessTruck(DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>, Mailbox<DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>>),
     }
     pub enum ComponentModelAddress {}
@@ -62,6 +66,24 @@ impl CustomComponentConnection for ComponentModel {
                 process.req_downstream.connect(DiscreteStock::<Truck>::get_state_async, ready_to_dump_mbox.address());
                 process.push_downstream.connect(DiscreteStock::<Truck>::add, ready_to_dump_mbox.address());
                 ready_to_dump.state_emitter.connect(DiscreteParallelProcess::update_state, process_mbox.address());
+                Ok(())
+            },
+            (ComponentModel::DiscreteStockTruck(truck_stock, truck_stock_mbox), ComponentModel::DumpingProcess(dump_process, dump_process_mbox)) => {
+                dump_process.req_upstream_trucks.connect(DiscreteStock::<Truck>::get_state_async, truck_stock_mbox.address());
+                dump_process.withdraw_upstream_trucks.connect(DiscreteStock::<Truck>::remove, truck_stock_mbox.address());
+                truck_stock.state_emitter.connect(DumpingProcess::update_state, dump_process_mbox.address());
+                Ok(())
+            },
+            (ComponentModel::DumpingProcess(dump_process, dump_process_mbox), ComponentModel::DiscreteStockTruck(truck_stock, truck_stock_mbox)) => {
+                dump_process.req_downstream_trucks.connect(DiscreteStock::<Truck>::get_state_async, truck_stock_mbox.address());
+                dump_process.push_downstream_trucks.connect(DiscreteStock::<Truck>::add, truck_stock_mbox.address());
+                truck_stock.state_emitter.connect(DumpingProcess::update_state, dump_process_mbox.address());
+                Ok(())
+            },
+            (ComponentModel::DumpingProcess(dump_process, dump_process_mbox), ComponentModel::DiscreteStockTruck(ore_stock, ore_stock_mbox)) => {
+                dump_process.req_downstream_ore.connect(VectorStock::<IronOre>::get_state_async, ore_stock_mbox.address());
+                dump_process.push_downstream_ore.connect(VectorStock::<IronOre>::add, ore_stock_mbox.address());
+                ore_stock.state_emitter.connect(DumpingProcess::update_state, dump_process_mbox.address());
                 Ok(())
             },
             (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
