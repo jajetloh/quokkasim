@@ -79,6 +79,7 @@ impl LoadingProcess {
             // Resolve current loading action if pending
             match self.process_state.take() {
                 Some((mut process_time_left, mut truck, ore)) => {
+                    println!("Processing loading for truck {} with ore {:?}", truck.truck_id, ore);
                     let duration_since_prev_check = time.duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
@@ -96,15 +97,19 @@ impl LoadingProcess {
                             element_from: self.element_name.clone(),
                             message: "Truck loaded with ore".into(),
                         })).await;
+                        println!("Truck loaded with ore");
+                    } else {
+                        self.process_state = Some((process_time_left, truck, ore));
                     }
                 }
-                None => {}
+                None => {
+                }
             }
 
             // Check if we need to start a new loading process
             match self.process_state {
-                Some(_) => {
-                    // Already processing, nothing to do
+                Some((time_left, _, _)) => {
+                    self.time_to_next_event = Some(time_left);
                 }
                 None => {
                     // Check if we have trucks and ore available
@@ -168,23 +173,23 @@ impl LoadingProcess {
                             self.time_to_next_event = None;
                         },
                     }
-
-                    self.previous_check_time = time;
-                    match self.time_to_next_event {
-                        Some(time_until_next) if time_until_next > Duration::ZERO => {
-                            let next_time = time + time_until_next;
-                            let notif_meta = NotificationMetadata {
-                                time: next_time,
-                                element_from: self.element_name.clone(),
-                                message: "Scheduling next loading process check".into(),
-                            };
-                            cx.schedule_event(next_time, Self::update_state, notif_meta).unwrap();
-                        }
-                        _ => {
-                            // No further events scheduled
-                            self.time_to_next_event = None;
-                        }
-                    }
+                }
+            }
+            
+            self.previous_check_time = time;
+            match self.time_to_next_event {
+                Some(time_until_next) if time_until_next > Duration::ZERO => {
+                    let next_time = time + time_until_next;
+                    let notif_meta = NotificationMetadata {
+                        time: next_time,
+                        element_from: self.element_name.clone(),
+                        message: "Scheduling next loading process check".into(),
+                    };
+                    println!("Scheduling next loading process check at {} {:?}", next_time, self.process_state.clone());
+                    cx.schedule_event(next_time, Self::update_state, notif_meta).unwrap();
+                }
+                _ => {
+                    // No further events scheduled
                 }
             }
         }

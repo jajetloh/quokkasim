@@ -960,6 +960,7 @@ where
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+            println!("Wowee {} {} {:?}", self.element_name, time, self.processes_in_progress.clone());
             self.processes_in_progress.retain_mut(|(process_time_left, item)| {
                 *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                 if process_time_left.is_zero() {
@@ -969,6 +970,8 @@ where
                     true
                 }
             });
+            println!("Yipee {} {} {:?}", self.element_name, time, self.processes_complete.clone());
+
             let mut processes_complete = std::mem::take(&mut self.processes_complete);
             for item in processes_complete.iter_mut() {
                 let ds_state = self.req_downstream.send(()).await.next();
@@ -979,6 +982,7 @@ where
                             element_from: self.element_name.clone(),
                             message: "ProcessComplete".into(),
                         })).await;
+                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: item.clone() }).await;
                     },
                     Some(DiscreteStockState::Full { .. }) => {
                         self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
@@ -1004,12 +1008,18 @@ where
                             message: "Withdraw request".into(),
                         })).await.next().unwrap();
                         if let Some(item) = item {
-                            self.push_downstream.send((Some(item.clone()), NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: "Push request".into(),
-                            })).await;
+                            // self.push_downstream.send((Some(item.clone()), NotificationMetadata {
+                            //     time,
+                            //     element_from: self.element_name.clone(),
+                            //     message: "Push request".into(),
+                            // })).await;
+                            let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                panic!("Process time distribution not set for process {}", self.element_name);
+                            }).sample());
+
+                            self.processes_in_progress.push((process_duration, Some(item.clone())));
                             self.log(time, DiscreteProcessLogType::ProcessStart { resource: Some(item) }).await;
+
                         } else {
                             break;
                         }
@@ -1024,6 +1034,13 @@ where
                     }
                 }
             }
+            self.time_to_next_event = if self.processes_in_progress.is_empty() {
+                None
+            } else {
+                // Find the minimum time to next event
+                let min_time = self.processes_in_progress.iter().map(|(time, _)| *time).min().unwrap();
+                Some(min_time)
+            };
 
         }
     }

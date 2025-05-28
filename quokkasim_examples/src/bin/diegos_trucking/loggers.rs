@@ -96,6 +96,15 @@ impl Serialize for TruckingProcessLog {
             TruckingProcessLogType::DumpingFailure { reason, .. } => {
                 ("ProcessFailure", None, None, None, None, None, None, None, None, Some(reason))
             },
+            TruckingProcessLogType::TruckMovementStart { truck_id } => {
+                ("TruckMovementStart", Some(truck_id.clone()), None, None, None, None, None, None, None, None)
+            },
+            TruckingProcessLogType::TruckMovementSuccess { truck_id } => {
+                ("TruckMovementSuccess", Some(truck_id.clone()), None, None, None, None, None, None, None, None)
+            },
+            TruckingProcessLogType::TruckMovementFailure { reason, .. } => {
+                ("TruckMovementFailure", None, None, None, None, None, None, None, None, Some(reason))
+            },
             _ => {
                 unimplemented!()
             }

@@ -229,7 +229,7 @@ fn main() {
         .with_type("IronOreStock".into())
         .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
         .with_low_capacity(10.)
-        .with_max_capacity(100.),
+        .with_max_capacity(999_999_999.),
         Mailbox::new(),
     );
 
@@ -310,7 +310,7 @@ fn main() {
     dumping_process_addr.initialise(&mut simu).unwrap();
     dumped_truck_movements_addr.initialise(&mut simu).unwrap();
 
-    simu.step_until(start_time + Duration::from_secs(600)).unwrap();
+    simu.step_until(start_time + Duration::from_secs(10)).unwrap();
 
     let output_dir = "outputs/diegos_trucking";
     create_dir_all(output_dir).unwrap();
