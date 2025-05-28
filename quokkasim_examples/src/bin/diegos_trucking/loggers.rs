@@ -58,7 +58,9 @@ pub enum TruckingProcessLogType {
     LoadingStart { truck_id: String, quantity: f64, ore: IronOre },
     LoadingSuccess { truck_id: String, quantity: f64, ore: IronOre },
     LoadingFailure { reason: &'static str },
-    // TODO: Add dumping log types
+    DumpingStart { truck_id: String, quantity: f64, ore: IronOre },
+    DumpingSuccess { truck_id: String, quantity: f64, ore: IronOre },
+    DumpingFailure { reason: &'static str },
 }
 
 impl Serialize for TruckingProcessLog {
@@ -80,6 +82,15 @@ impl Serialize for TruckingProcessLog {
                 ("ProcessSuccess", Some(truck_id.clone()), Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
             },
             TruckingProcessLogType::LoadingFailure { reason, .. } => {
+                ("ProcessFailure", None, None, None, None, None, None, None, None, Some(reason))
+            },
+            TruckingProcessLogType::DumpingStart { truck_id, quantity, ore: vector } => {
+                ("ProcessStart", Some(truck_id.clone()), Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
+            },
+            TruckingProcessLogType::DumpingSuccess { truck_id, quantity, ore: vector } => {
+                ("ProcessSuccess", Some(truck_id.clone()), Some(quantity), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite), None)
+            },
+            TruckingProcessLogType::DumpingFailure { reason, .. } => {
                 ("ProcessFailure", None, None, None, None, None, None, None, None, Some(reason))
             },
             _ => {

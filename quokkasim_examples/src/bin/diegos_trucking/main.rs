@@ -170,8 +170,8 @@ fn main() {
     );
     let mut loaded_truck_movements_addr = loaded_truck_movements.get_address();
 
-    let mut ready_to_dump = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
-        .with_name("ready_to_dump".into())
+    let mut trucks_ready_to_dump = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
+        .with_name("trucks_ready_to_dump".into())
         .with_type("TruckStock".into())
         .with_initial_contents(Vec::new())
         .with_low_capacity(0)
@@ -179,32 +179,86 @@ fn main() {
         Mailbox::new(),
     );
 
+    let mut destination_sp = ComponentModel::IronOreStock(VectorStock::new()
+        .with_name("destination_sp".into())
+        .with_type("IronOreStock".into())
+        .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
+        .with_low_capacity(10.)
+        .with_max_capacity(100.),
+        Mailbox::new(),
+    );
+
+    let mut dumping_process = ComponentModel::DumpingProcess(DumpingProcess::new()
+        .with_name("dumping_process".into())
+        .with_type("DumpingProcess".into())
+        .with_process_quantity_distr(df.create(DistributionConfig::Constant(5.)).unwrap())
+        .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap()),
+        Mailbox::new(),
+    );
+    let mut dumping_process_addr = dumping_process.get_address();
+
+    let mut trucks_dumped = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
+        .with_name("trucks_dumped".into())
+        .with_type("TruckStock".into())
+        .with_initial_contents(Vec::new())
+        .with_low_capacity(0)
+        .with_max_capacity(10),
+        Mailbox::new(),
+    );
+
+    let mut dumped_truck_movements = ComponentModel::DiscreteParallelProcessTruck(DiscreteParallelProcess::new()
+        .with_name("dumped_truck_movements".into())
+        .with_type("DumpedTruckMovements".into())
+        .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 120. }).unwrap()),
+        Mailbox::new(),
+    );
+    let mut dumped_truck_movements_addr = dumped_truck_movements.get_address();
+
+
     // Connect components
 
+    // TODO: connect components for remaining stocks/processes
     connect_components!(&mut source_sp, &mut loading_process).unwrap();
     connect_components!(&mut trucks_ready_to_load, &mut loading_process).unwrap();
     connect_components!(&mut loading_process, &mut trucks_loaded).unwrap();
     connect_components!(&mut trucks_loaded, &mut loaded_truck_movements).unwrap();
-    connect_components!(&mut loaded_truck_movements, &mut ready_to_dump).unwrap();
+    connect_components!(&mut loaded_truck_movements, &mut trucks_ready_to_dump).unwrap();
+    connect_components!(&mut trucks_ready_to_dump, &mut dumping_process).unwrap();
+    connect_components!(&mut dumping_process, &mut destination_sp).unwrap();
+    connect_components!(&mut dumping_process, &mut trucks_dumped).unwrap();
+    connect_components!(&mut trucks_dumped, &mut dumped_truck_movements).unwrap();
+    connect_components!(&mut dumped_truck_movements, &mut trucks_ready_to_load).unwrap();
 
     let mut ore_stock_logger = ComponentLogger::IronOreStockLogger(VectorStockLogger::new("OreStockLogger".into()));
     let mut truck_stock_logger = ComponentLogger::TruckStockLogger(DiscreteStockLogger::new("TruckStockLogger".into()));
     let mut truck_process_logger = ComponentLogger::TruckingProcessLogger(TruckingProcessLogger::new("TruckProcessLogger".into()));
 
+    // TODO: connect loggers for remaining stocks/processes
     connect_logger!(&mut ore_stock_logger, &mut source_sp).unwrap();
+    connect_logger!(&mut ore_stock_logger, &mut destination_sp).unwrap();
     connect_logger!(&mut truck_stock_logger, &mut trucks_ready_to_load).unwrap();
     connect_logger!(&mut truck_stock_logger, &mut trucks_loaded).unwrap();
-    connect_logger!(&mut truck_stock_logger, &mut ready_to_dump).unwrap();
+    connect_logger!(&mut truck_stock_logger, &mut trucks_ready_to_dump).unwrap();
+    connect_logger!(&mut truck_stock_logger, &mut trucks_dumped).unwrap();
     connect_logger!(&mut truck_process_logger, &mut loading_process).unwrap();
     connect_logger!(&mut truck_process_logger, &mut loaded_truck_movements).unwrap();
+    connect_logger!(&mut truck_process_logger, &mut dumping_process).unwrap();
+    connect_logger!(&mut truck_process_logger, &mut dumped_truck_movements).unwrap();
 
+    // TODO: register components for remaining stocks/processes
     let mut sim_builder = SimInit::new();
     sim_builder = register_component!(sim_builder, source_sp);
     sim_builder = register_component!(sim_builder, trucks_ready_to_load);
     sim_builder = register_component!(sim_builder, loading_process);
     sim_builder = register_component!(sim_builder, trucks_loaded);
     sim_builder = register_component!(sim_builder, loaded_truck_movements);
-    sim_builder = register_component!(sim_builder, ready_to_dump);
+    sim_builder = register_component!(sim_builder, trucks_ready_to_dump);
+    sim_builder = register_component!(sim_builder, dumping_process);
+    sim_builder = register_component!(sim_builder, destination_sp);
+    sim_builder = register_component!(sim_builder, trucks_dumped);
+    sim_builder = register_component!(sim_builder, dumped_truck_movements);
+
+
 
     let start_time = MonotonicTime::try_from_date_time(2025, 5, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_builder.init(start_time.clone()).unwrap().0;
