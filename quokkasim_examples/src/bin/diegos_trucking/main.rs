@@ -310,7 +310,8 @@ fn main() {
     dumping_process_addr.initialise(&mut simu).unwrap();
     dumped_truck_movements_addr.initialise(&mut simu).unwrap();
 
-    simu.step_until(start_time + Duration::from_secs(10)).unwrap();
+    simu.step_until(start_time + Duration::from_secs_f64(120.)).unwrap();
+    // simu.step_until(start_time + Duration::from_secs_f64(9.952383953)).unwrap();
 
     let output_dir = "outputs/diegos_trucking";
     create_dir_all(output_dir).unwrap();

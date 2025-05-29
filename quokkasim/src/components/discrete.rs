@@ -884,7 +884,7 @@ pub struct DiscreteParallelProcess<
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
     pub processes_in_progress: Vec<(Duration, U)>,
-    pub processes_complete: Vec<U>,
+    pub processes_complete: VecDeque<U>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<U>>,
@@ -903,7 +903,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
             withdraw_upstream: Requestor::new(),
             push_downstream: Output::new(),
             processes_in_progress: Vec::new(),
-            processes_complete: Vec::new(),
+            processes_complete: VecDeque::new(),
             process_time_distr: None,
             process_quantity_distr: None,
             log_emitter: Output::new(),
@@ -960,23 +960,27 @@ where
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-            println!("Wowee {} {} {:?}", self.element_name, time, self.processes_in_progress.clone());
+            println!("{} {}: {:?} {}", time, self.element_name, notif_meta.time.to_chrono_date_time(0).unwrap(), notif_meta.message);
+            println!("123 In progress: {} {} {:?}", self.element_name, time, self.processes_in_progress.clone());
             self.processes_in_progress.retain_mut(|(process_time_left, item)| {
                 *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                 if process_time_left.is_zero() {
-                    self.processes_complete.push(item.clone());
+                    self.processes_complete.push_back(item.clone());
                     false
                 } else {
                     true
                 }
             });
-            println!("Yipee {} {} {:?}", self.element_name, time, self.processes_complete.clone());
+            println!("123 Ready to move: {} {} {:?}", self.element_name, time, self.processes_complete.clone());
 
-            let mut processes_complete = std::mem::take(&mut self.processes_complete);
-            for item in processes_complete.iter_mut() {
+            // let mut unable_to_push_downstream = Vec::new();
+            // let mut processes_complete = std::mem::take(&mut self.processes_complete);
+            while let Some(item) = self.processes_complete.pop_front() {
+            // for item in self.processes_complete.drain(..) {
                 let ds_state = self.req_downstream.send(()).await.next();
                 match &ds_state {
                     Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                        println!("123 Pushing downstream: {} {} {:?}", self.element_name, time, item);
                         self.push_downstream.send((item.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
@@ -994,7 +998,7 @@ where
                     }
                 }
             }
-            self.processes_complete = processes_complete;
+            // self.processes_complete = processes_complete;
 
             // Then check for any processes to start
 
