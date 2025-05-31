@@ -240,18 +240,20 @@ pub struct DiscreteStockLog<T> {
     pub resource: ItemDeque<T>,
 }
 
-impl Serialize for DiscreteStockLog<String> {
+impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
-        let mut state = serializer.serialize_struct("ResourceStockLog", 6)?;
+        let mut state = serializer.serialize_struct("DiscreteStockLog", 6)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("log_type", &self.log_type)?;
         state.serialize_field("state", &self.state.get_name())?;
-        state.serialize_field("resource", &format!("{:?}", self.resource))?;
+        let resource_str: String = serde_json::to_string(&self.resource.0)
+            .map_err(|e| serde::ser::Error::custom(format!("Failed to serialize resource: {}", e)))?;
+        state.serialize_field("resource", &resource_str)?;
         state.end()
     }
 }
@@ -866,7 +868,7 @@ pub struct DiscreteParallelProcess<
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
     pub processes_in_progress: Vec<(Duration, U)>,
-    pub processes_complete: Vec<U>,
+    pub processes_complete: VecDeque<U>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<U>>,
@@ -885,7 +887,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
             withdraw_upstream: Requestor::new(),
             push_downstream: Output::new(),
             processes_in_progress: Vec::new(),
-            processes_complete: Vec::new(),
+            processes_complete: VecDeque::new(),
             process_time_distr: None,
             process_quantity_distr: None,
             log_emitter: Output::new(),
@@ -945,14 +947,13 @@ where
             self.processes_in_progress.retain_mut(|(process_time_left, item)| {
                 *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                 if process_time_left.is_zero() {
-                    self.processes_complete.push(item.clone());
+                    self.processes_complete.push_back(item.clone());
                     false
                 } else {
                     true
                 }
             });
-            let mut processes_complete = std::mem::take(&mut self.processes_complete);
-            for item in processes_complete.iter_mut() {
+            while let Some(item) = self.processes_complete.pop_front() {
                 let ds_state = self.req_downstream.send(()).await.next();
                 match &ds_state {
                     Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
@@ -961,6 +962,7 @@ where
                             element_from: self.element_name.clone(),
                             message: "ProcessComplete".into(),
                         })).await;
+                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: item.clone() }).await;
                     },
                     Some(DiscreteStockState::Full { .. }) => {
                         self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
@@ -972,7 +974,6 @@ where
                     }
                 }
             }
-            self.processes_complete = processes_complete;
 
             // Then check for any processes to start
 
@@ -986,11 +987,11 @@ where
                             message: "Withdraw request".into(),
                         })).await.next().unwrap();
                         if let Some(item) = item {
-                            self.push_downstream.send((Some(item.clone()), NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: "Push request".into(),
-                            })).await;
+                            let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                panic!("Process time distribution not set for process {}", self.element_name);
+                            }).sample());
+
+                            self.processes_in_progress.push((process_duration, Some(item.clone())));
                             self.log(time, DiscreteProcessLogType::ProcessStart { resource: Some(item) }).await;
                         } else {
                             break;
@@ -1006,7 +1007,13 @@ where
                     }
                 }
             }
-
+            self.time_to_next_event = if self.processes_in_progress.is_empty() {
+                None
+            } else {
+                // Find the minimum time to next event
+                let min_time = self.processes_in_progress.iter().map(|(time, _)| *time).min().unwrap();
+                Some(min_time)
+            };
         }
     }
 

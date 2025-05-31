@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Debug, fs::File, time::Duration};
 use crate::common::{NotificationMetadata};
 use csv::WriterBuilder;
 use nexosim::{model::{Context, Model}, ports::EventQueue, simulation::ExecutionError};
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 
 pub struct SubtractParts<T, U> {
@@ -28,6 +28,19 @@ impl VectorArithmetic<f64, f64, f64> for f64 {
 #[derive(Debug, Clone)]
 pub struct Vector3 {
     pub values: [f64; 3],
+}
+
+impl Serialize for Vector3 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Vector3", 3)?;
+        state.serialize_field("x", &self.values[0])?;
+        state.serialize_field("y", &self.values[1])?;
+        state.serialize_field("z", &self.values[2])?;
+        state.end()
+    }
 }
 
 impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
@@ -297,10 +310,6 @@ macro_rules! define_model_enums {
 
         $(#[$components_address_enum_meta:meta])*
         pub enum $ComponentModelAddress:ident {
-          $(
-            $(#[$components_address_var_meta:meta])*
-            $Q:ident $( ( $QT:ty ) )?
-          ),* $(,)?
         }
 
         $(#[$logger_enum_meta:meta])*
@@ -310,9 +319,6 @@ macro_rules! define_model_enums {
                 $U:ident $( ( $UT:ty ) )?
             ),* $(,)?
         }
-
-        // $(#[$model_init_meta:meta])*
-        // pub enum $ComponentInit:ident {}
 
         $(#[$sch_event_config_enum_meta:meta])*
         pub enum $ScheduledEventConfig:ident {
@@ -827,7 +833,7 @@ macro_rules! define_model_enums {
             DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<Option<String>, ()>>),
             $(
-                $Q $( ($QT) )?
+                $R $( ($crate::nexosim::Address<$RT>) )?
             ),*
         }
 
