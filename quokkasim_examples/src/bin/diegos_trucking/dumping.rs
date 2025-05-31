@@ -119,6 +119,8 @@ impl DumpingProcess {
                         
                         // send empty truck to truck stock
 
+                    } else {
+                        self.process_state = Some((process_time_left, truck));
                     }
                 }
                 None => {}
