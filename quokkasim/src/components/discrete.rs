@@ -240,25 +240,6 @@ pub struct DiscreteStockLog<T> {
     pub resource: ItemDeque<T>,
 }
 
-<<<<<<< HEAD
-// impl Serialize for DiscreteStockLog<String> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//         where
-//             S: serde::Serializer {
-//         let mut state = serializer.serialize_struct("ResourceStockLog", 6)?;
-//         state.serialize_field("time", &self.time)?;
-//         state.serialize_field("event_id", &self.event_id)?;
-//         state.serialize_field("element_name", &self.element_name)?;
-//         state.serialize_field("element_type", &self.element_type)?;
-//         state.serialize_field("log_type", &self.log_type)?;
-//         state.serialize_field("state", &self.state.get_name())?;
-//         state.serialize_field("resource", &format!("{:?}", self.resource))?;
-//         state.end()
-//     }
-// }
-
-=======
->>>>>>> dev
 impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -963,8 +944,6 @@ where
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-            println!("{} {}: {:?} {}", time, self.element_name, notif_meta.time.to_chrono_date_time(0).unwrap(), notif_meta.message);
-            println!("123 In progress: {} {} {:?}", self.element_name, time, self.processes_in_progress.clone());
             self.processes_in_progress.retain_mut(|(process_time_left, item)| {
                 *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                 if process_time_left.is_zero() {
@@ -978,7 +957,6 @@ where
                 let ds_state = self.req_downstream.send(()).await.next();
                 match &ds_state {
                     Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
-                        println!("123 Pushing downstream: {} {} {:?}", self.element_name, time, item);
                         self.push_downstream.send((item.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),

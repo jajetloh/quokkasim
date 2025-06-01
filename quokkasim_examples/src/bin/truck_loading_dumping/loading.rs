@@ -76,30 +76,29 @@ impl LoadingProcess {
         async move {
             let time = cx.time();
 
-            // Resolve current loading action if pending
+            // Resolve current loading action if pending. Take the state - if time still remains before the event is due, we'll put it back
             match self.process_state.take() {
-                Some((mut process_time_left, mut truck, ore)) => {
-                    println!("Processing loading for truck {} with ore {:?}", truck.truck_id, ore);
+                Some((mut process_time_left, mut truck, ore_to_load)) => {
                     let duration_since_prev_check = time.duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, TruckingProcessLogType::LoadingSuccess { truck_id: truck.truck_id.clone(), quantity: ore.total(), ore: ore.clone() }).await;
-                        match truck.ore {
-                            Some(_) => {
-                                panic!("Truck already has ore loaded, cannot load again"); 
-                            },
-                            None => {
-                                truck.ore = Some(ore);
-                            }
-                        }
-                        self.push_downstream_trucks.send((Some(truck), NotificationMetadata {
+                        let nm = NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
-                            message: "Truck loaded with ore".into(),
-                        })).await;
-                        println!("Truck loaded with ore");
+                            message: "Truck loaded".into(),
+                        };
+                        self.log(time, TruckingProcessLogType::LoadingSuccess { truck_id: truck.truck_id.clone(), quantity: ore_to_load.total(), ore: ore_to_load.clone() }).await;
+                        match &mut truck.ore {
+                            Some(existing_ore) => {
+                                existing_ore.add(ore_to_load);
+                            },
+                            None => {
+                                truck.ore = Some(ore_to_load);
+                            }
+                        }
+                        self.push_downstream_trucks.send((Some(truck), nm)).await;
                     } else {
-                        self.process_state = Some((process_time_left, truck, ore));
+                        self.process_state = Some((process_time_left, truck, ore_to_load));
                     }
                 }
                 None => {
@@ -185,7 +184,6 @@ impl LoadingProcess {
                         element_from: self.element_name.clone(),
                         message: "Scheduling next loading process check".into(),
                     };
-                    println!("Scheduling next loading process check at {} {:?}", next_time, self.process_state.clone());
                     cx.schedule_event(next_time, Self::update_state, notif_meta).unwrap();
                 }
                 _ => {

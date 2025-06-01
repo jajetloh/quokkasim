@@ -108,7 +108,6 @@ impl CustomLoggerConnection for ComponentLogger {
                 Ok(())
             },
             (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::DiscreteParallelProcessTruck(process, _), _) => {
-                // process.log_emitter.connect_sink(&logger.buffer);
                 process.log_emitter.filter_map_connect_sink(|x| {
                     let event = match &x.event {
                         DiscreteProcessLogType::ProcessStart { resource } => TruckingProcessLogType::TruckMovementStart { truck_id: resource.clone().unwrap().truck_id },
@@ -123,7 +122,6 @@ impl CustomLoggerConnection for ComponentLogger {
                         event,
                     })
                 }, &logger.buffer);
-                // TODO: Implement logging for DiscreteParallelProcess
                 Ok(())
             },
             (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::DumpingProcess(process, _), _) => {
@@ -181,8 +179,8 @@ fn main() {
         .with_type("TruckStock".into())
         .with_initial_contents(vec![
             Truck { ore: None, truck_id: "Truck_01".into() },
-            // Truck { ore: None, truck_id: "Truck_02".into() },
-            // Truck { ore: None, truck_id: "Truck_03".into() },
+            Truck { ore: None, truck_id: "Truck_02".into() },
+            Truck { ore: None, truck_id: "Truck_03".into() },
         ])
         .with_low_capacity(0)
         .with_max_capacity(10),
@@ -300,8 +298,6 @@ fn main() {
     sim_builder = register_component!(sim_builder, trucks_dumped);
     sim_builder = register_component!(sim_builder, dumped_truck_movements);
 
-
-
     let start_time = MonotonicTime::try_from_date_time(2025, 5, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_builder.init(start_time.clone()).unwrap().0;
 
@@ -311,9 +307,8 @@ fn main() {
     dumped_truck_movements_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(start_time + Duration::from_secs_f64(7200.)).unwrap();
-    // simu.step_until(start_time + Duration::from_secs_f64(9.952383953)).unwrap();
 
-    let output_dir = "outputs/diegos_trucking";
+    let output_dir = "outputs/truck_loading_dumping";
     create_dir_all(output_dir).unwrap();
 
     ore_stock_logger.write_csv(output_dir.into()).unwrap();

@@ -26,7 +26,6 @@ pub struct DumpingProcess {
     pub previous_check_time: MonotonicTime,
 }
 
-// Utility methods
 impl DumpingProcess {
     pub fn new() -> Self {
         DumpingProcess {
@@ -76,49 +75,28 @@ impl DumpingProcess {
         async move {
             let time = cx.time();
 
-            // Resolve current dumping action if pending
+            // Resolve current dumping action if pending. Take the state - if time still remains before the event is due, we'll put it back
             match self.process_state.take() {
-
-                // we only have the truck stock upstream
                 Some((mut process_time_left, mut truck)) => {
                     let duration_since_prev_check = time.duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
+                        let nm = NotificationMetadata {
+                            time,
+                            element_from: self.element_name.clone(),
+                            message: "Truck dumped".into(),
+                        };
                         let ore = truck.ore.take();
+                        self.push_downstream_trucks.send((Some(truck.clone()), nm.clone())).await;
                         match ore {
                             Some(ore) => {
-                                self.push_downstream_trucks.send((Some(truck.clone()), NotificationMetadata {
-                                    time,
-                                    element_from: self.element_name.clone(),
-                                    message: "Dumped truck without ore".into(),
-                                })).await;
-
-                                // send ore to ore stock - silly question, do we send all of it "at once"
-                                // This bit runs at the after the dumping duration is passed, so yes at this point we send it all
-                                self.push_downstream_ore.send((ore.clone(), NotificationMetadata {
-                                    time,
-                                    element_from: self.element_name.clone(),
-                                    message: "Ore received at destination stock".into(),
-                                })).await;
+                                self.push_downstream_ore.send((ore.clone(), nm)).await;
                                 self.log(time, TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: ore.total(), ore: ore.clone() }).await;
-
                             },
                             None => {
-                                panic!("Hold on a second! Truck has no ore to dump!"); // no ore to dump
+                                self.log(time, TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: 0., ore: IronOre::default() }).await;
                             }
                         }
-                        // Don't need this part as truck.take() before already cleaned truck.ore up
-                        // match truck.ore {
-                        //     Some(_) => {
-                        //         truck.ore = None; // dumpin'
-                        //     },
-                        //     None => {
-                        //         panic!("Hold on a second! Truck already dumped, cannot dump again!"); // dumped already
-                        //     }
-                        // }
-                        
-                        // send empty truck to truck stock
-
                     } else {
                         self.process_state = Some((process_time_left, truck));
                     }
@@ -126,19 +104,17 @@ impl DumpingProcess {
                 None => {}
             }
 
-            // Check if we need to start a new dumping process
+            // Check if we can start a new dumping event
             match self.process_state {
-                Some(_) => {
-                    // Already dumpin', nothing to do
+                Some((time_left, _)) => {
+                    self.time_to_next_event = Some(time_left);
                 }
                 None => {
-                    // Check if we have trucks available for dumpin'
                     let us_trucks_state = self.req_upstream_trucks.send(()).await.next();
                     let ds_ore_state = self.req_downstream_ore.send(()).await.next();
                     let ds_trucks_state = self.req_downstream_trucks.send(()).await.next();
 
                     match (&us_trucks_state, &ds_ore_state, &ds_trucks_state) {
-                        // adjusted vector stock so it's either empty or normal - if it's full we can't add more to it
                         (
                             Some(DiscreteStockState::Normal { .. }) | Some(DiscreteStockState::Full { .. }),
                             Some(VectorStockState::Empty { .. }) | Some(VectorStockState::Normal { .. }),
@@ -152,56 +128,34 @@ impl DumpingProcess {
                             })).await.next().unwrap();
 
                             match truck.take() {
-                                Some(Truck { ore: None, .. }) => {
-                                    // Truck already dumped - how did we get here? No idea.
-                                    panic!("Truck has already been dumped, cannot dump again");
-                                },
                                 Some(truck) => {
-                                    // There's some ore in the truck - woop woop - let's DUMP
-                                    // let process_quantity = self.process_quantity_distr.sample();
-                                    let ore = truck.ore.clone().unwrap();
 
-                                    // No need to send upstream withdraw request 
+                                    let ore = match &truck.ore {
+                                        Some(x) => x.clone(),
+                                        None => IronOre::default(), // Zero
+                                    };
 
-                                    // let ore = self.withdraw_upstream_ore.send((process_quantity, NotificationMetadata {
-                                    //     time,
-                                    //     element_from: self.element_name.clone(),
-                                    //     message: "Requesting ore for loading".into(),
-                                    // })).await.next().unwrap();
-
-
-                                    // not sure if this is the correct way to manage dumping
                                     let process_duration = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration), truck.clone()));
 
                                     self.log(time, TruckingProcessLogType::DumpingStart { truck_id: truck.truck_id, quantity: ore.total(), ore: ore.clone() }).await;
-                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration)); // Retry after 1 second
+                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration));
                                 }
                                 None => {
-                                    // No truck available upstream
                                     self.log(time, TruckingProcessLogType::DumpingFailure { reason: "No truck available upstream" }).await;
                                     self.time_to_next_event = None;
                                 }
                             }
                         }
-
-                        
-
                         (Some(DiscreteStockState::Empty { .. }) | None, _, _) => {
-                            // Upstream truck stock is empty
                             self.log(time, TruckingProcessLogType::DumpingFailure { reason: "Upstream truck stock is empty or not connected" }).await;
                             self.time_to_next_event = None;
                         },
-
-                        // adjusted to case where downstream stock is full
                         (_, Some(VectorStockState::Full { .. }) | None, _) => {
-                            // No ore can be received downstream
                             self.log(time, TruckingProcessLogType::DumpingFailure { reason: "No ore can be received downstream" }).await;
                             self.time_to_next_event = None;
                         },
-
                         (_, _, Some(DiscreteStockState::Full { .. }) | None) => {
-                            // Downstream truck stock is full
                             self.log(time, TruckingProcessLogType::DumpingFailure { reason: "Downstream truck stock is full or not connected" }).await;
                             self.time_to_next_event = None;
                         },
@@ -216,7 +170,7 @@ impl DumpingProcess {
                                 element_from: self.element_name.clone(),
                                 message: "Scheduling next dumping process check".into(),
                             };
-                            cx.schedule_event(next_time, Self::update_state, notif_meta);
+                            cx.schedule_event(next_time, Self::update_state, notif_meta).unwrap();
                         }
                         _ => {
                             // No further events scheduled
