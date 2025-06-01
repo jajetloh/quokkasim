@@ -127,4 +127,6 @@ fn main() {
     create_dir_all(output_dir).unwrap();
     stock_logger.write_csv(&output_dir).unwrap();
     process_logger.write_csv(&output_dir).unwrap();
+
+    panic!("?!");
 }
