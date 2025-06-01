@@ -1,5 +1,5 @@
 use std::{error::Error, fmt::Debug, fs::File, time::Duration};
-use crate::common::{NotificationMetadata};
+use crate::common::NotificationMetadata;
 use csv::WriterBuilder;
 use nexosim::{model::{Context, Model}, ports::EventQueue, simulation::ExecutionError};
 use serde::{ser::SerializeStruct, Serialize};
