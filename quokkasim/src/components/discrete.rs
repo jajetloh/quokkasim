@@ -240,6 +240,7 @@ pub struct DiscreteStockLog<T> {
     pub resource: ItemDeque<T>,
 }
 
+<<<<<<< HEAD
 // impl Serialize for DiscreteStockLog<String> {
 //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 //         where
@@ -256,6 +257,8 @@ pub struct DiscreteStockLog<T> {
 //     }
 // }
 
+=======
+>>>>>>> dev
 impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
@@ -971,12 +974,7 @@ where
                     true
                 }
             });
-            println!("123 Ready to move: {} {} {:?}", self.element_name, time, self.processes_complete.clone());
-
-            // let mut unable_to_push_downstream = Vec::new();
-            // let mut processes_complete = std::mem::take(&mut self.processes_complete);
             while let Some(item) = self.processes_complete.pop_front() {
-            // for item in self.processes_complete.drain(..) {
                 let ds_state = self.req_downstream.send(()).await.next();
                 match &ds_state {
                     Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
@@ -998,7 +996,6 @@ where
                     }
                 }
             }
-            // self.processes_complete = processes_complete;
 
             // Then check for any processes to start
 
@@ -1012,11 +1009,6 @@ where
                             message: "Withdraw request".into(),
                         })).await.next().unwrap();
                         if let Some(item) = item {
-                            // self.push_downstream.send((Some(item.clone()), NotificationMetadata {
-                            //     time,
-                            //     element_from: self.element_name.clone(),
-                            //     message: "Push request".into(),
-                            // })).await;
                             let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
                                 panic!("Process time distribution not set for process {}", self.element_name);
                             }).sample());
@@ -1045,7 +1037,6 @@ where
                 let min_time = self.processes_in_progress.iter().map(|(time, _)| *time).min().unwrap();
                 Some(min_time)
             };
-
         }
     }
 
