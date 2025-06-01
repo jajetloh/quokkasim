@@ -83,6 +83,20 @@ impl<TT> VectorArithmetic<Option<TT>, (), u32> for ItemDeque<TT> {
     }
 }
 
+// impl<TT> VectorArithmetic<TT, (), u32> for ItemDeque<TT> {
+//     fn add(&mut self, other: TT) {
+//         self.push_back(other);
+//     }
+//     fn subtract(&mut self, _: ()) -> TT {
+//         self.pop_front().unwrap_or_else(|| {
+//             panic!("Tried to pop from an empty ItemDeque");
+//         })
+//     }
+//     fn total(&self) -> u32 {
+//         self.len() as u32
+//     }
+// }
+
 impl<TT: Default> Default for ItemDeque<TT> {
     fn default() -> Self {
         ItemDeque(VecDeque::new())

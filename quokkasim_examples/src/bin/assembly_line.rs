@@ -8,7 +8,7 @@ struct ProtoCar {
 
 define_model_enums! {
     pub enum ComponentModel {
-        ProtoCarProcess(DiscreteProcess<ProtoCar, (), ProtoCar>, Mailbox<DiscreteProcess<ProtoCar, (), ProtoCar>>),
+        ProtoCarProcess(DiscreteProcess<Option<ProtoCar>, (), Option<ProtoCar>>, Mailbox<DiscreteProcess<Option<ProtoCar>, (), Option<ProtoCar>>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
     }
     pub enum ComponentModelAddress {}
@@ -22,8 +22,9 @@ impl CustomComponentConnection for ComponentModel {
             (ComponentModel::ProtoCarProcess(process, process_mbox), ComponentModel::ProtoCarStock(stock, stock_mbox)) => {
                 process.req_downstream.connect(DiscreteStock::<ProtoCar>::get_state_async, stock_mbox.address());
                 process.push_downstream.connect(DiscreteStock::<ProtoCar>::add, stock_mbox.address());
+                stock.state_emitter.connect(DiscreteProcess::update_state, process_mbox.address());
                 Ok(())
-            },
+            }, 
             (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }
