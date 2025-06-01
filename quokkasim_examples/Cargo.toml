@@ -18,3 +18,34 @@ paste = "1.0.15"
 log = "0.4.27"
 strum = "0.27.1"
 strum_macros = "0.27.1"
+
+[[test]]
+name = "material_blending"
+path = "src/bin/material_blending.rs"
+harness = false
+
+[[test]]
+name = "discrete_queue"
+path = "src/bin/discrete_queue.rs"
+harness = false
+
+
+[[test]]
+name = "iron_ore"
+path = "src/bin/iron_ore.rs"
+harness = false
+
+[[test]]
+name = "scheduled_event"
+path = "src/bin/scheduled_event.rs"
+harness = false
+
+[[test]]
+name = "source_sink"
+path = "src/bin/source_sink.rs"
+harness = false
+
+[[test]]
+name = "truck_loading_dumping"
+path = "src/bin/truck_loading_dumping/main.rs"
+harness = false
