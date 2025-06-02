@@ -6,25 +6,53 @@ struct ProtoCar {
     id: usize,
 }
 
+struct ProtoCarGenerator {
+    next_id: usize
+}
+
+impl ItemFactory<ProtoCar> for ProtoCarGenerator {
+    fn create_item(&mut self) -> ProtoCar {
+        let result = ProtoCar { id: self.next_id };
+        self.next_id += 1;
+        result
+    }
+}
+
 define_model_enums! {
     pub enum ComponentModel {
         ProtoCarProcess(DiscreteProcess<Option<ProtoCar>, (), Option<ProtoCar>>, Mailbox<DiscreteProcess<Option<ProtoCar>, (), Option<ProtoCar>>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
+        ProtoCarSource(DiscreteSource<ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCarGenerator>>),
     }
     pub enum ComponentModelAddress {}
-    pub enum ComponentLogger {}
+    pub enum ComponentLogger {
+        ProtoCarProcessLogger(DiscreteProcessLogger<ProtoCar>),
+        ProtoCarStockLogger(DiscreteStockLogger<ProtoCar>),
+    }
     pub enum ScheduledEvent {}
 }
 
 impl CustomComponentConnection for ComponentModel {
     fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
-            (ComponentModel::ProtoCarProcess(process, process_mbox), ComponentModel::ProtoCarStock(stock, stock_mbox)) => {
-                process.req_downstream.connect(DiscreteStock::<ProtoCar>::get_state_async, stock_mbox.address());
-                process.push_downstream.connect(DiscreteStock::<ProtoCar>::add, stock_mbox.address());
+            (ComponentModel::ProtoCarSource(source, source_mbox), ComponentModel::ProtoCarStock(stock, stock_mbox)) => {
+                source.req_downstream.connect(DiscreteStock::get_state_async, stock_mbox.address());
+                source.push_downstream.map_connect(|x| (Some(x.0.clone()), x.1.clone()), DiscreteStock::add, stock_mbox.address());
+                stock.state_emitter.connect(DiscreteSource::update_state, source_mbox.address());
+                Ok(())
+            },
+            (ComponentModel::ProtoCarStock(stock, stock_mbox), ComponentModel::ProtoCarProcess(process, process_mbox)) => {
+                process.req_upstream.connect(DiscreteStock::get_state_async, stock_mbox.address());
+                process.withdraw_upstream.connect(DiscreteStock::remove, stock_mbox.address());
                 stock.state_emitter.connect(DiscreteProcess::update_state, process_mbox.address());
                 Ok(())
-            }, 
+            },
+            (ComponentModel::ProtoCarProcess(process, process_mbox), ComponentModel::ProtoCarStock(stock, stock_mbox)) => {
+                process.req_downstream.connect(DiscreteStock::get_state_async, stock_mbox.address());
+                process.push_downstream.connect(DiscreteStock::add, stock_mbox.address());
+                stock.state_emitter.connect(DiscreteProcess::update_state, process_mbox.address());
+                Ok(())
+            },
             (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }

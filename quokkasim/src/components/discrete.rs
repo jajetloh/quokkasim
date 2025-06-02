@@ -334,12 +334,12 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteProcess<U, V, W> {}
 
-impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteProcess<Option<U>, (), Option<U>>
+impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteProcess<U, (), Option<U>>
 where
     Self: Model,
     ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
 {
-    type LogDetailsType = DiscreteProcessLogType<Option<U>>;
+    type LogDetailsType = DiscreteProcessLogType<U>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event
@@ -437,7 +437,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: DiscreteProcessLogType<Option<U>>) -> impl Future<Output = ()> + Send {
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: DiscreteProcessLogType<U>) -> impl Future<Output = ()> + Send {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -469,7 +469,7 @@ pub struct DiscreteProcessLog<T> {
     pub event: DiscreteProcessLogType<T>,
 }
 
-impl Serialize for DiscreteProcessLog<Option<String>> {
+impl Serialize for DiscreteProcessLog<String> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
@@ -479,8 +479,8 @@ impl Serialize for DiscreteProcessLog<Option<String>> {
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         let (event_type, item, reason): (String, Option<&str>, Option<&str>) = match &self.event {
-            DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), resource.as_deref(), None),
-            DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), resource.as_deref(), None),
+            DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), Some(resource), None),
+            DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), Some(resource), None),
             DiscreteProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
         };
         state.serialize_field("event_type", &event_type)?;
@@ -489,6 +489,27 @@ impl Serialize for DiscreteProcessLog<Option<String>> {
         state.end()
     }
 }
+
+// impl Serialize for DiscreteProcessLog<Option<String>> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//         where
+//             S: serde::Serializer {
+//         let mut state = serializer.serialize_struct("DiscreteProcessLog", 7)?;
+//         state.serialize_field("time", &self.time)?;
+//         state.serialize_field("event_id", &self.event_id)?;
+//         state.serialize_field("element_name", &self.element_name)?;
+//         state.serialize_field("element_type", &self.element_type)?;
+//         let (event_type, item, reason): (String, Option<&str>, Option<&str>) = match &self.event {
+//             DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), resource.as_deref(), None),
+//             DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), resource.as_deref(), None),
+//             DiscreteProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
+//         };
+//         state.serialize_field("event_type", &event_type)?;
+//         state.serialize_field("item", &item)?;
+//         state.serialize_field("reason", &reason)?;
+//         state.end()
+//     }
+// }
 
 pub struct DiscreteProcessLogger<T> where T: Send {
     pub name: String,
@@ -540,12 +561,6 @@ impl ItemFactory<String> for StringItemFactory {
         let item = format!("{}_{:0>width$}", self.prefix, self.next_index, width = self.num_digits);
         self.next_index += 1;
         String::from(item)
-    }
-}
-
-impl ItemFactory<Option<String>> for StringItemFactory {
-    fn create_item(&mut self) -> Option<String> {
-        Some(self.create_item())
     }
 }
 
@@ -933,12 +948,12 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteParallelProcess<U, V, W> {}
 
-impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteParallelProcess<Option<U>, (), Option<U>>
+impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteParallelProcess<U, (), Option<U>>
 where
     Self: Model,
     ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
 {
-    type LogDetailsType = DiscreteProcessLogType<Option<U>>;
+    type LogDetailsType = DiscreteProcessLogType<U>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event

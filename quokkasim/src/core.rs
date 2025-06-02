@@ -364,9 +364,9 @@ macro_rules! define_model_enums {
             VectorSplitter4Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
             VectorSplitter5Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
-            DiscreteProcessString($crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
-            DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<Option<String>, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<Option<String>, (), Option<String>>>),
-            DiscreteSourceString($crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
+            DiscreteProcessString($crate::components::discrete::DiscreteProcess<String, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<String, (), Option<String>>>),
+            DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<String, (), Option<String>>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<String, (), Option<String>>>),
+            DiscreteSourceString($crate::components::discrete::DiscreteSource<String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, StringItemFactory>>),
             DiscreteSinkString($crate::components::discrete::DiscreteSink<Option<String>, ()>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<Option<String>, ()>>),
             $(
                 $(#[$components_var_meta])*
@@ -601,7 +601,7 @@ macro_rules! define_model_enums {
                     ($ComponentModel::DiscreteSourceString(a, am), $ComponentModel::DiscreteStockString(b, bm), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteSource::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
-                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        a.push_downstream.map_connect(|x| (Some(x.0.clone()), x.1.clone()), $crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
                     ($ComponentModel::DiscreteStockString(a, am), $ComponentModel::DiscreteSinkString(b, bm), _) => {
@@ -828,9 +828,9 @@ macro_rules! define_model_enums {
             VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 4>>),
             VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, 5>>),
             DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
-            DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<Option<String>, (), Option<String>>>),
-            DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<Option<String>, (), Option<String>>>),
-            DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<Option<String>, StringItemFactory>>),
+            DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<String, (), Option<String>>>),
+            DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<String, (), Option<String>>>),
+            DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<Option<String>, ()>>),
             $(
                 $R $( ($crate::nexosim::Address<$RT>) )?
@@ -847,7 +847,7 @@ macro_rules! define_model_enums {
             VectorProcessLoggerVector3($crate::components::vector::VectorProcessLogger<Vector3>),
 
             DiscreteStockLoggerString($crate::components::discrete::DiscreteStockLogger<String>),
-            DiscreteProcessLoggerString($crate::components::discrete::DiscreteProcessLogger<Option<String>>),
+            DiscreteProcessLoggerString($crate::components::discrete::DiscreteProcessLogger<String>),
             $(
                 $(#[$logger_var_meta])*
                 $U $( ( $UT ) )?
@@ -1018,9 +1018,9 @@ macro_rules! define_model_enums {
                     $ComponentModelAddress::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, 5>::update_state, notif_meta, a.clone()) },
 
                     $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
-                    $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<Option<String>, (), Option<String>>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<Option<String>, StringItemFactory>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<String, (), Option<String>>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<String, (), Option<String>>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<String, StringItemFactory>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::DiscreteSinkString(a) => { simu.process_event($crate::components::discrete::DiscreteSink::<Option<String>, ()>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)
