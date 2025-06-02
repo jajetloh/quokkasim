@@ -25,12 +25,33 @@ impl ItemFactory<ProtoCar> for ProtoCarGenerator {
     }
 }
 
+struct ShiftEventController {
+    state: ShiftState,
+    emit_change: Output<()>,
+}
+
+impl Model for ShiftEventController {}
+
+impl ShiftEventController {
+    fn get_state_async(&self) -> impl Future<Output = ShiftState> {
+        async move { self.state.clone() }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ShiftState {
+    ShiftChange,
+    Operating,
+    MealBreak,
+}
+
 define_model_enums! {
     pub enum ComponentModel {
         ProtoCarProcess(DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>, Mailbox<DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
         ProtoCarSource(DiscreteSource<ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCarGenerator>>),
         ProtoCarSink(DiscreteSink<(), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteSink<(), Option<ProtoCar>, ProtoCar>>),
+        ShiftEventController(ShiftEventController, Mailbox<ShiftEventController>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
@@ -115,6 +136,11 @@ impl CustomInit for ComponentModelAddress {
             },
             ComponentModelAddress::ProtoCarSink(addr) => {
                 simu.process_event(DiscreteSink::update_state, notif_meta, addr.clone()).unwrap();
+                Ok(())
+            },
+            ComponentModelAddress::ShiftEventController(addr) => {
+                // simu.process_event(ShiftEventController::get_state_async, notif_meta, addr.clone()).unwrap();
+                // TODO: Implement.
                 Ok(())
             },
             _ => {
