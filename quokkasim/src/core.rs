@@ -158,18 +158,6 @@ impl Default for Vector3 {
     }
 }
 
-/**
- * A: Added/removed parameter type
- * B: Subtract parameter type
- * C: Metric type for total
- */
-// pub trait VectorArithmetic<A, B, C> where Self: Sized {
-//     fn add(&mut self, arg: A);
-//     fn subtract(&mut self, arg: B) -> A;
-//     fn total(&self) -> C;
-//     // fn multiply(&mut self, factor: f64) {}
-// }
-
 pub trait ResourceAdd<T> {
     fn add(&mut self, arg: T);
 }
@@ -198,26 +186,22 @@ pub trait StateEq {
  * C: Metric type for resource total
  */
 pub trait Stock<
-    T: Clone + 'static,
-    U: Clone + Send + 'static,
-    V: Clone + Send + 'static,
-    W: Clone + Send + 'static,
-    C: 'static
-> where
-    Self: Model,
-    T: ResourceAdd<U> + ResourceRemove<V, W> + ResourceTotal<C> + Send + 'static,
-{
+    ContainerType: Clone + 'static,
+    ReceiveType: Clone + Send + 'static,
+    SendParameterType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+> where Self: Model {
     type StockState: StateEq + Clone + Debug;
 
-    fn pre_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn pre_add<'a>(&'a mut self, payload: &'a (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn add_impl<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a ;
+    fn add_impl<'a>(&'a mut self, payload: &'a (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a ;
 
-    fn post_add<'a>(&'a mut self, payload: &'a (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn post_add<'a>(&'a mut self, payload: &'a (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             let current_state = self.get_state();
             let previous_state: &Option<Self::StockState> = self.get_previous_state();
@@ -248,7 +232,7 @@ pub trait Stock<
 
     fn emit_change<'a>(&'a mut self, payload: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a;
 
-    fn add<'a>(&'a mut self, payload: (U, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where U: 'static {
+    fn add<'a>(&'a mut self, payload: (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where ReceiveType: 'static {
         async move {
             self.pre_add(&payload, cx).await;
             self.add_impl(&payload, cx).await;
@@ -256,15 +240,15 @@ pub trait Stock<
         }
     }
 
-    fn pre_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn pre_remove<'a>(&'a mut self, payload: &'a (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn remove_impl<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = W> + 'a;
+    fn remove_impl<'a>(&'a mut self, payload: &'a (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = SendType> + 'a;
 
-    fn post_remove<'a>(&'a mut self, payload: &'a (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn post_remove<'a>(&'a mut self, payload: &'a (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             let current_state = self.get_state();
             let previous_state: &Option<Self::StockState> = self.get_previous_state();
@@ -293,7 +277,7 @@ pub trait Stock<
         }
     }
 
-    fn remove<'a>(&'a mut self, payload: (V, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = W> + 'a where V: 'static {
+    fn remove<'a>(&'a mut self, payload: (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = SendType> + 'a where SendParameterType: 'static {
         async move {
             self.pre_remove(&payload, cx).await;
             let  result = self.remove_impl(&payload, cx).await;
@@ -308,22 +292,12 @@ pub trait Stock<
         }
     }
     fn get_state(&mut self) -> Self::StockState;
-    fn get_resource(&self) -> &T;
+    fn get_resource(&self) -> &ContainerType;
     fn get_previous_state(&mut self) -> &Option<Self::StockState>;
     fn set_previous_state(&mut self);
     fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send;
 }
 
-/**
- * T: Resource type
- * U: Added/removed parameter type
- * V: Parameter type to subtract
- * C: Metric type for resource total
- */
-// pub trait Process<T: VectorArithmetic<U, V, C> + Clone + Debug, U, V, C> {
-// pub trait Process<T: Clone + Debug, U, V, C>
-// where 
-//     T: ResourceAdd<U> + ResourceRemove<V, T> + ResourceTotal<C> + Send + 'static
 pub trait Process {
     type LogDetailsType;
 
@@ -460,10 +434,10 @@ macro_rules! define_model_enums {
             VectorSplitter4Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, Vector3, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, Vector3, 4>>),
             VectorSplitter5Vector3($crate::components::vector::VectorSplitter<Vector3, Vector3, f64, Vector3, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, Vector3, 5>>),
             DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
-            DiscreteProcessString($crate::components::discrete::DiscreteProcess<String, (), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<String, (), Option<String>, String>>),
-            DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<String, (), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<String, (), Option<String>, String>>),
+            DiscreteProcessString($crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
+            DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             DiscreteSourceString($crate::components::discrete::DiscreteSource<String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, StringItemFactory>>),
-            DiscreteSinkString($crate::components::discrete::DiscreteSink<String, ()>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<String, ()>>),
+            DiscreteSinkString($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
@@ -920,10 +894,10 @@ macro_rules! define_model_enums {
             VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, Vector3, 4>>),
             VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<Vector3, Vector3, f64, Vector3, 5>>),
             DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
-            DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<String, (), Option<String>, String>>),
-            DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<String, (), Option<String>, String>>),
+            DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
+            DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, StringItemFactory>>),
-            DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<String, ()>>),
+            DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
             $(
                 $R $( ($crate::nexosim::Address<$RT>) )?
             ),*
@@ -1110,10 +1084,10 @@ macro_rules! define_model_enums {
                     $ComponentModelAddress::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<Vector3, Vector3, f64, Vector3, 5>::update_state, notif_meta, a.clone()) },
 
                     $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
-                    $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<String, (), Option<String>, String>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<String, (), Option<String>, String>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<(), Option<String>, String, String>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<(), Option<String>, String, String>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<String, StringItemFactory>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteSinkString(a) => { simu.process_event($crate::components::discrete::DiscreteSink::<String, ()>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteSinkString(a) => { simu.process_event($crate::components::discrete::DiscreteSink::<(), Option<String>, String>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)
                     }

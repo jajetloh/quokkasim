@@ -66,7 +66,7 @@ impl<T: Clone + Debug + Default + Send> Default for VectorStock<T> {
     }
 }
 
-impl<T: Clone + Debug + Send> Stock<T, T, f64, T, f64> for VectorStock<T>
+impl<T: Clone + Debug + Send> Stock<T, T, f64, T> for VectorStock<T>
 where
     Self: Model,
     T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>

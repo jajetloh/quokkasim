@@ -5,6 +5,7 @@ use crate::prelude::*;
 use std::collections::{VecDeque, HashMap};
 use std::time::Duration;
 use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone)]
 pub enum DiscreteStockState {
@@ -61,33 +62,31 @@ impl<T: Clone + Default + Send + 'static> Default for DiscreteStock<T> {
     }
 }
 
-use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone)]
-
 pub struct ItemDeque<T>(VecDeque<T>);
 impl<T> Deref for ItemDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl<T> DerefMut for ItemDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
 
-impl<TT: Default> Default for ItemDeque<TT> {
+impl<T: Default> Default for ItemDeque<T> {
     fn default() -> Self {
         ItemDeque(VecDeque::new())
     }
 }
 
-impl<TT> ResourceAdd<TT> for ItemDeque<TT> {
-    fn add(&mut self, item: TT) {
+impl<T> ResourceAdd<T> for ItemDeque<T> {
+    fn add(&mut self, item: T) {
         self.push_back(item);
     }
 }
 
-impl<TT> ResourceRemove<(), Option<TT>> for ItemDeque<TT> {
-    fn remove(&mut self, _: ()) -> Option<TT> {
+impl<T> ResourceRemove<(), Option<T>> for ItemDeque<T> {
+    fn remove(&mut self, _: ()) -> Option<T> {
         self.pop_front()
     }
 }
 
-impl<TT> ResourceTotal<u32> for ItemDeque<TT> {
+impl<T> ResourceTotal<u32> for ItemDeque<T> {
     fn total(&self) -> u32 {
         self.len() as u32
     }
@@ -128,7 +127,7 @@ where
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
+impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for DiscreteStock<T> {
     type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.resource.total();
@@ -222,7 +221,6 @@ pub struct DiscreteStockLogger<T> where T: Send {
     pub buffer: EventQueue<DiscreteStockLog<T>>,
 }
 
-// impl<T> Logger for DiscreteStockLogger<T> where DiscreteStockLog<T>: Serialize, T: Send + 'static {
 impl<T> Logger for DiscreteStockLogger<T> where T: Serialize + Send + 'static {
     type RecordType = DiscreteStockLog<T>;
     fn get_name(&self) -> &String {
@@ -268,23 +266,22 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     }
 }
 
-/**
- * U: Parameter type pushed to downstream stock
- * V: Parameter type requested from upstream stock
- * W: Parameter type received from upstream stock
- * X: Parameter type of internal stored resource
- */
-pub struct DiscreteProcess<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> {
+pub struct DiscreteProcess<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+> {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
-    pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, X)>,
+    pub withdraw_upstream: Requestor<(ReceiveParameterType, NotificationMetadata), ReceiveType>,
+    pub push_downstream: Output<(SendType, NotificationMetadata)>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<DiscreteProcessLog<X>>,
+    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
@@ -309,7 +306,12 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> DiscreteProcess<U, V, W, X> {
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+> DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     pub fn new() -> Self {
         DiscreteProcess::default()
     }
@@ -329,15 +331,15 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 }
 
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Model for DiscreteProcess<U, V, W, X> {}
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+> Model for DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {}
 
-impl<U: Clone + Debug + Send + 'static> Process for DiscreteProcess<U, (), Option<U>, U>
-where
-    Self: Model,
-    // ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
-    ItemDeque<U>: ResourceAdd<U> + ResourceRemove<(), Option<U>> + ResourceTotal<u32>
-{
-    type LogDetailsType = DiscreteProcessLogType<U>;
+impl<T: Clone + Debug + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
+    type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
         &self.time_to_next_event
@@ -351,7 +353,7 @@ where
         self.previous_check_time = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             let time = cx.time();
 
@@ -426,7 +428,7 @@ where
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -443,7 +445,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: DiscreteProcessLogType<U>) -> impl Future<Output = ()> + Send {
+    fn log<'a>(&'a mut self, time: MonotonicTime, details: DiscreteProcessLogType<T>) -> impl Future<Output = ()> + Send {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -551,7 +553,6 @@ impl ItemFactory<String> for StringItemFactory {
 
 pub struct DiscreteSource<
     T: Clone + Send + 'static,
-    // U: Clone + Send + 'static,
     TF: ItemFactory<T>,
 > {
     pub element_name: String,
@@ -614,12 +615,7 @@ impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, 
 
 impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, TF> {}
 
-impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process for DiscreteSource<T, TF>
-where
-    Self: Model,
-    ItemDeque<T>: ResourceAdd<T> + ResourceRemove<(), Option<T>> + ResourceTotal<u32>,
-    // ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
-{
+impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process for DiscreteSource<T, TF> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -687,7 +683,7 @@ where
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -720,23 +716,28 @@ where
 }
 
 pub struct DiscreteSink<
-    T: Clone + Send + 'static,
-    V: Clone + Send + 'static
+    RequestParameterType: Clone + Send + 'static,
+    RequestType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), Option<T>>,
-    pub process_state: Option<(Duration, T)>,
+    pub withdraw_upstream: Requestor<(RequestParameterType, NotificationMetadata), RequestType>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<DiscreteProcessLog<T>>,
+    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
 }
 
-impl<T: Clone + Send + 'static, V: Clone + Send + 'static> Default for DiscreteSink<T, V> {
+impl<
+    RequestParameterType: Clone + Send + 'static,
+    RequestType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static
+> Default for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {
     fn default() -> Self {
         DiscreteSink {
             element_name: "DiscreteSink".to_string(),
@@ -754,7 +755,11 @@ impl<T: Clone + Send + 'static, V: Clone + Send + 'static> Default for DiscreteS
     }
 }
 
-impl<T: Clone + Send + 'static, V: Clone + Send + 'static> DiscreteSink<T, V> {
+impl<
+    RequestParameterType: Clone + Send + 'static,
+    RequestType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static
+> DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {
     pub fn new() -> Self {
         DiscreteSink::default()
     }
@@ -772,14 +777,13 @@ impl<T: Clone + Send + 'static, V: Clone + Send + 'static> DiscreteSink<T, V> {
     }
 }
 
-impl<T: Clone + Send + 'static, V: Clone + Send + 'static> Model for DiscreteSink<T, V> {}
+impl<
+    RequestParameterType: Clone + Send + 'static,
+    RequestType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static
+> Model for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {}
 
-impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<T, ()>
-where
-    Self: Model,
-    ItemDeque<T>: ResourceAdd<T> + ResourceRemove<(), Option<T>> + ResourceTotal<u32>,
-    // ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
-{
+impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -886,28 +890,33 @@ where
 }
 
 pub struct DiscreteParallelProcess<
-    U: Clone + Send + 'static,
-    V: Clone + Send + 'static,
-    W: Clone + Send + 'static,
-    X: Clone + Send + 'static
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
-    pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub processes_in_progress: Vec<(Duration, X)>,
-    pub processes_complete: VecDeque<U>,
+    pub withdraw_upstream: Requestor<(ReceiveParameterType, NotificationMetadata), ReceiveType>,
+    pub push_downstream: Output<(SendType, NotificationMetadata)>,
+    pub processes_in_progress: Vec<(Duration, InternalResourceType)>,
+    pub processes_complete: VecDeque<SendType>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<DiscreteProcessLog<U>>,
+    pub log_emitter: Output<DiscreteProcessLog<SendType>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Default for DiscreteParallelProcess<U, V, W, X> {
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static
+> Default for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     fn default() -> Self {
         DiscreteParallelProcess {
             element_name: "DiscreteParallelProcess".to_string(),
@@ -928,7 +937,12 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> DiscreteParallelProcess<U, V, W, X> {
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static
+> DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     pub fn new() -> Self {
         DiscreteParallelProcess::default()
     }
@@ -947,13 +961,14 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Model for DiscreteParallelProcess<U, V, W, X> {}
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static
+> Model for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {}
 
-impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<U, (), Option<U>, U>
-where
-    Self: Model,
-    ItemDeque<U>: ResourceAdd<U> + ResourceRemove<(), Option<U>> + ResourceTotal<u32>,
-{
+impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
     type LogDetailsType = DiscreteProcessLogType<U>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> { 

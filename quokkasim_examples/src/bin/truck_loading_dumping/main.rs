@@ -24,7 +24,7 @@ define_model_enums! {
         DiscreteStockTruck(DiscreteStock<Truck>, Mailbox<DiscreteStock<Truck>>),
         LoadingProcess(LoadingProcess, Mailbox<LoadingProcess>),
         DumpingProcess(DumpingProcess, Mailbox<DumpingProcess>),
-        DiscreteParallelProcessTruck(DiscreteParallelProcess<Truck, (), Option<Truck>, Truck>, Mailbox<DiscreteParallelProcess<Truck, (), Option<Truck>, Truck>>),
+        DiscreteParallelProcessTruck(DiscreteParallelProcess<(), Option<Truck>, Truck, Truck>, Mailbox<DiscreteParallelProcess<(), Option<Truck>, Truck, Truck>>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {

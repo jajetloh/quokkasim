@@ -27,10 +27,10 @@ impl ItemFactory<ProtoCar> for ProtoCarGenerator {
 
 define_model_enums! {
     pub enum ComponentModel {
-        ProtoCarProcess(DiscreteProcess<ProtoCar, (), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteProcess<ProtoCar, (), Option<ProtoCar>, ProtoCar>>),
+        ProtoCarProcess(DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>, Mailbox<DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
         ProtoCarSource(DiscreteSource<ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCarGenerator>>),
-        ProtoCarSink(DiscreteSink<ProtoCar, ()>, Mailbox<DiscreteSink<ProtoCar, ()>>),
+        ProtoCarSink(DiscreteSink<(), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteSink<(), Option<ProtoCar>, ProtoCar>>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
