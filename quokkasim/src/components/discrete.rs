@@ -336,7 +336,19 @@ impl<
     ReceiveType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
-> Model for DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {}
+> Model for DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    } 
+}
 
 impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
@@ -552,25 +564,30 @@ impl ItemFactory<String> for StringItemFactory {
 }
 
 pub struct DiscreteSource<
-    T: Clone + Send + 'static,
-    TF: ItemFactory<T>,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    FactoryType: ItemFactory<InternalResourceType>,
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
-    pub push_downstream: Output<(T, NotificationMetadata)>,
-    pub process_state: Option<(Duration, T)>,
+    pub push_downstream: Output<(SendType, NotificationMetadata)>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<DiscreteProcessLog<T>>,
+    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
-    pub item_factory: TF,
+    pub item_factory: FactoryType,
 }
 
-impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for DiscreteSource<T, TF> {
+impl<
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    FactoryType: ItemFactory<InternalResourceType> + Default,
+> Default for DiscreteSource<InternalResourceType, SendType, FactoryType> {
     fn default() -> Self {
         DiscreteSource {
             element_name: "DiscreteSource".to_string(),
@@ -585,12 +602,16 @@ impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> Default for Discre
             time_to_next_event: None,
             next_event_id: 0,
             previous_check_time: MonotonicTime::EPOCH,
-            item_factory: TF::default(),
+            item_factory: FactoryType::default(),
         }
     }
 }
 
-impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, TF> {
+impl<
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    FactoryType: ItemFactory<InternalResourceType> + Default,
+> DiscreteSource<InternalResourceType, SendType, FactoryType> {
     pub fn new() -> Self {
         DiscreteSource::default()
     }
@@ -606,16 +627,35 @@ impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, 
         self.process_time_distr = Some(distr);
         self
     }
-    pub fn with_item_factory(mut self, item_factory: TF) -> Self {
+    pub fn with_item_factory(mut self, item_factory: FactoryType) -> Self {
         self.item_factory = item_factory;
         self
     }
 }
 
 
-impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, TF> {}
+impl<
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    FactoryType: ItemFactory<InternalResourceType> + Send + 'static,
+> Model for DiscreteSource<InternalResourceType, SendType, FactoryType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
-impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process for DiscreteSource<T, TF> {
+impl<
+    T: Clone + Send + 'static,
+    FactoryType: ItemFactory<T> + Send + 'static,
+> Process for DiscreteSource<T, T, FactoryType> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -781,7 +821,19 @@ impl<
     RequestParameterType: Clone + Send + 'static,
     RequestType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static
-> Model for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {}
+> Model for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
@@ -966,7 +1018,19 @@ impl<
     ReceiveType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static
-> Model for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {}
+> Model for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
     type LogDetailsType = DiscreteProcessLogType<U>;

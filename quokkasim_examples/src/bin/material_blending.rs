@@ -86,7 +86,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
     );
-    let mut reclaimer_1_addr = reclaimer_1.get_address();
 
     let mut output_stockpile_1 = ComponentModel::VectorStockVector3(
         VectorStock::new()
@@ -113,7 +112,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
     );
-    let mut reclaimer_2_addr = reclaimer_2.get_address();
 
     let mut reclaimer_3 = ComponentModel::VectorCombiner1Vector3(
         VectorCombiner::new() 
@@ -122,7 +120,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(60.)),
         Mailbox::new()
     );
-    let mut reclaimer_3_addr = reclaimer_3.get_address();
 
     let mut stacker = ComponentModel::VectorSplitter2Vector3(
         VectorSplitter::new()
@@ -131,7 +128,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(360.)),
         Mailbox::new()
     );
-    let mut stacker_addr = stacker.get_address();
 
     connect_components!(&mut stockpile_1, &mut reclaimer_1, 0).unwrap();
     connect_components!(&mut stockpile_2, &mut reclaimer_1, 1).unwrap();
@@ -173,11 +169,6 @@ fn main() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let (mut simu, mut scheduler) = sim_builder.init(start_time).unwrap();
-
-    reclaimer_1_addr.initialise(&mut simu).unwrap();
-    reclaimer_2_addr.initialise(&mut simu).unwrap();
-    reclaimer_3_addr.initialise(&mut simu).unwrap();
-    stacker_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(start_time + Duration::from_secs(60 * 60 * 1))
         .unwrap();

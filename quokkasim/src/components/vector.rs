@@ -258,12 +258,6 @@ impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
  * Process
  */
 
- /**
-  * T: Returned type from upstream stock
-  * U: Message type for pushing to downstream stock
-  * V: Message type for withdrawing from upstream stock
-  * W: Internal resource type of process state
-  */
 pub struct VectorProcess<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
@@ -636,7 +630,25 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
     pub split_ratios: [f64; M],
 }
 
-impl<T: Clone + Send + 'static, U: Clone + Send, const M: usize> Model for VectorCombiner<U, T, [T; M], T, M> {}
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    const M: usize
+> Model for VectorCombiner<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, M> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<
     T: Clone + Send + 'static,
@@ -910,7 +922,19 @@ impl<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
     const N: usize
-> Model for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> {}
+> Model for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<T: Send + 'static + Clone + Default, const N: usize> Process for VectorSplitter<f64, T, T, T, N>
 where
@@ -1090,7 +1114,22 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
     }
 }
 
-impl<InternalResourceType: Clone + Send + 'static, SendType: Clone + Send + 'static> Model for VectorSource<InternalResourceType, SendType> {}
+impl<
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static
+> Model for VectorSource<InternalResourceType, SendType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<InternalResourceType: Send + 'static + Clone + Default, SendType: Send + 'static + Clone + Default> VectorSource<InternalResourceType, SendType> {
     pub fn new() -> Self {
@@ -1257,7 +1296,19 @@ impl<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static,
-> Model for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> {}
+> Model for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<
     ReceiveParameterType: Clone + Send + Default + 'static,

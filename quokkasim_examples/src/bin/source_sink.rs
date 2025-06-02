@@ -53,7 +53,6 @@ fn main() {
             .with_source_vector([1., 4., 5.].into()),
         Mailbox::new()
     );
-    let mut source_addr = source.get_address();
 
     let mut stock_1 = ComponentModel::VectorStockVector3(
         VectorStock::new()
@@ -70,7 +69,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
-    let mut process_addr = process.get_address();
     let mut stock_2 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Stock 2".into())
@@ -87,7 +85,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(2.)),
         Mailbox::new()
     );
-    let mut sink_addr = sink.get_address();
 
     let mut process_logger = ComponentLogger::VectorProcessLoggerVector3(VectorProcessLogger::new("ProcessLogger".into()));
     let mut stock_logger = ComponentLogger::VectorStockLoggerVector3(VectorStockLogger::new("StockLogger".into()));
@@ -116,10 +113,6 @@ fn main() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
     let (mut simu, mut scheduler) = sim_builder.init(start_time.clone()).unwrap();
-
-    source_addr.initialise(&mut simu).unwrap();
-    process_addr.initialise(&mut simu).unwrap();
-    sink_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 

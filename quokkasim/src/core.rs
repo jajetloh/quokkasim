@@ -375,7 +375,7 @@ macro_rules! define_model_enums {
             DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
             DiscreteProcessString($crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
             DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
-            DiscreteSourceString($crate::components::discrete::DiscreteSource<String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, StringItemFactory>>),
+            DiscreteSourceString($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             DiscreteSinkString($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
             $(
                 $(#[$components_var_meta])*
@@ -835,7 +835,7 @@ macro_rules! define_model_enums {
             DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
             DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
             DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
-            DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, StringItemFactory>>),
+            DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
             $(
                 $R $( ($crate::nexosim::Address<$RT>) )?
@@ -1025,7 +1025,7 @@ macro_rules! define_model_enums {
                     $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
                     $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<(), Option<String>, String, String>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<(), Option<String>, String, String>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<String, StringItemFactory>::update_state, notif_meta, a.clone()) },
+                    $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<String, String, StringItemFactory>::update_state, notif_meta, a.clone()) },
                     $ComponentModelAddress::DiscreteSinkString(a) => { simu.process_event($crate::components::discrete::DiscreteSink::<(), Option<String>, String>::update_state, notif_meta, a.clone()) },
                     a => {
                         <Self as CustomInit>::initialise(a, simu)

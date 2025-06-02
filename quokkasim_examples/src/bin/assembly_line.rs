@@ -50,7 +50,7 @@ define_model_enums! {
     pub enum ComponentModel {
         ProtoCarProcess(DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>, Mailbox<DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
-        ProtoCarSource(DiscreteSource<ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCarGenerator>>),
+        ProtoCarSource(DiscreteSource<ProtoCar, ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCar, ProtoCarGenerator>>),
         ProtoCarSink(DiscreteSink<(), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteSink<(), Option<ProtoCar>, ProtoCar>>),
         ShiftEventController(ShiftEventController, Mailbox<ShiftEventController>),
     }

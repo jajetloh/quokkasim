@@ -194,7 +194,6 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap()),
         Mailbox::new(),
     );
-    let mut loading_process_addr = loading_process.get_address();
 
     let mut trucks_loaded = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
         .with_name("trucks_loaded".into())
@@ -211,7 +210,6 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 120. }).unwrap()),
         Mailbox::new(),
     );
-    let mut loaded_truck_movements_addr = loaded_truck_movements.get_address();
 
     let mut trucks_ready_to_dump = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
         .with_name("trucks_ready_to_dump".into())
@@ -238,7 +236,6 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap()),
         Mailbox::new(),
     );
-    let mut dumping_process_addr = dumping_process.get_address();
 
     let mut trucks_dumped = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
         .with_name("trucks_dumped".into())
@@ -255,8 +252,6 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 120. }).unwrap()),
         Mailbox::new(),
     );
-    let mut dumped_truck_movements_addr = dumped_truck_movements.get_address();
-
 
     // Connect components
 
@@ -300,11 +295,6 @@ fn main() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 5, 1, 0, 0, 0, 0).unwrap();
     let mut simu = sim_builder.init(start_time.clone()).unwrap().0;
-
-    loading_process_addr.initialise(&mut simu).unwrap();
-    loaded_truck_movements_addr.initialise(&mut simu).unwrap();
-    dumping_process_addr.initialise(&mut simu).unwrap();
-    dumped_truck_movements_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(start_time + Duration::from_secs_f64(7200.)).unwrap();
 

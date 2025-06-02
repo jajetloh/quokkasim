@@ -69,7 +69,6 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
-    let mut process_addr = process.get_address();
 
     let mut process_logger = ComponentLogger::VectorProcessLoggerF64(VectorProcessLogger::new("ProcessLogger".into()));
     let mut stock_logger = ComponentLogger::VectorStockLoggerF64(VectorStockLogger::new("StockLogger".into()));
@@ -103,7 +102,6 @@ fn main() {
     let event_time = start_time.clone() + Duration::from_secs(60);
     
     create_scheduled_event!(&mut scheduler, event_time, capacity_change, stock_1_addr, &mut df).unwrap();
-    process_addr.initialise(&mut simu).unwrap();
     simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 
     let output_dir = "outputs/scheduled_event";

@@ -41,9 +41,6 @@ impl CustomInit for ComponentModelAddress {
     }
 }
 
-
-
-
 fn main() {
 
     let mut df = DistributionFactory {
@@ -52,7 +49,6 @@ fn main() {
     };
 
     let mut source = ComponentModel::DiscreteSourceString(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
-    let mut source_addr = source.get_address();
 
     let mut queue_1 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue1".into())
@@ -67,7 +63,6 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
-    let mut process_1_addr = process_1.get_address();
 
     let mut queue_2 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue2".into())
@@ -82,7 +77,6 @@ fn main() {
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
-    let mut process_par_addr = process_par.get_address();
 
     let mut queue_3 = ComponentModel::DiscreteStockString(DiscreteStock::new()
         .with_name("Queue3".into())
@@ -97,7 +91,6 @@ fn main() {
         .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );
-    let mut sink_addr = sink.get_address();
 
     connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();
@@ -127,11 +120,6 @@ fn main() {
     sim_builder = register_component!(sim_builder, sink);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
-
-    source_addr.initialise(&mut simu).unwrap();
-    process_1_addr.initialise(&mut simu).unwrap();
-    process_par_addr.initialise(&mut simu).unwrap();
-    sink_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 

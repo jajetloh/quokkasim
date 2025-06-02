@@ -372,8 +372,6 @@ fn main() {
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    process1_addr.initialise(&mut simu).unwrap();
-
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs_f64(300.)).unwrap();
 
     let output_dir = "outputs/iron_ore";
