@@ -127,7 +127,7 @@ where
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for DiscreteStock<T> {
+impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for DiscreteStock<T> {
     type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.resource.total();
@@ -149,26 +149,26 @@ impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> fo
     fn get_resource(&self) -> &ItemDeque<T> {
         &self.resource
     }
-    fn add_impl<'a>(&'a mut self, payload: &'a (T, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn add_impl(&mut self, payload: &(T, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.resource.add(payload.0.clone());
         }
     }
-    fn remove_impl<'a>(&'a mut self, payload: &'a ((), NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = Option<T>> + 'a {
+    fn remove_impl(&mut self, payload: &((), NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = Option<T>> {
         async move {
             self.prev_state = Some(self.get_state());
             self.resource.pop_front()
         }
     }
 
-    fn emit_change<'a>(&'a mut self, payload: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.state_emitter.send(payload).await;
             self.log(cx.time(), "Emit Change".to_string()).await;
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> {
         async move {
             let log = DiscreteStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -187,7 +187,7 @@ impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> fo
 
 impl<T: Clone + Default + Send> Model for DiscreteStock<T> {}
 
-impl<T: Clone + Default + Debug + Send> DiscreteStock<T> {
+impl<T: Clone + Default + Send> DiscreteStock<T> {
     pub fn new() -> Self {
         DiscreteStock::default()
     }
@@ -338,7 +338,7 @@ impl<
     SendType: Clone + Send + 'static,
 > Model for DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {}
 
-impl<T: Clone + Debug + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
+impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -353,7 +353,7 @@ impl<T: Clone + Debug + Send + 'static> Process for DiscreteProcess<(), Option<T
         self.previous_check_time = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -428,7 +428,7 @@ impl<T: Clone + Debug + Send + 'static> Process for DiscreteProcess<(), Option<T
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -445,7 +445,7 @@ impl<T: Clone + Debug + Send + 'static> Process for DiscreteProcess<(), Option<T
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: DiscreteProcessLogType<T>) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: DiscreteProcessLogType<T>) -> impl Future<Output = ()> {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -615,7 +615,7 @@ impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, 
 
 impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, TF> {}
 
-impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process for DiscreteSource<T, TF> {
+impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process for DiscreteSource<T, TF> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -630,7 +630,7 @@ impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Pro
         self.previous_check_time = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -683,7 +683,7 @@ impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Pro
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -700,7 +700,7 @@ impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Pro
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -783,7 +783,7 @@ impl<
     InternalResourceType: Clone + Send + 'static
 > Model for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {}
 
-impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
+impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -798,7 +798,7 @@ impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<(), Option<T>, 
         self.previous_check_time = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -857,7 +857,7 @@ impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<(), Option<T>, 
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -874,7 +874,7 @@ impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<(), Option<T>, 
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -968,7 +968,7 @@ impl<
     SendType: Clone + Send + 'static
 > Model for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {}
 
-impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
+impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
     type LogDetailsType = DiscreteProcessLogType<U>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> { 
@@ -983,7 +983,7 @@ impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<(), 
         self.previous_check_time = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             // First resolve any completed processes
 
@@ -1063,7 +1063,7 @@ impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<(), 
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1080,7 +1080,7 @@ impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<(), 
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),

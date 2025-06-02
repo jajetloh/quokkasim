@@ -248,7 +248,7 @@ impl Logger for IronOreStockLogger {
 //
 define_model_enums! {
     pub enum ComponentModel {
-        IronOreProcess(VectorProcess<IronOre, IronOre, f64, IronOre>, Mailbox<VectorProcess<IronOre, IronOre, f64, IronOre>>),
+        IronOreProcess(VectorProcess<f64, IronOre, IronOre, IronOre>, Mailbox<VectorProcess<f64, IronOre, IronOre, IronOre>>),
         IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>)
     }
     pub enum ComponentModelAddress {}
@@ -264,15 +264,15 @@ impl CustomComponentConnection for ComponentModel {
     fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
             (ComponentModel::IronOreProcess(a, ad), ComponentModel::IronOreStock(b, bd)) => {
-                b.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64, IronOre>::update_state, ad.address());
-                a.req_downstream.connect(VectorStock::<IronOre>::get_state_async, bd.address());
-                a.push_downstream.connect(VectorStock::<IronOre>::add, bd.address());
+                b.state_emitter.connect(VectorProcess::update_state, ad.address());
+                a.req_downstream.connect(VectorStock::get_state_async, bd.address());
+                a.push_downstream.connect(VectorStock::add, bd.address());
                 Ok(())
             },
             (ComponentModel::IronOreStock(a, ad), ComponentModel::IronOreProcess(b, bd)) => {
-                a.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64, IronOre>::update_state, bd.address());
-                b.req_upstream.connect(VectorStock::<IronOre>::get_state_async, ad.address());
-                b.withdraw_upstream.connect(VectorStock::<IronOre>::remove, ad.address());
+                a.state_emitter.connect(VectorProcess::update_state, bd.address());
+                b.req_upstream.connect(VectorStock::get_state_async, ad.address());
+                b.withdraw_upstream.connect(VectorStock::remove, ad.address());
                 Ok(())
             },
             (a, b) => Err(format!("No component connection defined from {} to {}", a, b).into()),
@@ -306,7 +306,7 @@ impl CustomInit for ComponentModelAddress {
         };
         match self {
             ComponentModelAddress::IronOreProcess(addr) => {
-                simu.process_event(VectorProcess::<IronOre, IronOre, f64, IronOre>::update_state, notif_meta, addr.clone())?;
+                simu.process_event(VectorProcess::update_state, notif_meta, addr.clone())?;
                 Ok(())
             },
             ComponentModelAddress::IronOreStock(_) => {

@@ -50,7 +50,7 @@ pub struct VectorStock<T: Clone + Send + 'static> {
     next_event_id: u64,
 }
 
-impl<T: Clone + Debug + Default + Send> Default for VectorStock<T> {
+impl<T: Clone + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
             element_name: String::new(),
@@ -66,9 +66,8 @@ impl<T: Clone + Debug + Default + Send> Default for VectorStock<T> {
     }
 }
 
-impl<T: Clone + Debug + Send> Stock<T, T, f64, T> for VectorStock<T>
+impl<T: Clone + Send> Stock<T, T, f64, T> for VectorStock<T>
 where
-    Self: Model,
     T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>
 {
 
@@ -96,36 +95,36 @@ where
         &self.vector
     }
 
-    fn add_impl<'a>(
-        &'a mut self,
-        payload: &'a (T, NotificationMetadata),
-        cx: &'a mut ::nexosim::model::Context<Self>
-    ) -> impl Future<Output=()> + 'a {
+    fn add_impl(
+        &mut self,
+        payload: &(T, NotificationMetadata),
+        cx: &mut ::nexosim::model::Context<Self>
+    ) -> impl Future<Output=()> {
         async move {
             self.prev_state = Some(self.get_state().clone());
             self.vector.add(payload.0.clone());
         }
     }
 
-    fn remove_impl<'a>(
-        &'a mut self,
-        data: &'a (f64, NotificationMetadata),
-        cx: &'a mut ::nexosim::model::Context<Self>
-    ) -> impl Future<Output=T> + 'a {
+    fn remove_impl(
+        &mut self,
+        data: &(f64, NotificationMetadata),
+        cx: &mut ::nexosim::model::Context<Self>
+    ) -> impl Future<Output=T> {
         async move {
             self.prev_state = Some(self.get_state());
             self.vector.remove(data.0.clone())
         }
     }
 
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> + Send {
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
         async move {
             self.state_emitter.send(payload).await;
             self.log(cx.time(), "Emit Change".to_string()).await;
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output=()> + Send {
+    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output =()> {
         async move {
             let log = VectorStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -142,9 +141,9 @@ where
     }
 }
 
-impl<T: Clone + Debug + Send> VectorStock<T>
+impl<T: Clone + Send> VectorStock<T>
 where
-    Self: Model,
+    Self: Default,
     T: ResourceTotal<f64>
 {
     pub fn get_state(&mut self) -> VectorStockState {
@@ -203,7 +202,7 @@ where
     }
 }
 
-impl<T: Debug + Clone + Send> Model for VectorStock<T> {}
+impl<T: Clone + Send> Model for VectorStock<T> {}
 
 pub struct VectorStockLogger<T> where T: Send {
     pub name: String,
@@ -266,31 +265,31 @@ impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
   * W: Internal resource type of process state
   */
 pub struct VectorProcess<
-    T: Clone + Send + 'static,
-    U: Clone + Send + 'static,
-    V: Clone + Send + 'static,
-    W: Clone + Send + 'static
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), VectorStockState>,
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
-    pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, W)>,
+    pub withdraw_upstream: Requestor<(ReceiveParameterType, NotificationMetadata), ReceiveType>,
+    pub push_downstream: Output<(SendType, NotificationMetadata)>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<VectorProcessLog<W>>,
+    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
 }
 impl<
-    T: Clone + Send,
-    U: Clone + Send,
-    V: Clone + Send,
-    W: Clone + Send
-> Default for VectorProcess<T, U, V, W> {
+    ReceiveParameterType: Clone + Send,
+    ReceiveType: Clone + Send,
+    InternalResourceType: Clone + Send,
+    SendType: Clone + Send
+> Default for VectorProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     fn default() -> Self {
         VectorProcess {
             element_name: String::new(),
@@ -312,12 +311,28 @@ impl<
     }
 }
 
-impl<T: Clone + Send + 'static + Debug, V: Clone + Send> Model for VectorProcess<T, T, V, T> {}
+impl<
+    ReceiveParameterType: Clone + Send,
+    ReceiveType: Clone + Send,
+    InternalResourceType: Clone + Send,
+    SendType: Clone + Send
+> Model for VectorProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let notif_meta = NotificationMetadata {
+                time: ctx.time(),
+                element_from: self.element_name.clone(),
+                message: "Initialisation".into(),
+            };
+            self.update_state(notif_meta, ctx).await;
+            self.into()
+        }
+    }
+}
 
-impl<T: Clone + Send + 'static + Debug> Process for VectorProcess<T, T, f64, T>
+impl<T: Clone + Send> Process for VectorProcess<f64, T, T, T>
 where
-    Self: Model,
-    T: ResourceTotal<f64>
+    T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>,
 {
     type LogDetailsType = VectorProcessLogType<T>;
 
@@ -330,7 +345,7 @@ where
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
-    fn update_state_impl<'a> (&'a mut self, notif_meta: &NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -396,7 +411,7 @@ where
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -413,7 +428,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: VectorProcessLogType<T>) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: VectorProcessLogType<T>) -> impl Future<Output = ()> {
         async move {
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -428,7 +443,7 @@ where
     }
 }
 
-impl<T: Clone + Debug + Send + 'static> VectorProcess<T, T, f64, T> {
+impl<T: Clone + Send> VectorProcess<f64, T, T, T> {
     pub fn with_name(self, name: String) -> Self {
         VectorProcess {
             element_name: name,
@@ -509,7 +524,7 @@ pub struct VectorProcessLog<T> {
     pub event: VectorProcessLogType<T>,
 }
 
-impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send + 'static {
+impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -598,43 +613,36 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send + 'static {
  * Combiner
  */
 
- /**
-  * T: Resource type of upstream stock
-  * U: Message type for pushing to downstream stock
-  * V: Message type for withdrawing from upstream stock
-  * M: Number of upstream stocks - number of stocks to combine from
-  */
-pub struct VectorCombiner<
-    T: Clone + Send + 'static,
-    U: Clone + Send + 'static,
-    V: Clone + Send + 'static,
-    W: Clone + Send + 'static,
+ pub struct VectorCombiner<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
     const M: usize
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstreams: [Requestor<(), VectorStockState>; M],
     pub req_downstream: Requestor<(), VectorStockState>,
-    pub withdraw_upstreams: [Requestor<(V, NotificationMetadata), T>; M],
-    pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, W)>,
+    pub withdraw_upstreams: [Requestor<(ReceiveParameterType, NotificationMetadata), ReceiveType>; M],
+    pub push_downstream: Output<(SendType, NotificationMetadata)>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<VectorProcessLog<T>>,
+    pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
     pub previous_check_time: MonotonicTime,
     pub split_ratios: [f64; M],
 }
 
-impl<T: Clone + Debug + Send + 'static, V: Clone + Send, const M: usize> Model for VectorCombiner<T, T, V, [T; M], M> {}
+impl<T: Clone + Send + 'static, U: Clone + Send, const M: usize> Model for VectorCombiner<U, T, [T; M], T, M> {}
 
 impl<
-    T: Clone + Debug + Send + 'static,
+    T: Clone + Send + 'static,
     U: Clone + Send,
-    V: Clone + Send,
     const M: usize
-> VectorCombiner<T, U, V, [T; M], M> {
+> VectorCombiner<U, T, [T; M], T, M> {
     pub fn new() -> Self {
         VectorCombiner {
             element_name: String::new(),
@@ -676,7 +684,7 @@ impl<
     }
 }
 
-impl<T: Send + 'static + Clone + Debug + Default, const M: usize> Process for VectorCombiner<T, T, f64, [T; M], M>
+impl<T: Send + 'static + Clone + Default, const M: usize> Process for VectorCombiner<f64, T, [T; M], T, M>
 where
     T: ResourceAdd<T> + ResourceTotal<f64>,
 {
@@ -694,7 +702,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -713,7 +721,7 @@ where
                         self.push_downstream.send((total, NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
-                            message: format!("Pushing quantity {:?}", resources),
+                            message: "Process successful".into(),
                         })).await;
                     } else {
                         self.process_state = Some((process_time_left, resources));
@@ -751,7 +759,7 @@ where
                                 .map(|mut x| x.next().unwrap_or_else(|| Default::default()))
                                 .collect::<Vec<T>>()
                                 .try_into()
-                                .expect("Failed to convert to array");
+                                .unwrap_or_else(|_| panic!("Failed to convert to array"));
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
                             self.log(time, VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn.into() }).await;
@@ -782,7 +790,7 @@ where
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -799,7 +807,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -819,37 +827,30 @@ where
  * Splitter
  */
 
- /**
-  * T: Resource type of upstream stock
-  * U: Message type for pushing to downstream stock
-  * V: Message type for withdrawing from upstream stock
-  * N: Number of downstream stocks - number of stocks to split into
-  */
-
 pub struct VectorSplitter<
-    T: Clone + Send + 'static,
-    U: Clone + Send + 'static,
-    V: Clone + Send + 'static,
-    W: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
     const N: usize
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstreams: [Requestor<(), VectorStockState>; N],
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
-    pub push_downstreams: [Output<(U, NotificationMetadata)>; N],
-    pub process_state: Option<(Duration, W)>,
+    pub withdraw_upstream: Requestor<(ReceiveParameterType, NotificationMetadata), ReceiveType>,
+    pub push_downstreams: [Output<(SendType, NotificationMetadata)>; N],
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<VectorProcessLog<T>>,
+    pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
     pub previous_check_time: MonotonicTime,
     pub split_ratios: [f64; N],
 }
 
-impl<T: Send + 'static + Clone + Debug + Default, const N: usize> VectorSplitter<T, T, f64, T, N> {
+impl<T: Send + 'static + Clone + Default, const N: usize> VectorSplitter<f64, T, T, T, N> where Self: Default {
     pub fn new() -> Self {
         Default::default()
     }
@@ -876,7 +877,13 @@ impl<T: Send + 'static + Clone + Debug + Default, const N: usize> VectorSplitter
     }
 }
 
-impl<T: Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send, const N: usize> Default for VectorSplitter<T, U, V, T, N> {
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    const N: usize
+> Default for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> {
     fn default() -> Self {
         VectorSplitter {
             element_name: String::new(),
@@ -897,9 +904,15 @@ impl<T: Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send, const 
     }
 }
 
-impl<T: Clone + Send + 'static, const N: usize> Model for VectorSplitter<T, T, f64, T, N> {}
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
+    const N: usize
+> Model for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> {}
 
-impl<T: Send + 'static + Clone + Debug + Default, const N: usize> Process for VectorSplitter<T, T, f64, T, N>
+impl<T: Send + 'static + Clone + Default, const N: usize> Process for VectorSplitter<f64, T, T, T, N>
 where
     T: ResourceRemove<f64, T> + ResourceTotal<f64>,
 {
@@ -917,7 +930,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -939,7 +952,7 @@ where
                             push.send((resource.clone(), NotificationMetadata {
                                 time,
                                 element_from: self.element_name.clone(),
-                                message: format!("Pushing quantity {:?}", resource),
+                                message: "Process successful".into()
                             }))
                         })).await;
                     } else {
@@ -1004,7 +1017,7 @@ where
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1021,7 +1034,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -1040,31 +1053,25 @@ where
 /**
  * Source
  */
-
-/**
- * T: Resource type of upstream stock
- * U: Message type for pushing to downstream stock
- */
-
 pub struct VectorSource<
-    T: Clone + Send + 'static,
-    U: Clone + Send + 'static
+    InternalResourceType: Clone + Send + 'static,
+    SendType: Clone + Send + 'static,
 > {
     pub element_name: String,
     pub element_type: String,
     pub req_downstream: Requestor<(), VectorStockState>,
-    pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, T)>,
+    pub push_downstream: Output<(SendType, NotificationMetadata)>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub source_vector: T,
+    pub source_vector: InternalResourceType,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<VectorProcessLog<T>>,
+    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
 }
 
-impl<T: Clone + Debug + Default + Send, U: Clone + Send> Default for VectorSource<T, U> {
+impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Default for VectorSource<InternalResourceType, SendType> {
     fn default() -> Self {
         VectorSource {
             element_name: String::new(),
@@ -1074,7 +1081,7 @@ impl<T: Clone + Debug + Default + Send, U: Clone + Send> Default for VectorSourc
             process_state: None,
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
-            source_vector: T::default(),
+            source_vector: InternalResourceType::default(),
             time_to_next_event: None,
             next_event_id: 0,
             log_emitter: Output::default(),
@@ -1083,9 +1090,9 @@ impl<T: Clone + Debug + Default + Send, U: Clone + Send> Default for VectorSourc
     }
 }
 
-impl<T: Clone + Send + 'static, U: Clone + Send + 'static> Model for VectorSource<T, U> {}
+impl<InternalResourceType: Clone + Send + 'static, SendType: Clone + Send + 'static> Model for VectorSource<InternalResourceType, SendType> {}
 
-impl<T: Send + 'static + Clone + Debug + Default> VectorSource<T, T> {
+impl<InternalResourceType: Send + 'static + Clone + Default, SendType: Send + 'static + Clone + Default> VectorSource<InternalResourceType, SendType> {
     pub fn new() -> Self {
         Default::default()
     }
@@ -1111,7 +1118,7 @@ impl<T: Send + 'static + Clone + Debug + Default> VectorSource<T, T> {
         }
     }
 
-    pub fn with_source_vector(self, source_vector: T) -> Self {
+    pub fn with_source_vector(self, source_vector: InternalResourceType) -> Self {
         VectorSource {
             source_vector,
             ..self
@@ -1119,13 +1126,12 @@ impl<T: Send + 'static + Clone + Debug + Default> VectorSource<T, T> {
     }
 }
 
-impl<T: Send + 'static + Clone + Debug> Process for VectorSource<T, T>
+impl<T: Clone + Send + 'static> Process for VectorSource<T, T>
 where
-    Self: Model,
     T: ResourceTotal<f64> + ResourceMultiply<f64>
 {
     type LogDetailsType = VectorProcessLogType<T>;
-    
+
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
@@ -1138,7 +1144,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()>{
         async move {
             let time = cx.time();
 
@@ -1151,7 +1157,7 @@ where
                         self.push_downstream.send((resource.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
-                            message: format!("Pushing quantity {:?}", resource),
+                            message: "Processed".into(),
                         })).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
@@ -1193,7 +1199,7 @@ where
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1210,7 +1216,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -1229,28 +1235,35 @@ where
  * Sink
  */
 
-/**
- * T: Resource type of upstream stock
- * V: Message type for pushing to downstream stock
- */
-
-pub struct VectorSink<T: Clone + Debug + Send + 'static, V: Clone + Send + 'static> {
+pub struct VectorSink<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+> {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
-    pub process_state: Option<(Duration, T)>,
+    pub withdraw_upstream: Requestor<(ReceiveParameterType, NotificationMetadata), ReceiveType>,
+    pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<VectorProcessLog<T>>,
+    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
 }
 
-impl<T: Send + 'static + Clone + Debug + Default, V: Clone + Send + 'static> Model for VectorSink<T, V> {}
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+> Model for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> {}
 
-impl<T: Clone + Send + Debug + Default + 'static, V: Clone + Send + 'static> Default for VectorSink<T, V> {
+impl<
+    ReceiveParameterType: Clone + Send + Default + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+> Default for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> {
     fn default() -> Self {
         VectorSink {
             element_name: String::new(),
@@ -1268,7 +1281,11 @@ impl<T: Clone + Send + Debug + Default + 'static, V: Clone + Send + 'static> Def
     }
 }
 
-impl<T: Clone + Send + 'static + Debug + Default, V: Clone + Send + 'static> VectorSink<T, V> {
+impl<
+    ReceiveParameterType: Clone + Send + 'static,
+    ReceiveType: Clone + Send + 'static,
+    InternalResourceType: Clone + Send + 'static,
+> VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> where Self: Default {
     pub fn new() -> Self {
         Default::default()
     }
@@ -1295,7 +1312,7 @@ impl<T: Clone + Send + 'static + Debug + Default, V: Clone + Send + 'static> Vec
     }
 }
 
-impl<T: Send + 'static + Clone + Debug + Default> Process for VectorSink<T, f64>
+impl<T: Send + 'static + Clone + Default> Process for VectorSink<f64, T, T>
 where
     T: ResourceTotal<f64>,
 {
@@ -1313,7 +1330,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -1364,7 +1381,7 @@ where
         }
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> + Send {
+    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
         async move {
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),

@@ -26,6 +26,7 @@ impl ItemFactory<ProtoCar> for ProtoCarGenerator {
 }
 
 struct ShiftEventController {
+    element_name: String,
     state: ShiftState,
     emit_change: Output<()>,
 }
