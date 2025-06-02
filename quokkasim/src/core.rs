@@ -301,10 +301,6 @@ pub trait CustomLoggerConnection {
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
-pub trait CustomInit {
-    fn initialise(&mut self, simu: &mut crate::nexosim::Simulation) -> Result<(), ExecutionError>;
-}
-
 // Components and loggers enums must be defined together as logger enum connector method requires the components enum
 #[macro_export]
 macro_rules! define_model_enums {
@@ -982,56 +978,6 @@ macro_rules! define_model_enums {
                     }
                 }
             } 
-        }
-
-        impl $ComponentModelAddress {
-            fn initialise(&mut self, simu: &mut $crate::nexosim::Simulation) -> Result<(), $crate::nexosim::ExecutionError> {
-                let notif_meta = NotificationMetadata {
-                    time: simu.time(),
-                    element_from: "Init".into(),
-                    message: "Init".into(),
-                }; 
-                match self {
-                    $ComponentModelAddress::VectorStockF64(a) => { Ok(()) },
-                    $ComponentModelAddress::VectorProcessF64(a) => { simu.process_event($crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSourceF64(a) => { simu.process_event($crate::components::vector::VectorSource::<f64, f64>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSinkF64(a) => { simu.process_event($crate::components::vector::VectorSink::<f64, f64, f64>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner1F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, [f64; 1], f64, 1>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner2F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, [f64; 2], f64, 2>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner3F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, [f64; 3], f64, 3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner4F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, [f64; 4], f64, 4>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner5F64(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, f64, [f64; 5], f64, 5>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter1F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, f64, 1>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter2F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, f64, 2>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter3F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, f64, 3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter4F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, f64, 4>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter5F64(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, f64, f64, f64, 5>::update_state, notif_meta, a.clone()) },
-
-                    $ComponentModelAddress::VectorStockVector3(a) => { Ok(()) },
-                    $ComponentModelAddress::VectorProcessVector3(a) => { simu.process_event($crate::components::vector::VectorProcess::<f64, Vector3, Vector3, Vector3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSourceVector3(a) => { simu.process_event($crate::components::vector::VectorSource::<Vector3, Vector3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSinkVector3(a) => { simu.process_event($crate::components::vector::VectorSink::<f64, Vector3, Vector3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner1Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, Vector3, [Vector3; 1], Vector3, 1>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner2Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, Vector3, [Vector3; 2], Vector3, 2>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner3Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, Vector3, [Vector3; 3], Vector3, 3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner4Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, Vector3, [Vector3; 4], Vector3, 4>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorCombiner5Vector3(a) => { simu.process_event($crate::components::vector::VectorCombiner::<f64, Vector3, [Vector3; 5], Vector3, 5>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter1Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, Vector3, Vector3, Vector3, 1>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter2Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, Vector3, Vector3, Vector3, 2>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter3Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, Vector3, Vector3, Vector3, 3>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter4Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, Vector3, Vector3, Vector3, 4>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::VectorSplitter5Vector3(a) => { simu.process_event($crate::components::vector::VectorSplitter::<f64, Vector3, Vector3, Vector3, 5>::update_state, notif_meta, a.clone()) },
-
-                    $ComponentModelAddress::DiscreteStockString(a) => { Ok(()) },
-                    $ComponentModelAddress::DiscreteProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteProcess::<(), Option<String>, String, String>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteParallelProcessString(a) => { simu.process_event($crate::components::discrete::DiscreteParallelProcess::<(), Option<String>, String, String>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteSourceString(a) => { simu.process_event($crate::components::discrete::DiscreteSource::<String, String, StringItemFactory>::update_state, notif_meta, a.clone()) },
-                    $ComponentModelAddress::DiscreteSinkString(a) => { simu.process_event($crate::components::discrete::DiscreteSink::<(), Option<String>, String>::update_state, notif_meta, a.clone()) },
-                    a => {
-                        <Self as CustomInit>::initialise(a, simu)
-                    }
-                }
-            }
         }
 
         #[derive(Display)]

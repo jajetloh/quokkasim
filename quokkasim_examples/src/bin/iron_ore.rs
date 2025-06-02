@@ -297,29 +297,6 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentModelAddress {
-    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
-        let notif_meta = NotificationMetadata {
-            time: simu.time(),
-            element_from: "Init".into(),
-            message: "Start".into(),
-        };
-        match self {
-            ComponentModelAddress::IronOreProcess(addr) => {
-                simu.process_event(VectorProcess::update_state, notif_meta, addr.clone())?;
-                Ok(())
-            },
-            ComponentModelAddress::IronOreStock(_) => {
-                // No init required for this stock
-                Ok(())
-            },
-            _ => {
-                Err(ExecutionError::BadQuery)
-            }
-        }
-    }
-}
-
 fn main() {
 
     let base_seed = 123456789;

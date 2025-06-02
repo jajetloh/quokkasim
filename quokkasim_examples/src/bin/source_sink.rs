@@ -27,21 +27,6 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentModelAddress {
-    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
-        let notif_meta = NotificationMetadata {
-            time: simu.time(),
-            element_from: "Init".into(),
-            message: "Start".into(),
-        };
-        match self {
-            _ => {
-                Err(ExecutionError::BadQuery)
-            }
-        }
-    }
-}
-
 fn main() {
     // Declarations
 

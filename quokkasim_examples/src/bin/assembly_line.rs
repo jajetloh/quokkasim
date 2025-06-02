@@ -119,38 +119,6 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentModelAddress {
-    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
-        let notif_meta = NotificationMetadata {
-            time: simu.time(),
-            element_from: "Init".into(),
-            message: "Start".into(),
-        };
-        match self {
-            ComponentModelAddress::ProtoCarProcess(addr) => {
-                simu.process_event(DiscreteProcess::update_state, notif_meta, addr.clone()).unwrap();
-                Ok(())
-            },
-            ComponentModelAddress::ProtoCarSource(addr) => {
-                simu.process_event(DiscreteSource::update_state, notif_meta, addr.clone()).unwrap();
-                Ok(())
-            },
-            ComponentModelAddress::ProtoCarSink(addr) => {
-                simu.process_event(DiscreteSink::update_state, notif_meta, addr.clone()).unwrap();
-                Ok(())
-            },
-            ComponentModelAddress::ShiftEventController(addr) => {
-                // simu.process_event(ShiftEventController::get_state_async, notif_meta, addr.clone()).unwrap();
-                // TODO: Implement.
-                Ok(())
-            },
-            _ => {
-                Err(ExecutionError::BadQuery)
-            }
-        }
-    }
-}
-
 fn main() {
 
     let mut df = DistributionFactory {
@@ -238,11 +206,6 @@ fn main() {
     sim_builder = register_component!(sim_builder, sink);
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
-
-    source_addr.initialise(&mut simu).unwrap();
-    process_1_addr.initialise(&mut simu).unwrap();
-    process_par_addr.initialise(&mut simu).unwrap();
-    sink_addr.initialise(&mut simu).unwrap();
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 

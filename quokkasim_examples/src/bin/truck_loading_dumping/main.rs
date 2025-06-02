@@ -133,33 +133,6 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-impl CustomInit for ComponentModelAddress {
-    fn initialise(&mut self, simu: &mut Simulation) -> Result<(), ExecutionError> {
-        let notif_meta = NotificationMetadata {
-            time: simu.time(),
-            element_from: "Init".into(),
-            message: "Start".into(),
-        };
-        match self {
-            ComponentModelAddress::LoadingProcess(addr) => {
-                simu.process_event(LoadingProcess::update_state, notif_meta.clone(), addr.clone()).unwrap();
-                Ok(())
-            },
-            ComponentModelAddress::DiscreteParallelProcessTruck(addr) => {
-                simu.process_event(DiscreteParallelProcess::update_state, notif_meta.clone(), addr.clone())?;
-                Ok(())
-            },
-            ComponentModelAddress::DumpingProcess(addr) => {
-                simu.process_event(DumpingProcess::update_state, notif_meta.clone(), addr.clone())?;
-                Ok(())
-            },
-            x => {
-                panic!("No initialisation defined for component address: {}", x);
-            }
-        }
-    }
-}
-
 fn main() {
 
     let base_seed = 987654321;
