@@ -5,26 +5,6 @@ use nexosim::{model::{Context, Model}, ports::EventQueue, simulation::ExecutionE
 use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 
-// pub struct SubtractParts<T, U> {
-//     pub remaining: T,
-//     pub subtracted: U,
-// }
-
-// impl VectorArithmetic<f64, f64, f64> for f64 {
-//     fn add(&mut self, other: Self) {
-//         *self += other;
-//     }
-
-//     fn subtract(&mut self, quantity: f64) -> f64 {
-//         *self = *self - quantity;
-//         quantity
-//     }
-
-//     fn total(&self) -> f64 {
-//         *self
-//     }
-// }
-
 impl ResourceAdd<f64> for f64 {
     fn add(&mut self, arg: f64) {
         *self += arg;
@@ -67,39 +47,6 @@ impl Serialize for Vector3 {
         state.end()
     }
 }
-
-// impl VectorArithmetic<Vector3, f64, f64> for Vector3 {
-//     fn add(&mut self, other: Vector3) {
-//         self.values[0] += other.values[0];
-//         self.values[1] += other.values[1];
-//         self.values[2] += other.values[2];
-//     }
-
-//     fn subtract(&mut self, arg: f64) -> Vector3 {
-//         let proportion_subtracted = arg / self.total();
-//         let proportion_remaining = 1.0 - proportion_subtracted;
-//         let remaining = Vector3 {
-//             values: [
-//                 self.values[0] * proportion_remaining,
-//                 self.values[1] * proportion_remaining,
-//                 self.values[2] * proportion_remaining,
-//             ],
-//         };
-//         let subtracted = Vector3 {
-//             values: [
-//                 self.values[0] * proportion_subtracted,
-//                 self.values[1] * proportion_subtracted,
-//                 self.values[2] * proportion_subtracted,
-//             ],
-//         };
-//         *self = remaining;
-//         subtracted
-//     }
-
-//     fn total(&self) -> f64 {
-//         self.values.iter().sum()
-//     }
-// }
 
 impl ResourceAdd<Vector3> for Vector3 {
     fn add(&mut self, arg: Vector3) {
@@ -178,13 +125,6 @@ pub trait StateEq {
     fn is_same_state(&self, other: &Self) -> bool;
 }
 
-/**
- * T: Resource type
- * U: Received type from process when adding stock
- * V: Received type from process when removing stock
- * W: Returned type to process when removing stock
- * C: Metric type for resource total
- */
 pub trait Stock<
     ContainerType: Clone + 'static,
     ReceiveType: Clone + Send + 'static,
