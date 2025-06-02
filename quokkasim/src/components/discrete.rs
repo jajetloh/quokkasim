@@ -69,37 +69,27 @@ pub struct ItemDeque<T>(VecDeque<T>);
 impl<T> Deref for ItemDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl<T> DerefMut for ItemDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
 
-impl<TT> VectorArithmetic<Option<TT>, (), u32> for ItemDeque<TT> {
-    fn add(&mut self, other: Option<TT>) {
-        if let Some(item) = other {
-            self.push_back(item);
-        }
-    }
-    fn subtract(&mut self, _: ()) -> Option<TT> {
-        self.pop_front()
-    }
-    fn total(&self) -> u32 {
-        self.len() as u32
-    }
-}
-
-// impl<TT> VectorArithmetic<TT, (), u32> for ItemDeque<TT> {
-//     fn add(&mut self, other: TT) {
-//         self.push_back(other);
-//     }
-//     fn subtract(&mut self, _: ()) -> TT {
-//         self.pop_front().unwrap_or_else(|| {
-//             panic!("Tried to pop from an empty ItemDeque");
-//         })
-//     }
-//     fn total(&self) -> u32 {
-//         self.len() as u32
-//     }
-// }
-
 impl<TT: Default> Default for ItemDeque<TT> {
     fn default() -> Self {
         ItemDeque(VecDeque::new())
+    }
+}
+
+impl<TT> ResourceAdd<TT> for ItemDeque<TT> {
+    fn add(&mut self, item: TT) {
+        self.push_back(item);
+    }
+}
+
+impl<TT> ResourceRemove<(), Option<TT>> for ItemDeque<TT> {
+    fn remove(&mut self, _: ()) -> Option<TT> {
+        self.pop_front()
+    }
+}
+
+impl<TT> ResourceTotal<u32> for ItemDeque<TT> {
+    fn total(&self) -> u32 {
+        self.len() as u32
     }
 }
 
@@ -111,29 +101,34 @@ pub struct ItemMap<S, T: HasUniqueKey<S>>(HashMap<S, T>);
 impl<S, T: HasUniqueKey<S>> Deref for ItemMap<S, T> { type Target = HashMap<S, T>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl<S, T: HasUniqueKey<S>> DerefMut for ItemMap<S, T> { fn deref_mut(&mut self) -> &mut HashMap<S, T> { &mut self.0 } }
 
-impl<S, T: HasUniqueKey<S>> VectorArithmetic<Option<T>, (), u32> for ItemMap<S, T>
+impl<T> ResourceAdd<T> for ItemMap<String, T>
 where
-    S: Eq + std::hash::Hash,
+    T: HasUniqueKey<String>,
 {
-    fn add(&mut self, other: Option<T>) {
-        if let Some(item) = other {
-            self.insert(item.get_key(), item);
-        }
+    fn add(&mut self, item: T) {
+        self.insert(item.get_key(), item);
     }
-    fn subtract(&mut self, _: ()) -> Option<T> {
-        if let Some((_, item)) = self.iter_mut().next() {
-            let key = item.get_key();
-            let item = self.remove(&key);
-            return item;
-        }
-        None
+}
+
+impl<T> ResourceRemove<String, Option<T>> for ItemMap<String, T>
+where
+    T: HasUniqueKey<String>,
+{
+    fn remove(&mut self, key: String) -> Option<T> {
+        HashMap::<String, T>::remove(self, &key)
     }
+}
+
+impl<T> ResourceTotal<u32> for ItemMap<String, T>
+where
+    T: HasUniqueKey<String>,
+{
     fn total(&self) -> u32 {
         self.len() as u32
     }
 }
 
-impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, Option<T>, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
+impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>, u32> for DiscreteStock<T> where Self: Model {
     type StockState = DiscreteStockState;
     fn get_state(&mut self) -> Self::StockState {
         let occupied = self.resource.total();
@@ -155,7 +150,7 @@ impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, Option<T>, (), Optio
     fn get_resource(&self) -> &ItemDeque<T> {
         &self.resource
     }
-    fn add_impl<'a>(&'a mut self, payload: &'a (Option<T>, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn add_impl<'a>(&'a mut self, payload: &'a (T, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             self.resource.add(payload.0.clone());
         }
@@ -227,7 +222,8 @@ pub struct DiscreteStockLogger<T> where T: Send {
     pub buffer: EventQueue<DiscreteStockLog<T>>,
 }
 
-impl<T> Logger for DiscreteStockLogger<T> where DiscreteStockLog<T>: Serialize, T: Send + 'static {
+// impl<T> Logger for DiscreteStockLogger<T> where DiscreteStockLog<T>: Serialize, T: Send + 'static {
+impl<T> Logger for DiscreteStockLogger<T> where T: Serialize + Send + 'static {
     type RecordType = DiscreteStockLog<T>;
     fn get_name(&self) -> &String {
         &self.name
@@ -276,23 +272,24 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
  * U: Parameter type pushed to downstream stock
  * V: Parameter type requested from upstream stock
  * W: Parameter type received from upstream stock
+ * X: Parameter type of internal stored resource
  */
-pub struct DiscreteProcess<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> {
+pub struct DiscreteProcess<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, W)>,
+    pub process_state: Option<(Duration, X)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
-    pub log_emitter: Output<DiscreteProcessLog<U>>,
+    pub log_emitter: Output<DiscreteProcessLog<X>>,
     time_to_next_event: Option<Duration>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
 }
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Default for DiscreteProcess<U, V, W> {
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Default for DiscreteProcess<U, V, W, X> {
     fn default() -> Self {
         DiscreteProcess {
             element_name: "DiscreteProcess".to_string(),
@@ -312,7 +309,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> DiscreteProcess<U, V, W> {
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> DiscreteProcess<U, V, W, X> {
     pub fn new() -> Self {
         DiscreteProcess::default()
     }
@@ -332,12 +329,13 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 }
 
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteProcess<U, V, W> {}
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Model for DiscreteProcess<U, V, W, X> {}
 
-impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteProcess<U, (), Option<U>>
+impl<U: Clone + Debug + Send + 'static> Process for DiscreteProcess<U, (), Option<U>, U>
 where
     Self: Model,
-    ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+    // ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+    ItemDeque<U>: ResourceAdd<U> + ResourceRemove<(), Option<U>> + ResourceTotal<u32>
 {
     type LogDetailsType = DiscreteProcessLogType<U>;
 
@@ -383,17 +381,25 @@ where
                             Some(DiscreteStockState::Normal { .. } | DiscreteStockState::Full { .. }),
                             Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }),
                         ) => {
-                            let moved = self.withdraw_upstream.send(((), NotificationMetadata {
+                            let received = self.withdraw_upstream.send(((), NotificationMetadata {
                                 time,
                                 element_from: self.element_name.clone(),
                                 message: "Withdraw request".into(),
                             })).await.next().unwrap();
-                            let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                panic!("Process time distribution not set for process {}", self.element_name);
-                            }).sample();
-                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
-                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: moved.clone() }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            match received {
+                                Some(received_resource) => {
+                                    let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                        panic!("Process time distribution not set for process {}", self.element_name);
+                                    }).sample();
+                                    self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), received_resource.clone()));
+                                    self.log(time, DiscreteProcessLogType::ProcessStart { resource: received_resource }).await;
+                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                                },
+                                None => {
+                                    self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream did not provide resource" }).await;
+                                    self.time_to_next_event = None;
+                                }
+                            }
                         },
                         (Some(DiscreteStockState::Empty { .. }), _ ) => {
                             self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
@@ -430,7 +436,7 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<ItemDeque<U>, Option<U>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -469,7 +475,7 @@ pub struct DiscreteProcessLog<T> {
     pub event: DiscreteProcessLogType<T>,
 }
 
-impl Serialize for DiscreteProcessLog<String> {
+impl<T: Serialize> Serialize for DiscreteProcessLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
@@ -478,9 +484,9 @@ impl Serialize for DiscreteProcessLog<String> {
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let (event_type, item, reason): (String, Option<&str>, Option<&str>) = match &self.event {
-            DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), Some(resource), None),
-            DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), Some(resource), None),
+        let (event_type, item, reason): (String, Option<String>, Option<&str>) = match &self.event {
+            DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), Some(serde_json::to_string(resource).unwrap()), None),
+            DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), Some(serde_json::to_string(resource).unwrap()), None),
             DiscreteProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
         };
         state.serialize_field("event_type", &event_type)?;
@@ -490,33 +496,12 @@ impl Serialize for DiscreteProcessLog<String> {
     }
 }
 
-// impl Serialize for DiscreteProcessLog<Option<String>> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//         where
-//             S: serde::Serializer {
-//         let mut state = serializer.serialize_struct("DiscreteProcessLog", 7)?;
-//         state.serialize_field("time", &self.time)?;
-//         state.serialize_field("event_id", &self.event_id)?;
-//         state.serialize_field("element_name", &self.element_name)?;
-//         state.serialize_field("element_type", &self.element_type)?;
-//         let (event_type, item, reason): (String, Option<&str>, Option<&str>) = match &self.event {
-//             DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), resource.as_deref(), None),
-//             DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), resource.as_deref(), None),
-//             DiscreteProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
-//         };
-//         state.serialize_field("event_type", &event_type)?;
-//         state.serialize_field("item", &item)?;
-//         state.serialize_field("reason", &reason)?;
-//         state.end()
-//     }
-// }
-
 pub struct DiscreteProcessLogger<T> where T: Send {
     pub name: String,
     pub buffer: EventQueue<DiscreteProcessLog<T>>,
 }
 
-impl<T> Logger for DiscreteProcessLogger<T> where DiscreteProcessLog<T>: Serialize, T: Send + 'static {
+impl<T> Logger for DiscreteProcessLogger<T> where T: Serialize, T: Send + 'static {
     type RecordType = DiscreteProcessLog<T>;
     fn get_name(&self) -> &String {
         &self.name
@@ -620,15 +605,20 @@ impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Default> DiscreteSource<T, 
         self.process_time_distr = Some(distr);
         self
     }
+    pub fn with_item_factory(mut self, item_factory: TF) -> Self {
+        self.item_factory = item_factory;
+        self
+    }
 }
 
 
 impl<T: Clone + Send + 'static, TF: ItemFactory<T> + Send + 'static> Model for DiscreteSource<T, TF> {}
 
-impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process<ItemDeque<T>, Option<T>, (), u32> for DiscreteSource<T, TF>
+impl<T: Clone + Debug + Send + 'static, TF: ItemFactory<T> + Send + 'static> Process for DiscreteSource<T, TF>
 where
     Self: Model,
-    ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
+    ItemDeque<T>: ResourceAdd<T> + ResourceRemove<(), Option<T>> + ResourceTotal<u32>,
+    // ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
 {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
@@ -707,7 +697,7 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<ItemDeque<T>, Option<T>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -736,7 +726,7 @@ pub struct DiscreteSink<
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
-    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
+    pub withdraw_upstream: Requestor<(V, NotificationMetadata), Option<T>>,
     pub process_state: Option<(Duration, T)>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
@@ -784,10 +774,11 @@ impl<T: Clone + Send + 'static, V: Clone + Send + 'static> DiscreteSink<T, V> {
 
 impl<T: Clone + Send + 'static, V: Clone + Send + 'static> Model for DiscreteSink<T, V> {}
 
-impl<T: Clone + Debug + Send + 'static> Process<ItemDeque<T>, Option<T>, (), u32> for DiscreteSink<T, ()>
+impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<T, ()>
 where
     Self: Model,
-    ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
+    ItemDeque<T>: ResourceAdd<T> + ResourceRemove<(), Option<T>> + ResourceTotal<u32>,
+    // ItemDeque<T>: VectorArithmetic<Option<T>, (), u32>,
 {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
@@ -829,12 +820,21 @@ where
                                 element_from: self.element_name.clone(),
                                 message: "Withdraw request".into(),
                             })).await.next().unwrap();
-                            let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                panic!("Process time distribution not set for sink {}", self.element_name);
-                            }).sample();
-                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
-                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: moved }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            match moved {
+                                Some(moved) => {
+                                    let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                        panic!("Process time distribution not set for sink {}", self.element_name);
+                                    }).sample();
+                                    self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
+                                    self.log(time, DiscreteProcessLogType::ProcessStart { resource: moved }).await;
+                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                                },
+                                None => {
+                                    self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream did not provide resource" }).await;
+                                    self.time_to_next_event = None;
+                                    return;
+                                }
+                            }
                         },
                         Some(DiscreteStockState::Empty { .. }) => {
                             self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
@@ -863,7 +863,7 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<ItemDeque<T>, Option<T>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -889,6 +889,7 @@ pub struct DiscreteParallelProcess<
     U: Clone + Send + 'static,
     V: Clone + Send + 'static,
     W: Clone + Send + 'static,
+    X: Clone + Send + 'static
 > {
     pub element_name: String,
     pub element_type: String,
@@ -896,7 +897,7 @@ pub struct DiscreteParallelProcess<
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), W>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub processes_in_progress: Vec<(Duration, U)>,
+    pub processes_in_progress: Vec<(Duration, X)>,
     pub processes_complete: VecDeque<U>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
@@ -906,7 +907,7 @@ pub struct DiscreteParallelProcess<
     pub previous_check_time: MonotonicTime,
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Default for DiscreteParallelProcess<U, V, W> {
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Default for DiscreteParallelProcess<U, V, W, X> {
     fn default() -> Self {
         DiscreteParallelProcess {
             element_name: "DiscreteParallelProcess".to_string(),
@@ -927,7 +928,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> DiscreteParallelProcess<U, V, W> {
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> DiscreteParallelProcess<U, V, W, X> {
     pub fn new() -> Self {
         DiscreteParallelProcess::default()
     }
@@ -946,16 +947,16 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
     }
 }
 
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static> Model for DiscreteParallelProcess<U, V, W> {}
+impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Model for DiscreteParallelProcess<U, V, W, X> {}
 
-impl<U: Clone + Debug + Send + 'static> Process<ItemDeque<U>, Option<U>, (), u32> for DiscreteParallelProcess<U, (), Option<U>>
+impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<U, (), Option<U>, U>
 where
     Self: Model,
-    ItemDeque<U>: VectorArithmetic<Option<U>, (), u32>,
+    ItemDeque<U>: ResourceAdd<U> + ResourceRemove<(), Option<U>> + ResourceTotal<u32>,
 {
     type LogDetailsType = DiscreteProcessLogType<U>;
 
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
+    fn get_time_to_next_event(&mut self) -> &Option<Duration> { 
         &self.time_to_next_event
     }
 
@@ -1020,8 +1021,8 @@ where
                                 panic!("Process time distribution not set for process {}", self.element_name);
                             }).sample());
 
-                            self.processes_in_progress.push((process_duration, Some(item.clone())));
-                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: Some(item) }).await;
+                            self.processes_in_progress.push((process_duration, item.clone()));
+                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: item }).await;
 
                         } else {
                             break;
@@ -1057,7 +1058,7 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<ItemDeque<U>, Option<U>, (), u32>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };

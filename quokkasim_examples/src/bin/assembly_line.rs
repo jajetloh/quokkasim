@@ -1,13 +1,20 @@
 use std::{error::Error, fs::create_dir_all, time::Duration};
 use quokkasim::{define_model_enums, prelude::*};
+use serde::Serialize;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 struct ProtoCar {
     id: usize,
 }
 
 struct ProtoCarGenerator {
     next_id: usize
+}
+
+impl Default for ProtoCarGenerator {
+    fn default() -> Self {
+        ProtoCarGenerator { next_id: 0 }
+    }
 }
 
 impl ItemFactory<ProtoCar> for ProtoCarGenerator {
@@ -20,9 +27,10 @@ impl ItemFactory<ProtoCar> for ProtoCarGenerator {
 
 define_model_enums! {
     pub enum ComponentModel {
-        ProtoCarProcess(DiscreteProcess<Option<ProtoCar>, (), Option<ProtoCar>>, Mailbox<DiscreteProcess<Option<ProtoCar>, (), Option<ProtoCar>>>),
+        ProtoCarProcess(DiscreteProcess<ProtoCar, (), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteProcess<ProtoCar, (), Option<ProtoCar>, ProtoCar>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
         ProtoCarSource(DiscreteSource<ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCarGenerator>>),
+        ProtoCarSink(DiscreteSink<ProtoCar, ()>, Mailbox<DiscreteSink<ProtoCar, ()>>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
@@ -37,7 +45,7 @@ impl CustomComponentConnection for ComponentModel {
         match (a, b) {
             (ComponentModel::ProtoCarSource(source, source_mbox), ComponentModel::ProtoCarStock(stock, stock_mbox)) => {
                 source.req_downstream.connect(DiscreteStock::get_state_async, stock_mbox.address());
-                source.push_downstream.map_connect(|x| (Some(x.0.clone()), x.1.clone()), DiscreteStock::add, stock_mbox.address());
+                source.push_downstream.connect(DiscreteStock::add, stock_mbox.address());
                 stock.state_emitter.connect(DiscreteSource::update_state, source_mbox.address());
                 Ok(())
             },
@@ -53,6 +61,12 @@ impl CustomComponentConnection for ComponentModel {
                 stock.state_emitter.connect(DiscreteProcess::update_state, process_mbox.address());
                 Ok(())
             },
+            (ComponentModel::ProtoCarStock(stock, stock_mbox), ComponentModel::ProtoCarSink(sink, sink_mbox)) => {
+                sink.req_upstream.connect(DiscreteStock::get_state_async, stock_mbox.address());
+                sink.withdraw_upstream.connect(DiscreteStock::remove, stock_mbox.address());
+                stock.state_emitter.connect(DiscreteSink::update_state, sink_mbox.address());
+                Ok(())
+            },
             (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }
@@ -62,6 +76,22 @@ impl CustomLoggerConnection for ComponentLogger {
     type ComponentType = ComponentModel;
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b, n) {
+            (ComponentLogger::ProtoCarProcessLogger(logger), ComponentModel::ProtoCarProcess(process, _), _) => {
+                process.log_emitter.connect_sink(&logger.buffer);
+                Ok(())
+            },
+            (ComponentLogger::ProtoCarProcessLogger(logger), ComponentModel::ProtoCarSource(process, _), _) => {
+                process.log_emitter.connect_sink(&logger.buffer);
+                Ok(())
+            },
+            (ComponentLogger::ProtoCarProcessLogger(logger), ComponentModel::ProtoCarSink(process, _), _) => {
+                process.log_emitter.connect_sink(&logger.buffer);
+                Ok(())
+            },
+            (ComponentLogger::ProtoCarStockLogger(logger), ComponentModel::ProtoCarStock(stock, _), _) => {
+                stock.log_emitter.connect_sink(&logger.buffer);
+                Ok(())
+            },
             (a, b, _) => Err(format!("No logger connection defined from {} to {} (n={:?})", a, b, n).into()),
         }
     }
@@ -75,6 +105,18 @@ impl CustomInit for ComponentModelAddress {
             message: "Start".into(),
         };
         match self {
+            ComponentModelAddress::ProtoCarProcess(addr) => {
+                simu.process_event(DiscreteProcess::update_state, notif_meta, addr.clone()).unwrap();
+                Ok(())
+            },
+            ComponentModelAddress::ProtoCarSource(addr) => {
+                simu.process_event(DiscreteSource::update_state, notif_meta, addr.clone()).unwrap();
+                Ok(())
+            },
+            ComponentModelAddress::ProtoCarSink(addr) => {
+                simu.process_event(DiscreteSink::update_state, notif_meta, addr.clone()).unwrap();
+                Ok(())
+            },
             _ => {
                 Err(ExecutionError::BadQuery)
             }
@@ -89,10 +131,14 @@ fn main() {
         next_seed: 0,
     };
 
-    let mut source = ComponentModel::DiscreteSourceString(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
+    let mut source = ComponentModel::ProtoCarSource(DiscreteSource::new()
+        .with_name("Source".into())
+        .with_process_time_distr(Distribution::Constant(3.)),
+        Mailbox::new()
+    );
     let mut source_addr = source.get_address();
 
-    let mut queue_1 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+    let mut queue_1 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue1".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -100,14 +146,14 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_1 = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
+    let mut process_1 = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
         .with_name("Process1".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
     let mut process_1_addr = process_1.get_address();
 
-    let mut queue_2 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+    let mut queue_2 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue2".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -115,14 +161,14 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_par = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
+    let mut process_par = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
         .with_name("Process2".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
     let mut process_par_addr = process_par.get_address();
 
-    let mut queue_3 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+    let mut queue_3 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue3".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -130,7 +176,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut sink = ComponentModel::DiscreteSinkString(DiscreteSink::new()
+    let mut sink = ComponentModel::ProtoCarSink(DiscreteSink::new()
         .with_name("Sink".into())
         .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
@@ -144,8 +190,8 @@ fn main() {
     connect_components!(&mut process_par, &mut queue_3).unwrap();
     connect_components!(&mut queue_3, &mut sink).unwrap();
 
-    let mut queue_logger = ComponentLogger::DiscreteStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
-    let mut process_logger = ComponentLogger::DiscreteProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
+    let mut queue_logger = ComponentLogger::ProtoCarStockLogger(DiscreteStockLogger::new("QueueLogger".into()));
+    let mut process_logger = ComponentLogger::ProtoCarProcessLogger(DiscreteProcessLogger::new("ProcessLogger".into()));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
@@ -173,7 +219,7 @@ fn main() {
 
     simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
 
-    let output_dir = "outputs/discrete_queue";
+    let output_dir = "outputs/assembly_line";
     create_dir_all(output_dir).unwrap();
     queue_logger.write_csv(output_dir.into()).unwrap();
     process_logger.write_csv(output_dir.into()).unwrap();

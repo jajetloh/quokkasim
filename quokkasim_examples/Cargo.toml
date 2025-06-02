@@ -29,7 +29,6 @@ name = "discrete_queue"
 path = "src/bin/discrete_queue.rs"
 harness = false
 
-
 [[test]]
 name = "iron_ore"
 path = "src/bin/iron_ore.rs"

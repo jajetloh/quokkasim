@@ -4,9 +4,7 @@ use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
 use std::{fmt::Debug, time::Duration};
 
-use crate::{core::{StateEq, Process, Stock}, prelude::{Vector3, VectorArithmetic}};
-use crate::core::Logger;
-use crate::common::{Distribution, NotificationMetadata};
+use crate::prelude::*;
 
 /**
  * Stock
@@ -40,7 +38,7 @@ impl StateEq for VectorStockState {
     }
 }
 
-pub struct VectorStock<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static> {
+pub struct VectorStock<T: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
     pub vector: T,
@@ -51,7 +49,8 @@ pub struct VectorStock<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send +
     pub prev_state: Option<VectorStockState>,
     next_event_id: u64,
 }
-impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Default + Send> Default for VectorStock<T> {
+
+impl<T: Clone + Debug + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
             element_name: String::new(),
@@ -67,7 +66,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Default + Send> Default 
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> Stock<T, T, f64, T, f64> for VectorStock<T> where Self: Model {
+impl<T: Clone + Debug + Send> Stock<T, T, f64, T, f64> for VectorStock<T>
+where
+    Self: Model,
+    T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>
+{
 
     type StockState = VectorStockState;
 
@@ -111,7 +114,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> Stock<T, T, f64, T
     ) -> impl Future<Output=T> + 'a {
         async move {
             self.prev_state = Some(self.get_state());
-            self.vector.subtract(data.0.clone())
+            self.vector.remove(data.0.clone())
         }
     }
 
@@ -139,7 +142,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> Stock<T, T, f64, T
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> VectorStock<T> where Self: Model {
+impl<T: Clone + Debug + Send> VectorStock<T>
+where
+    Self: Model,
+    T: ResourceTotal<f64>
+{
     pub fn get_state(&mut self) -> VectorStockState {
         let occupied = self.vector.total();
         let empty = self.max_capacity - occupied;
@@ -196,7 +203,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send> VectorStock<T> whe
     }
 }
 
-impl<T: Debug + Clone + Send + VectorArithmetic<T, f64, f64>> Model for VectorStock<T> {}
+impl<T: Debug + Clone + Send> Model for VectorStock<T> {}
 
 pub struct VectorStockLogger<T> where T: Send {
     pub name: String,
@@ -253,17 +260,16 @@ impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
  */
 
  /**
-  * T: Resource type of upstream stock
+  * T: Returned type from upstream stock
   * U: Message type for pushing to downstream stock
   * V: Message type for withdrawing from upstream stock
-  *
-  * M: Number of upstream stocks
-  * N: Number of downstream stocks
+  * W: Internal resource type of process state
   */
 pub struct VectorProcess<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
+    T: Clone + Send + 'static,
     U: Clone + Send + 'static,
     V: Clone + Send + 'static,
+    W: Clone + Send + 'static
 > {
     pub element_name: String,
     pub element_type: String,
@@ -271,19 +277,20 @@ pub struct VectorProcess<
     pub req_downstream: Requestor<(), VectorStockState>,
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
     pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, T)>,
+    pub process_state: Option<(Duration, W)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
     next_event_id: u64,
-    pub log_emitter: Output<VectorProcessLog<T>>,
+    pub log_emitter: Output<VectorProcessLog<W>>,
     pub previous_check_time: MonotonicTime,
 }
 impl<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Default + Send,
+    T: Clone + Send,
     U: Clone + Send,
     V: Clone + Send,
-> Default for VectorProcess<T, U, V> {
+    W: Clone + Send
+> Default for VectorProcess<T, U, V, W> {
     fn default() -> Self {
         VectorProcess {
             element_name: String::new(),
@@ -305,10 +312,13 @@ impl<
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send> Model for VectorProcess<T, U, V> {}
+impl<T: Clone + Send + 'static + Debug, V: Clone + Send> Model for VectorProcess<T, T, V, T> {}
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<T, T, f64, f64> for VectorProcess<T, T, f64> where Self: Model {
-
+impl<T: Clone + Send + 'static + Debug> Process for VectorProcess<T, T, f64, T>
+where
+    Self: Model,
+    T: ResourceTotal<f64>
+{
     type LogDetailsType = VectorProcessLogType<T>;
 
     fn get_time_to_next_event(&mut self) -> &Option<Duration> {
@@ -333,7 +343,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
                         self.push_downstream.send((resource.clone(), NotificationMetadata {
                             time,
                             element_from: self.element_name.clone(),
-                            message: format!("Pushing quantity {:?}", resource),
+                            message: "Process successful".into(),
                         })).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
@@ -396,7 +406,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -418,7 +428,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
     }
 }
 
-impl<T, U: Clone + Send> VectorProcess<T, T, U> where T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static, Self: Model {
+impl<T: Clone + Debug + Send + 'static> VectorProcess<T, T, f64, T> {
     pub fn with_name(self, name: String) -> Self {
         VectorProcess {
             element_name: name,
@@ -595,9 +605,10 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send + 'static {
   * M: Number of upstream stocks - number of stocks to combine from
   */
 pub struct VectorCombiner<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
+    T: Clone + Send + 'static,
     U: Clone + Send + 'static,
     V: Clone + Send + 'static,
+    W: Clone + Send + 'static,
     const M: usize
 > {
     pub element_name: String,
@@ -606,7 +617,7 @@ pub struct VectorCombiner<
     pub req_downstream: Requestor<(), VectorStockState>,
     pub withdraw_upstreams: [Requestor<(V, NotificationMetadata), T>; M],
     pub push_downstream: Output<(U, NotificationMetadata)>,
-    pub process_state: Option<(Duration, Vec<T>)>,
+    pub process_state: Option<(Duration, W)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
@@ -616,14 +627,14 @@ pub struct VectorCombiner<
     pub split_ratios: [f64; M],
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static, const M: usize> Model for VectorCombiner<T, T, f64, M> {}
+impl<T: Clone + Debug + Send + 'static, V: Clone + Send, const M: usize> Model for VectorCombiner<T, T, V, [T; M], M> {}
 
 impl<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
+    T: Clone + Debug + Send + 'static,
     U: Clone + Send,
     V: Clone + Send,
     const M: usize
-> VectorCombiner<T, U, V, M> {
+> VectorCombiner<T, U, V, [T; M], M> {
     pub fn new() -> Self {
         VectorCombiner {
             element_name: String::new(),
@@ -665,9 +676,12 @@ impl<
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const M: usize> Process<T, T, f64, f64> for VectorCombiner<T, T, f64, M> where Self: Model {
+impl<T: Send + 'static + Clone + Debug + Default, const M: usize> Process for VectorCombiner<T, T, f64, [T; M], M>
+where
+    T: ResourceAdd<T> + ResourceTotal<f64>,
+{
     type LogDetailsType = VectorProcessLogType<T>;
-    
+
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
@@ -690,9 +704,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
                         let mut total: T = Default::default();
-                        while let Some(resource) = resources.pop() {
-                            total.add(resource);
+
+                        for resource in resources.iter() {
+                            total.add(resource.clone());
                         }
+
                         self.log(time, VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
                         self.push_downstream.send((total, NotificationMetadata {
                             time,
@@ -731,10 +747,14 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                                     message: format!("Withdrawing quantity {:?}", process_quantity),
                                 }))
                             })).await;
-                            let withdrawn: Vec<T> = withdraw_iterators.into_iter().filter_map(|mut x| x.next()).collect();
+                            let withdrawn: [T; M] = withdraw_iterators.into_iter()
+                                .map(|mut x| x.next().unwrap_or_else(|| Default::default()))
+                                .collect::<Vec<T>>()
+                                .try_into()
+                                .expect("Failed to convert to array");
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
-                            self.log(time, VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn }).await;
+                            self.log(time, VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn.into() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(false), _) => {
@@ -762,7 +782,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -772,7 +792,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -807,9 +827,10 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
   */
 
 pub struct VectorSplitter<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
+    T: Clone + Send + 'static,
     U: Clone + Send + 'static,
     V: Clone + Send + 'static,
+    W: Clone + Send + 'static,
     const N: usize
 > {
     pub element_name: String,
@@ -818,7 +839,7 @@ pub struct VectorSplitter<
     pub req_downstreams: [Requestor<(), VectorStockState>; N],
     pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
     pub push_downstreams: [Output<(U, NotificationMetadata)>; N],
-    pub process_state: Option<(Duration, U)>,
+    pub process_state: Option<(Duration, W)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
@@ -828,7 +849,7 @@ pub struct VectorSplitter<
     pub split_ratios: [f64; N],
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const N: usize> VectorSplitter<T, T, f64, N> {
+impl<T: Send + 'static + Clone + Debug + Default, const N: usize> VectorSplitter<T, T, f64, T, N> {
     pub fn new() -> Self {
         Default::default()
     }
@@ -855,7 +876,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send, const N: usize> Default for VectorSplitter<T, U, V, N> {
+impl<T: Send + 'static + Clone + Debug, U: Clone + Send, V: Clone + Send, const N: usize> Default for VectorSplitter<T, U, V, T, N> {
     fn default() -> Self {
         VectorSplitter {
             element_name: String::new(),
@@ -876,9 +897,12 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug, U: Clone
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + Clone + Debug, V: Clone + Debug + Send, const N: usize> Model for VectorSplitter<T, T, V, N> {}
+impl<T: Clone + Send + 'static, const N: usize> Model for VectorSplitter<T, T, f64, T, N> {}
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default, const N: usize> Process<T, T, f64, f64> for VectorSplitter<T, T, f64, N> where Self: Model {
+impl<T: Send + 'static + Clone + Debug + Default, const N: usize> Process for VectorSplitter<T, T, f64, T, N>
+where
+    T: ResourceRemove<f64, T> + ResourceTotal<f64>,
+{
     type LogDetailsType = VectorProcessLogType<T>;
     
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
@@ -906,7 +930,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     
                         let split_resources = self.split_ratios.iter().map(|ratio| {
                             let quantity = resource.total() * ratio;
-                            resource.clone().subtract(quantity)
+                            resource.clone().remove(quantity)
                         }).collect::<Vec<_>>();
                         
                         self.log(time, VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
@@ -990,7 +1014,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -1023,9 +1047,9 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
  */
 
 pub struct VectorSource<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static,
-    U: Clone + Send + 'static>
-{
+    T: Clone + Send + 'static,
+    U: Clone + Send + 'static
+> {
     pub element_name: String,
     pub element_type: String,
     pub req_downstream: Requestor<(), VectorStockState>,
@@ -1040,10 +1064,7 @@ pub struct VectorSource<
     pub previous_check_time: MonotonicTime,
 }
 
-impl<
-    T: VectorArithmetic<T, f64, f64> + Clone + Debug + Default + Send,
-    U: Clone + Send
-> Default for VectorSource<T, U>  {
+impl<T: Clone + Debug + Default + Send, U: Clone + Send> Default for VectorSource<T, U> {
     fn default() -> Self {
         VectorSource {
             element_name: String::new(),
@@ -1062,9 +1083,9 @@ impl<
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default> Model for VectorSource<T, T> {}
+impl<T: Clone + Send + 'static, U: Clone + Send + 'static> Model for VectorSource<T, U> {}
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default> VectorSource<T, T> {
+impl<T: Send + 'static + Clone + Debug + Default> VectorSource<T, T> {
     pub fn new() -> Self {
         Default::default()
     }
@@ -1098,7 +1119,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<T, T, f64, f64> for VectorSource<T, T> where Self: Model {
+impl<T: Send + 'static + Clone + Debug> Process for VectorSource<T, T>
+where
+    Self: Model,
+    T: ResourceTotal<f64> + ResourceMultiply<f64>
+{
     type LogDetailsType = VectorProcessLogType<T>;
     
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
@@ -1113,7 +1138,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a where Self: Model {
+    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + 'a {
         async move {
             let time = cx.time();
 
@@ -1168,7 +1193,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1178,7 +1203,7 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process<T, T, f64, f64>>::update_state, notif_meta.clone()).unwrap();
+                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
                     };
                 }
             };
@@ -1209,11 +1234,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug> Process<
  * V: Message type for pushing to downstream stock
  */
 
-pub struct VectorSink<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 'static> {
+pub struct VectorSink<T: Clone + Debug + Send + 'static, V: Clone + Send + 'static> {
     pub element_name: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
-    pub withdraw_upstream: Requestor<(f64, NotificationMetadata), T>,
+    pub withdraw_upstream: Requestor<(V, NotificationMetadata), T>,
     pub process_state: Option<(Duration, T)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
@@ -1223,9 +1248,9 @@ pub struct VectorSink<T: VectorArithmetic<T, f64, f64> + Clone + Debug + Send + 
     pub previous_check_time: MonotonicTime,
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default> Model for VectorSink<T> {}
+impl<T: Send + 'static + Clone + Debug + Default, V: Clone + Send + 'static> Model for VectorSink<T, V> {}
 
-impl<T: VectorArithmetic<T, f64, f64> + Clone + Send + Debug + Default + 'static> Default for VectorSink<T> {
+impl<T: Clone + Send + Debug + Default + 'static, V: Clone + Send + 'static> Default for VectorSink<T, V> {
     fn default() -> Self {
         VectorSink {
             element_name: String::new(),
@@ -1243,11 +1268,11 @@ impl<T: VectorArithmetic<T, f64, f64> + Clone + Send + Debug + Default + 'static
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default> VectorSink<T> {
+impl<T: Clone + Send + 'static + Debug + Default, V: Clone + Send + 'static> VectorSink<T, V> {
     pub fn new() -> Self {
         Default::default()
     }
-    
+
     pub fn with_name(self, name: String) -> Self {
         VectorSink {
             element_name: name,
@@ -1270,9 +1295,12 @@ impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default
     }
 }
 
-impl<T: VectorArithmetic<T, f64, f64> + Send + 'static + Clone + Debug + Default> Process<T, T, f64, f64> for VectorSink<T> where Self: Model {
+impl<T: Send + 'static + Clone + Debug + Default> Process for VectorSink<T, f64>
+where
+    T: ResourceTotal<f64>,
+{
     type LogDetailsType = VectorProcessLogType<T>;
-    
+
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }

@@ -14,7 +14,7 @@ pub struct DumpingProcess {
     pub req_downstream_ore: Requestor<(), VectorStockState>,
 
     pub withdraw_upstream_trucks: Requestor<((), NotificationMetadata), Option<Truck>>,
-    pub push_downstream_trucks: Output<(Option<Truck>, NotificationMetadata)>,
+    pub push_downstream_trucks: Output<(Truck, NotificationMetadata)>,
     pub push_downstream_ore: Output<(IronOre, NotificationMetadata)>,
 
     pub process_state: Option<(Duration, Truck)>,
@@ -87,7 +87,7 @@ impl DumpingProcess {
                             message: "Truck dumped".into(),
                         };
                         let ore = truck.ore.take();
-                        self.push_downstream_trucks.send((Some(truck.clone()), nm.clone())).await;
+                        self.push_downstream_trucks.send((truck.clone(), nm.clone())).await;
                         match ore {
                             Some(ore) => {
                                 self.push_downstream_ore.send((ore.clone(), nm)).await;

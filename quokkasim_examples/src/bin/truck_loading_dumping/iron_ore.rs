@@ -37,7 +37,8 @@ impl Default for IronOre {
     }
 }
 
-impl VectorArithmetic<IronOre, f64, f64> for IronOre {
+
+impl ResourceAdd<IronOre> for IronOre {
     fn add(&mut self, other: Self) {
         self.fe += other.fe;
         self.other_elements += other.other_elements;
@@ -45,12 +46,14 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.hematite += other.hematite;
         self.limonite += other.limonite;
     }
+}
 
-    fn subtract(&mut self, quantity: f64) -> IronOre {
+impl ResourceRemove<f64, IronOre> for IronOre {
+    fn remove(&mut self, quantity: f64) -> Self {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
         
-        let result = IronOre {
+        let removed = IronOre {
             fe: self.fe * proportion_removed,
             other_elements: self.other_elements * proportion_removed,
             magnetite: self.magnetite * proportion_removed,
@@ -64,11 +67,22 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.hematite *= proportion_remaining;
         self.limonite *= proportion_remaining;
 
-        result
+        removed
     }
+}
 
-    // We use the Fe + Other Elements as the 'source of truth' for the total mass
+impl ResourceTotal<f64> for IronOre {
     fn total(&self) -> f64 {
         self.fe + self.other_elements
+    }
+}
+
+impl ResourceMultiply<f64> for IronOre {
+    fn multiply(&mut self, factor: f64) {
+        self.fe *= factor;
+        self.other_elements *= factor;
+        self.magnetite *= factor;
+        self.hematite *= factor;
+        self.limonite *= factor;
     }
 }

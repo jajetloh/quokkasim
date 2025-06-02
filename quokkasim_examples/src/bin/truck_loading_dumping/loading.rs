@@ -15,7 +15,7 @@ pub struct LoadingProcess {
 
     pub withdraw_upstream_trucks: Requestor<((), NotificationMetadata), Option<Truck>>,
     pub withdraw_upstream_ore: Requestor<(f64, NotificationMetadata), IronOre>,
-    pub push_downstream_trucks: Output<(Option<Truck>, NotificationMetadata)>,
+    pub push_downstream_trucks: Output<(Truck, NotificationMetadata)>,
 
     pub process_state: Option<(Duration, Truck, IronOre)>,
     pub process_quantity_distr: Distribution,
@@ -96,7 +96,7 @@ impl LoadingProcess {
                                 truck.ore = Some(ore_to_load);
                             }
                         }
-                        self.push_downstream_trucks.send((Some(truck), nm)).await;
+                        self.push_downstream_trucks.send((truck, nm)).await;
                     } else {
                         self.process_state = Some((process_time_left, truck, ore_to_load));
                     }

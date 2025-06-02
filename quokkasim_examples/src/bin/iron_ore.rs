@@ -36,7 +36,7 @@ impl Default for IronOre {
     }
 }
 
-impl VectorArithmetic<IronOre, f64, f64> for IronOre {
+impl ResourceAdd<IronOre> for IronOre {
     fn add(&mut self, other: Self) {
         self.fe += other.fe;
         self.other_elements += other.other_elements;
@@ -44,8 +44,10 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
         self.hematite += other.hematite;
         self.limonite += other.limonite;
     }
+}
 
-    fn subtract(&mut self, quantity: f64) -> Self {
+impl ResourceRemove<f64, IronOre> for IronOre {
+    fn remove(&mut self, quantity: f64) -> Self {
         let proportion_removed = quantity / self.total();
         let proportion_remaining = 1.0 - proportion_removed;
         
@@ -65,10 +67,21 @@ impl VectorArithmetic<IronOre, f64, f64> for IronOre {
 
         removed
     }
+}
 
-    // We use the Fe + Other Elements as the 'source of truth' for the total mass
+impl ResourceTotal<f64> for IronOre {
     fn total(&self) -> f64 {
         self.fe + self.other_elements
+    }
+}
+
+impl ResourceMultiply<f64> for IronOre {
+    fn multiply(&mut self, factor: f64) {
+        self.fe *= factor;
+        self.other_elements *= factor;
+        self.magnetite *= factor;
+        self.hematite *= factor;
+        self.limonite *= factor;
     }
 }
 
@@ -235,7 +248,7 @@ impl Logger for IronOreStockLogger {
 //
 define_model_enums! {
     pub enum ComponentModel {
-        IronOreProcess(VectorProcess<IronOre, IronOre, f64>, Mailbox<VectorProcess<IronOre, IronOre, f64>>),
+        IronOreProcess(VectorProcess<IronOre, IronOre, f64, IronOre>, Mailbox<VectorProcess<IronOre, IronOre, f64, IronOre>>),
         IronOreStock(VectorStock<IronOre>, Mailbox<VectorStock<IronOre>>)
     }
     pub enum ComponentModelAddress {}
@@ -251,13 +264,13 @@ impl CustomComponentConnection for ComponentModel {
     fn connect_components(a: &mut Self, b: &mut Self, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b) {
             (ComponentModel::IronOreProcess(a, ad), ComponentModel::IronOreStock(b, bd)) => {
-                b.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, ad.address());
+                b.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64, IronOre>::update_state, ad.address());
                 a.req_downstream.connect(VectorStock::<IronOre>::get_state_async, bd.address());
                 a.push_downstream.connect(VectorStock::<IronOre>::add, bd.address());
                 Ok(())
             },
             (ComponentModel::IronOreStock(a, ad), ComponentModel::IronOreProcess(b, bd)) => {
-                a.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64>::update_state, bd.address());
+                a.state_emitter.connect(VectorProcess::<IronOre, IronOre, f64, IronOre>::update_state, bd.address());
                 b.req_upstream.connect(VectorStock::<IronOre>::get_state_async, ad.address());
                 b.withdraw_upstream.connect(VectorStock::<IronOre>::remove, ad.address());
                 Ok(())
@@ -293,7 +306,7 @@ impl CustomInit for ComponentModelAddress {
         };
         match self {
             ComponentModelAddress::IronOreProcess(addr) => {
-                simu.process_event(VectorProcess::<IronOre, IronOre, f64>::update_state, notif_meta, addr.clone())?;
+                simu.process_event(VectorProcess::<IronOre, IronOre, f64, IronOre>::update_state, notif_meta, addr.clone())?;
                 Ok(())
             },
             ComponentModelAddress::IronOreStock(_) => {

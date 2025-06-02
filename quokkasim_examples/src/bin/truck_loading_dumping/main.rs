@@ -24,7 +24,7 @@ define_model_enums! {
         DiscreteStockTruck(DiscreteStock<Truck>, Mailbox<DiscreteStock<Truck>>),
         LoadingProcess(LoadingProcess, Mailbox<LoadingProcess>),
         DumpingProcess(DumpingProcess, Mailbox<DumpingProcess>),
-        DiscreteParallelProcessTruck(DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>, Mailbox<DiscreteParallelProcess<Option<Truck>, (), Option<Truck>>>),
+        DiscreteParallelProcessTruck(DiscreteParallelProcess<Truck, (), Option<Truck>, Truck>, Mailbox<DiscreteParallelProcess<Truck, (), Option<Truck>, Truck>>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
@@ -110,8 +110,8 @@ impl CustomLoggerConnection for ComponentLogger {
             (ComponentLogger::TruckingProcessLogger(logger), ComponentModel::DiscreteParallelProcessTruck(process, _), _) => {
                 process.log_emitter.filter_map_connect_sink(|x| {
                     let event = match &x.event {
-                        DiscreteProcessLogType::ProcessStart { resource } => TruckingProcessLogType::TruckMovementStart { truck_id: resource.clone().unwrap().truck_id },
-                        DiscreteProcessLogType::ProcessSuccess { resource } => TruckingProcessLogType::TruckMovementSuccess { truck_id: resource.clone().unwrap().truck_id },
+                        DiscreteProcessLogType::ProcessStart { resource } => TruckingProcessLogType::TruckMovementStart { truck_id: resource.truck_id.clone() },
+                        DiscreteProcessLogType::ProcessSuccess { resource } => TruckingProcessLogType::TruckMovementSuccess { truck_id: resource.truck_id.clone() },
                         DiscreteProcessLogType::ProcessFailure { reason } => TruckingProcessLogType::TruckMovementFailure { reason },
                     };
                     Some(TruckingProcessLog {
