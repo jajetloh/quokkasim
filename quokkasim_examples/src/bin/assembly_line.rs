@@ -25,26 +25,42 @@ impl ItemFactory<ProtoCar> for ProtoCarGenerator {
     }
 }
 
-struct ShiftEventController {
-    element_name: String,
-    state: ShiftState,
-    emit_change: Output<()>,
-}
+// struct ShiftEventController {
+//     element_name: String,
+//     state: EnvironmentState,
+//     emit_change: Output<NotificationMetadata>,
+// }
 
-impl Model for ShiftEventController {}
+// impl Model for ShiftEventController {
+//     fn init(self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+//         async move {
+//             ctx.schedule_periodic_event(Duration::from_secs(6 * 3600), Duration::from_secs(12 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Stopped).unwrap();
+//             ctx.schedule_periodic_event(Duration::from_secs(6 * 3600 + 1800), Duration::from_secs(12 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Normal).unwrap();
 
-impl ShiftEventController {
-    fn get_state_async(&self) -> impl Future<Output = ShiftState> {
-        async move { self.state.clone() }
-    }
-}
+//             ctx.schedule_periodic_event(Duration::from_secs(3 * 3600), Duration::from_secs(6 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Stopped).unwrap();
+//             ctx.schedule_periodic_event(Duration::from_secs(3 * 3600 + 3600), Duration::from_secs(6 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Normal).unwrap();
+            
+//             self.into()
+//         }
+//     }
+// }
 
-#[derive(Debug, Clone)]
-enum ShiftState {
-    ShiftChange,
-    Operating,
-    MealBreak,
-}
+// impl ShiftEventController {
+//     fn get_state_async(&mut self) -> impl Future<Output = EnvironmentState> {
+//         async move { self.state.clone() }
+//     }
+
+//     fn set_shift_state(&mut self, state: EnvironmentState, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+//         async move {
+//             self.state = state;
+//             self.emit_change.send(NotificationMetadata {
+//                 time: cx.time(),
+//                 element_from: self.element_name.clone(),
+//                 message: format!("Shift state changed to {:?}", self.state),
+//             }).await;
+//         }
+//     }
+// }
 
 define_model_enums! {
     pub enum ComponentModel {
@@ -52,7 +68,7 @@ define_model_enums! {
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
         ProtoCarSource(DiscreteSource<ProtoCar, ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCar, ProtoCarGenerator>>),
         ProtoCarSink(DiscreteSink<(), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteSink<(), Option<ProtoCar>, ProtoCar>>),
-        ShiftEventController(ShiftEventController, Mailbox<ShiftEventController>),
+        // ShiftEventController(ShiftEventController, Mailbox<ShiftEventController>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
@@ -87,6 +103,11 @@ impl CustomComponentConnection for ComponentModel {
                 sink.req_upstream.connect(DiscreteStock::get_state_async, stock_mbox.address());
                 sink.withdraw_upstream.connect(DiscreteStock::remove, stock_mbox.address());
                 stock.state_emitter.connect(DiscreteSink::update_state, sink_mbox.address());
+                Ok(())
+            },
+            (ComponentModel::BasicEnvironment(controller, controller_mbox), ComponentModel::ProtoCarProcess(process, process_mbox)) => {
+                controller.emit_change.connect(DiscreteProcess::update_state, process_mbox.address());
+                process.req_environment.connect(BasicEnvironment::get_state_async, controller_mbox.address());
                 Ok(())
             },
             (a, b) => Err(format!("No component connection defined from {} to {} (n={:?})", a, b, n).into()),
@@ -128,10 +149,9 @@ fn main() {
 
     let mut source = ComponentModel::ProtoCarSource(DiscreteSource::new()
         .with_name("Source".into())
-        .with_process_time_distr(Distribution::Constant(3.)),
+        .with_process_time_distr(Distribution::Constant(15. * 60.)),
         Mailbox::new()
     );
-    let mut source_addr = source.get_address();
 
     let mut queue_1 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue1".into())
@@ -143,10 +163,9 @@ fn main() {
 
     let mut process_1 = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
         .with_name("Process1".into())
-        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
+        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 10. * 60., max: 25. * 60., mode: 13. * 60. }).unwrap()),
         Mailbox::new()
     );
-    let mut process_1_addr = process_1.get_address();
 
     let mut queue_2 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue2".into())
@@ -158,10 +177,9 @@ fn main() {
 
     let mut process_par = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
         .with_name("Process2".into())
-        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
+        .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 10. * 60., max: 25. * 60., mode: 13. * 60. }).unwrap()),
         Mailbox::new()
     );
-    let mut process_par_addr = process_par.get_address();
 
     let mut queue_3 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue3".into())
@@ -173,10 +191,15 @@ fn main() {
 
     let mut sink = ComponentModel::ProtoCarSink(DiscreteSink::new()
         .with_name("Sink".into())
-        .with_process_time_distr(Distribution::Constant(1.)),
+        .with_process_time_distr(Distribution::Constant(15. * 60.)),
         Mailbox::new()
     );
-    let mut sink_addr = sink.get_address();
+
+    let mut env_controller = ComponentModel::BasicEnvironment(BasicEnvironment::new()
+        .with_name("EnvironmentController".into()),
+        Mailbox::new()
+    );
+    let mut env_addr = env_controller.get_address();
 
     connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();
@@ -185,8 +208,14 @@ fn main() {
     connect_components!(&mut process_par, &mut queue_3).unwrap();
     connect_components!(&mut queue_3, &mut sink).unwrap();
 
-    let mut queue_logger = ComponentLogger::ProtoCarStockLogger(DiscreteStockLogger::new("QueueLogger".into()));
+    // connect_components!(&mut shift_controller, &mut source).unwrap();
+    connect_components!(&mut env_controller, &mut process_1).unwrap();
+    // connect_components!(&mut shift_controller, &mut process_par).unwrap();
+    // connect_components!(&mut shift_controller, &mut sink).unwrap();
+
+    let mut queue_logger = ComponentLogger::ProtoCarStockLogger(DiscreteStockLogger::new("StockLogger".into()));
     let mut process_logger = ComponentLogger::ProtoCarProcessLogger(DiscreteProcessLogger::new("ProcessLogger".into()));
+    let mut env_logger = ComponentLogger::BasicEnvironmentLogger(BasicEnvironmentLogger::new("EnvControllerLogger".into()));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
@@ -195,6 +224,7 @@ fn main() {
     connect_logger!(&mut process_logger, &mut process_1).unwrap();
     connect_logger!(&mut process_logger, &mut process_par).unwrap();
     connect_logger!(&mut process_logger, &mut sink).unwrap();
+    connect_logger!(&mut env_logger, &mut env_controller).unwrap();
 
     let mut sim_builder = SimInit::new();
     sim_builder = register_component!(sim_builder, source);
@@ -204,13 +234,25 @@ fn main() {
     sim_builder = register_component!(sim_builder, process_par);
     sim_builder = register_component!(sim_builder, queue_3);
     sim_builder = register_component!(sim_builder, sink);
+    sim_builder = register_component!(sim_builder, env_controller);
 
-    let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+    let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
 
-    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
+    let (mut simu, mut sched) = sim_builder.init(start_time.clone()).unwrap();
+
+    let event_time = start_time + Duration::from_secs(3600);
+    let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Stopped);
+    create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
+
+    let event_time = start_time + Duration::from_secs(7200);
+    let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Normal);
+    create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
+
+    simu.step_until(start_time + Duration::from_secs(48 * 3600)).unwrap();
 
     let output_dir = "outputs/assembly_line";
     create_dir_all(output_dir).unwrap();
     queue_logger.write_csv(output_dir.into()).unwrap();
     process_logger.write_csv(output_dir.into()).unwrap();
+    env_logger.write_csv(output_dir.into()).unwrap();
 }

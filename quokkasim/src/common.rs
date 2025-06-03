@@ -16,8 +16,8 @@ pub struct EventLog {
 #[derive(Debug, Clone)]
 pub struct NotificationMetadata {
     pub time: MonotonicTime,
-    pub element_from: String,
-    pub message: String,
+    pub source_event: String,
+    pub message: &'static str,
 }
 
 #[derive(Debug, Clone)]

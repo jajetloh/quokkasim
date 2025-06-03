@@ -132,30 +132,26 @@ pub trait Stock<
 > where Self: Model {
     type StockState: StateEq + Clone + Debug;
 
-    fn pre_add<'a>(&'a mut self, payload: &'a (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn pre_add(&mut self, payload: &(ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn add_impl<'a>(&'a mut self, payload: &'a (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a ;
+    fn add_impl(&mut self, payload: &(ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + ;
 
-    fn post_add<'a>(&'a mut self, payload: &'a (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn post_add(&mut self, payload: &(ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
+            let mut notif_meta = payload.1.clone();
             let current_state = self.get_state();
             let previous_state: &Option<Self::StockState> = self.get_previous_state();
             match previous_state {
                 None => {},
                 Some(ps) => {
                     let ps = ps.clone();
-                    self.log(cx.time(), "StockAdd".into()).await;
+                    notif_meta = self.log(cx.time(), notif_meta.source_event.clone(), "StockAdd").await;
                     if !ps.is_same_state(&current_state) {
-                        self.log(cx.time(), "StateChange".into()).await;
-                        let notif_meta = NotificationMetadata {
-                            time: cx.time(),
-                            element_from: "X".into(),
-                            message: "X".into(),
-                        };
+                        notif_meta = self.log(cx.time(), notif_meta.source_event.clone(), "StateChange").await;
                         // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
                         cx.schedule_event(
                             cx.time() + ::std::time::Duration::from_nanos(1),
@@ -169,9 +165,9 @@ pub trait Stock<
         }
     }
 
-    fn emit_change<'a>(&'a mut self, payload: NotificationMetadata, cx: &'a mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send + 'a;
+    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send;
 
-    fn add<'a>(&'a mut self, payload: (ReceiveType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a where ReceiveType: 'static {
+    fn add(&mut self, payload: (ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + where ReceiveType: 'static {
         async move {
             self.pre_add(&payload, cx).await;
             self.add_impl(&payload, cx).await;
@@ -179,30 +175,26 @@ pub trait Stock<
         }
     }
 
-    fn pre_remove<'a>(&'a mut self, payload: &'a (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn pre_remove(&mut self, payload: &(SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn remove_impl<'a>(&'a mut self, payload: &'a (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = SendType> + 'a;
+    fn remove_impl(&mut self, payload: &(SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = SendType>;
 
-    fn post_remove<'a>(&'a mut self, payload: &'a (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = ()> + 'a {
+    fn post_remove(&mut self, payload: &(SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
+            let mut notif_meta: NotificationMetadata = payload.1.clone();
             let current_state = self.get_state();
             let previous_state: &Option<Self::StockState> = self.get_previous_state();
             match previous_state {
                 None => {},
                 Some(ps) => {
                     let ps = ps.clone();
-                    self.log(cx.time(), "StockRemove".into()).await;
+                    notif_meta = self.log(cx.time(), notif_meta.source_event, "StockRemove").await;
                     if !ps.is_same_state(&current_state) {
-                        self.log(cx.time(), "StateChange".into()).await;
-                        let notif_meta = NotificationMetadata {
-                            time: cx.time(),
-                            element_from: "X".into(),
-                            message: "X".into(),
-                        };
+                        notif_meta = self.log(cx.time(), notif_meta.source_event, "StateChange").await;
                         // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
                         cx.schedule_event(
                             cx.time() + ::std::time::Duration::from_nanos(1),
@@ -216,7 +208,7 @@ pub trait Stock<
         }
     }
 
-    fn remove<'a>(&'a mut self, payload: (SendParameterType, NotificationMetadata), cx: &'a mut Context<Self>) -> impl Future<Output = SendType> + 'a where SendParameterType: 'static {
+    fn remove(&mut self, payload: (SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = SendType> + where SendParameterType: 'static {
         async move {
             self.pre_remove(&payload, cx).await;
             let  result = self.remove_impl(&payload, cx).await;
@@ -225,7 +217,7 @@ pub trait Stock<
         }
     }
 
-    fn get_state_async<'a>(&'a mut self) -> impl Future<Output = Self::StockState> + 'a {
+    fn get_state_async(&mut self) -> impl Future<Output = Self::StockState> + {
         async move {
             self.get_state()
         }
@@ -234,7 +226,157 @@ pub trait Stock<
     fn get_resource(&self) -> &ContainerType;
     fn get_previous_state(&mut self) -> &Option<Self::StockState>;
     fn set_previous_state(&mut self);
-    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output = ()> + Send;
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str) -> impl Future<Output = NotificationMetadata> + Send;
+}
+
+pub struct BasicEnvironment {
+    pub element_name: String,
+    pub element_code: String,
+    pub state: BasicEnvironmentState,
+    pub next_event_index: u64,
+    pub log_emitter: Output<BasicEnvironmentLog>,
+    pub emit_change: Output<NotificationMetadata>,
+}
+
+impl Model for BasicEnvironment {
+    fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            self.log(cx.time(), "Init_000000".into(), "Model Initialisation", self.state.clone()).await;
+            self.into()
+        }
+    }
+}
+
+impl BasicEnvironment {
+    pub fn new() -> Self {
+        BasicEnvironment {
+            element_name: String::new(),
+            element_code: String::new(),
+            state: BasicEnvironmentState::Normal,
+            next_event_index: 0,
+            log_emitter: Output::default(),
+            emit_change: Output::default(),
+        }
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.element_name = name;
+        self
+    }
+
+    pub fn with_state(mut self, state: BasicEnvironmentState) -> Self {
+        self.state = state;
+        self
+    }
+
+    pub fn set_state(&mut self, payload: (BasicEnvironmentState, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            let (state, notif_meta) = payload;
+            if self.state != state {
+                self.state = state;
+                let notif_meta = self.log(cx.time(), notif_meta.source_event, "Set environment state", self.state.clone()).await;
+                self.emit_change.send(notif_meta).await;
+            }
+        }
+    }
+
+    pub fn get_state_async(&mut self) -> impl Future<Output = BasicEnvironmentState> + {
+        async move {
+            self.state.clone()
+        }
+    }
+
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, event: BasicEnvironmentState) -> impl Future<Output = NotificationMetadata> + Send {
+        async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
+            let log = BasicEnvironmentLog {
+                time: time.to_string(),
+                event_id: event_id.clone(),
+                source_event_id: source_event,
+                element_name: self.element_name.clone(),
+                element_type: "BasicEnvironment".to_string(),
+                event,
+            };
+            self.log_emitter.send(log).await;
+            self.next_event_index += 1;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub enum BasicEnvironmentState {
+    Normal,
+    Stopped,
+}
+
+#[derive(Clone)]
+pub struct BasicEnvironmentLog {
+    pub time: String,
+    pub event_id: String,
+    pub source_event_id: String,
+    pub element_name: String,
+    pub element_type: String,
+    pub event: BasicEnvironmentState,
+}
+
+impl Serialize for BasicEnvironmentLog {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("BasicEnvironmentLog", 5)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        state.serialize_field("event", match &self.event {
+            BasicEnvironmentState::Normal => "Normal",
+            BasicEnvironmentState::Stopped => "Stopped",
+        })?;
+        state.end()
+    }
+}
+
+pub struct BasicEnvironmentLogger {
+    pub name: String,
+    pub buffer: EventQueue<BasicEnvironmentLog>,
+}
+
+impl Logger for BasicEnvironmentLogger {
+    type RecordType = BasicEnvironmentLog;
+
+    fn new(name: String) -> Self {
+        BasicEnvironmentLogger {
+            name,
+            buffer: EventQueue::new(),
+        }
+    }
+
+    fn get_name(&self) -> &String {
+        &self.name
+    }
+
+    fn get_buffer(self) -> EventQueue<Self::RecordType> {
+        self.buffer
+    }
+
+    fn write_csv(self, dir: String) -> Result<(), Box<dyn Error>> {
+        let file = File::create(format!("{}/{}.csv", dir, self.get_name()))?;
+        let mut writer = WriterBuilder::new().has_headers(true).from_writer(file);
+        self.get_buffer().into_reader().for_each(|log| {
+            writer
+                .serialize(log)
+                .expect("Failed to write log record to CSV file");
+        });
+        writer.flush()?;
+        Ok(())
+    }
 }
 
 pub trait Process {
@@ -246,16 +388,16 @@ pub trait Process {
 
     fn set_time_to_next_event(&mut self, time: Option<Duration>);
 
-    fn pre_update_state<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn pre_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {}
     }
 
-    fn update_state_impl<'a>(&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {}
     }
 
 
-    fn update_state<'a>(&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn update_state(&mut self, notif_meta: NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
             self.pre_update_state(&notif_meta, cx).await;
             self.update_state_impl(&notif_meta, cx).await;
@@ -263,11 +405,11 @@ pub trait Process {
         }
     }
 
-    fn post_update_state<'a> (&'a mut self, notif_meta: &'a NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a where Self: Model {
+    fn post_update_state (&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send + where Self: Model {
         async move {}
     }
 
-    fn log<'a>(&'a mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()>;
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata>;
 
 }
 
@@ -373,6 +515,7 @@ macro_rules! define_model_enums {
             DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             DiscreteSourceString($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             DiscreteSinkString($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+            BasicEnvironment(BasicEnvironment, $crate::nexosim::Mailbox<BasicEnvironment>),
             $(
                 $(#[$components_var_meta])*
                 $R $( ( $RT, $RT2 ) )?
@@ -736,6 +879,11 @@ macro_rules! define_model_enums {
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
+                    $ComponentModel::BasicEnvironment(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
                     $(
                         $ComponentModel::$R(a, mb) => {
                             let name = a.element_name.clone();
@@ -785,6 +933,7 @@ macro_rules! define_model_enums {
                     $ComponentModel::DiscreteParallelProcessString(_, mb) => $ComponentModelAddress::DiscreteParallelProcessString(mb.address()),
                     $ComponentModel::DiscreteSourceString(_, mb) => $ComponentModelAddress::DiscreteSourceString(mb.address()),
                     $ComponentModel::DiscreteSinkString(_, mb) => $ComponentModelAddress::DiscreteSinkString(mb.address()),
+                    $ComponentModel::BasicEnvironment(_, mb) => $ComponentModelAddress::BasicEnvironment(mb.address()),
                     $(
                         $(#[$components_var_meta])*
                         $ComponentModel::$R(_, mb) => {
@@ -833,6 +982,7 @@ macro_rules! define_model_enums {
             DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+            BasicEnvironment($crate::nexosim::Address<BasicEnvironment>),
             $(
                 $R $( ($crate::nexosim::Address<$RT>) )?
             ),*
@@ -849,6 +999,8 @@ macro_rules! define_model_enums {
 
             DiscreteStockLoggerString($crate::components::discrete::DiscreteStockLogger<String>),
             DiscreteProcessLoggerString($crate::components::discrete::DiscreteProcessLogger<String>),
+
+            BasicEnvironmentLogger(BasicEnvironmentLogger),
             $(
                 $(#[$logger_var_meta])*
                 $U $( ( $UT ) )?
@@ -953,6 +1105,10 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
+                    ($ComponentLogger::BasicEnvironmentLogger(a), $ComponentModel::BasicEnvironment(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
                     (a,b,n) => <$ComponentLogger as CustomLoggerConnection>::connect_logger(a, b, n)
                 }
             }
@@ -967,6 +1123,8 @@ macro_rules! define_model_enums {
 
                     $ComponentLogger::DiscreteStockLoggerString(a) => { a.write_csv(dir.to_string()) },
                     $ComponentLogger::DiscreteProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
+
+                    $ComponentLogger::BasicEnvironmentLogger(a) => { a.write_csv(dir.to_string()) },
 
                     $(
                         $ComponentLogger::$U (a) => {
@@ -986,13 +1144,15 @@ macro_rules! define_model_enums {
             SetMaxCapacity(f64),
             SetProcessQuantity(DistributionConfig),
             SetProcessTime(DistributionConfig),
+            SetEnvironmentState(BasicEnvironmentState),
         }
 
         impl $ScheduledEventConfig {
-            pub fn schedule_event(self, time: $crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: $ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
+            pub fn schedule_event(&self, time: &$crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: &$ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
+                let time = time.clone();
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::VectorStockF64(addr)) => {
-                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity, addr.clone())?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity.clone(), addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, NotificationMetadata {
                             time,
                             element_from: "Scheduler".into(),
@@ -1001,7 +1161,7 @@ macro_rules! define_model_enums {
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::VectorProcessF64(addr)) => {
-                        let distr_instance = df.create(distr)?;
+                        let distr_instance = df.create(distr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, NotificationMetadata {
                             time,
@@ -1009,7 +1169,11 @@ macro_rules! define_model_enums {
                             message: "Process quantity change".into(),
                         }, addr.clone())?;
                         Ok(())
-                    }
+                    },
+                    ($ScheduledEventConfig::SetEnvironmentState(env_state), $ComponentModelAddress::BasicEnvironment(addr)) => {
+                        scheduler.schedule_event(time, BasicEnvironment::set_state, env_state.clone(), addr.clone())?;
+                        Ok(())
+                    },
                     (a, b) => {
                         Err(format!("schedule_event not implemented for types ({}, {})", a, b).into())
                     }
@@ -1044,8 +1208,8 @@ macro_rules! define_model_enums {
         }
 
         macro_rules! create_scheduled_event {
-            (&mut $scheduler:ident, $time:ident, $event_config:ident, $component_addr:ident, &mut $df:ident) => {
-                $ScheduledEventConfig::schedule_event($event_config, $time, &mut $scheduler, $component_addr, &mut $df)
+            (&mut $scheduler:ident, &$time:ident, &$event_config:ident, &$component_addr:ident, &mut $df:ident) => {
+                $ScheduledEventConfig::schedule_event(&$event_config, &$time, &mut $scheduler, &$component_addr, &mut $df)
             }
         }
     }
