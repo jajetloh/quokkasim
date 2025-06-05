@@ -297,7 +297,7 @@ pub struct DiscreteProcess<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
-    next_event_id: u64,
+    next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Default for DiscreteProcess<U, V, W, X> {
@@ -317,7 +317,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
-            next_event_id: 0,
+            next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -488,9 +488,9 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: DiscreteProcessLogType<T>) -> impl Future<Output = NotificationMetadata> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
-            let event_id = format!("{}_{:06}", self.element_code, self.next_event_id);
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 event_id: event_id.clone(),
@@ -499,8 +499,9 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                 element_type: self.element_type.clone(),
                 event: details,
             };
-            self.next_event_id += 1;
             self.log_emitter.send(log).await;
+            self.next_event_index += 1;
+
             NotificationMetadata {
                 time,
                 source_event: event_id,
@@ -544,6 +545,7 @@ impl<T: Serialize> Serialize for DiscreteProcessLog<T> {
             DiscreteProcessLogType::ProcessSuccess { resource } => ("ProcessSuccess".into(), Some(serde_json::to_string(resource).unwrap()), None),
             DiscreteProcessLogType::ProcessFailure { reason } => ("ProcessFailure".into(), None, Some(reason)),
             DiscreteProcessLogType::ProcessStopped { reason } => ("ProcessStopped".into(), None, Some(reason)),
+            DiscreteProcessLogType::WithdrawRequest => ("WithdrawRequest".into(), None, None),
         };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("item", &item)?;
@@ -611,6 +613,7 @@ pub struct DiscreteSource<
     FactoryType: ItemFactory<InternalResourceType>,
 > {
     pub element_name: String,
+    element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
@@ -633,6 +636,7 @@ impl<
     fn default() -> Self {
         DiscreteSource {
             element_name: "DiscreteSource".to_string(),
+            element_code: "DiscreteSource".to_string(),
             element_type: "DiscreteSource".to_string(),
             req_upstream: Requestor::new(),
             req_downstream: Requestor::new(),
@@ -685,8 +689,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -716,17 +720,15 @@ impl<
         async move {
             let time = cx.time();
 
+            let mut notif_meta = notif_meta.clone();
+
             match self.process_state.take() {
                 Some((mut process_time_left, resource)) => {
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "ProcessStart".into(),
-                        })).await;
+                        notif_meta = self.log(time, notif_meta.source_event, "Resource created", DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
+                        self.push_downstream.send((resource.clone(), notif_meta)).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
@@ -782,19 +784,28 @@ impl<
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_id);
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
+            self.log_emitter.send(log.clone()).await;
             self.next_event_id += 1;
-            self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
+
 }
 
 pub struct DiscreteSink<
