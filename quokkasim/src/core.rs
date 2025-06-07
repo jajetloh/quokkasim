@@ -131,88 +131,88 @@ pub trait Stock<
     SendType: Clone + Send + 'static,
 > where Self: Model {
     type StockState: StateEq + Clone + Debug;
+    type LogDetailsType: Clone;
 
-    fn pre_add(&mut self, payload: &(ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+    fn pre_add(&mut self, payload: &mut (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn add_impl(&mut self, payload: &(ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + ;
+    fn add_impl(&mut self, payload: &mut (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + ;
 
-    fn post_add(&mut self, payload: &(ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+    fn post_add(&mut self, payload: &mut (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
-            let mut notif_meta = payload.1.clone();
-            let current_state = self.get_state();
-            let previous_state: &Option<Self::StockState> = self.get_previous_state();
-            match previous_state {
-                None => {},
-                Some(ps) => {
-                    let ps = ps.clone();
-                    notif_meta = self.log(cx.time(), notif_meta.source_event.clone(), "StockAdd").await;
-                    if !ps.is_same_state(&current_state) {
-                        notif_meta = self.log(cx.time(), notif_meta.source_event.clone(), "StateChange").await;
-                        // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
-                        cx.schedule_event(
-                            cx.time() + ::std::time::Duration::from_nanos(1),
-                            Self::emit_change,
-                            notif_meta,
-                        ).unwrap();
-                    } else {
-                    }
-                }
-            }
+            // let mut source_event_id = payload.1.clone();
+            // let current_state = self.get_state();
+            // let previous_state: &Option<Self::StockState> = self.get_previous_state();
+            // match previous_state {
+            //     None => {},
+            //     Some(ps) => {
+            //         let ps = ps.clone();
+            //         source_event_id = self.log(cx.time(), source_event_id.clone(), "StockAdd").await;
+            //         if !ps.is_same_state(&current_state) {
+            //             source_event_id = self.log(cx.time(), source_event_id.clone(), "StateChange").await;
+            //             // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
+            //             cx.schedule_event(
+            //                 cx.time() + ::std::time::Duration::from_nanos(1),
+            //                 Self::emit_change,
+            //                 source_event_id,
+            //             ).unwrap();
+            //         } else {
+            //         }
+            //     }
+            // }
         }
     }
 
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send;
+    fn emit_change(&mut self, payload: EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send;
 
-    fn add(&mut self, payload: (ReceiveType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + where ReceiveType: 'static {
+    fn add(&mut self, mut payload: (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + where ReceiveType: 'static {
         async move {
-            self.pre_add(&payload, cx).await;
-            self.add_impl(&payload, cx).await;
-            self.post_add(&payload, cx).await;
+            self.pre_add(&mut payload, cx).await;
+            self.add_impl(&mut payload, cx).await;
+            self.post_add(&mut payload, cx).await;
         }
     }
 
-    fn pre_remove(&mut self, payload: &(SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+    fn pre_remove(&mut self, payload: &mut (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
             self.set_previous_state();
         }
     }
 
-    fn remove_impl(&mut self, payload: &(SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = SendType>;
+    fn remove_impl(&mut self, payload: &mut (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = SendType>;
 
-    fn post_remove(&mut self, payload: &(SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+    fn post_remove(&mut self, payload: &mut (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
         async move {
-            let mut notif_meta: NotificationMetadata = payload.1.clone();
-            let current_state = self.get_state();
-            let previous_state: &Option<Self::StockState> = self.get_previous_state();
-            match previous_state {
-                None => {},
-                Some(ps) => {
-                    let ps = ps.clone();
-                    notif_meta = self.log(cx.time(), notif_meta.source_event, "StockRemove").await;
-                    if !ps.is_same_state(&current_state) {
-                        notif_meta = self.log(cx.time(), notif_meta.source_event, "StateChange").await;
-                        // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
-                        cx.schedule_event(
-                            cx.time() + ::std::time::Duration::from_nanos(1),
-                            Self::emit_change,
-                            notif_meta,
-                        ).unwrap();
-                    } else {
-                    }
-                }
-            }
+            // let mut event_id: EventId = payload.1.clone();
+            // let current_state = self.get_state();
+            // let previous_state: &Option<Self::StockState> = self.get_previous_state();
+            // match previous_state {
+            //     None => {},
+            //     Some(ps) => {
+            //         let ps = ps.clone();
+            //         if !ps.is_same_state(&current_state) {
+            //             event_id = self.log(cx.time(), event_id, ps).await;
+            //             // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
+            //             cx.schedule_event(
+            //                 cx.time() + ::std::time::Duration::from_nanos(1),
+            //                 Self::emit_change,
+            //                 event_id,
+            //             ).unwrap();
+            //         } else {
+            //         }
+            //     }
+            // }
         }
     }
 
-    fn remove(&mut self, payload: (SendParameterType, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = SendType> + where SendParameterType: 'static {
+    fn remove(&mut self, mut payload: (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = SendType> + where SendParameterType: 'static {
         async move {
-            self.pre_remove(&payload, cx).await;
-            let  result = self.remove_impl(&payload, cx).await;
-            self.post_remove(&payload, cx).await;
+            self.pre_remove(&mut payload, cx).await;
+            let  result = self.remove_impl(&mut payload, cx).await;
+            self.post_remove(&mut payload, cx).await;
             result
         }
     }
@@ -226,7 +226,7 @@ pub trait Stock<
     fn get_resource(&self) -> &ContainerType;
     fn get_previous_state(&mut self) -> &Option<Self::StockState>;
     fn set_previous_state(&mut self);
-    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str) -> impl Future<Output = NotificationMetadata> + Send;
+    fn log(&mut self, now: MonotonicTime, source_event: EventId, details: Self::LogDetailsType) -> impl Future<Output = EventId> + Send;
 }
 
 pub struct BasicEnvironment {
@@ -235,13 +235,13 @@ pub struct BasicEnvironment {
     pub state: BasicEnvironmentState,
     pub next_event_index: u64,
     pub log_emitter: Output<BasicEnvironmentLog>,
-    pub emit_change: Output<NotificationMetadata>,
+    pub emit_change: Output<EventId>,
 }
 
 impl Model for BasicEnvironment {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            self.log(cx.time(), "Init_000000".into(), "Model Initialisation", self.state.clone()).await;
+            self.log(cx.time(), EventId("Init_000000".into()), self.state.clone()).await;
             self.into()
         }
     }
@@ -264,18 +264,23 @@ impl BasicEnvironment {
         self
     }
 
+    pub fn with_code(mut self, code: String) -> Self {
+        self.element_code = code;
+        self
+    }
+
     pub fn with_state(mut self, state: BasicEnvironmentState) -> Self {
         self.state = state;
         self
     }
 
-    pub fn set_state(&mut self, payload: (BasicEnvironmentState, NotificationMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    pub fn set_state(&mut self, payload: (BasicEnvironmentState, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            let (state, notif_meta) = payload;
+            let (state, mut event_id) = payload;
             if self.state != state {
                 self.state = state;
-                let notif_meta = self.log(cx.time(), notif_meta.source_event, "Set environment state", self.state.clone()).await;
-                self.emit_change.send(notif_meta).await;
+                event_id = self.log(cx.time(), event_id, self.state.clone()).await;
+                self.emit_change.send(event_id).await;
             }
         }
     }
@@ -286,13 +291,13 @@ impl BasicEnvironment {
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, event: BasicEnvironmentState) -> impl Future<Output = NotificationMetadata> + Send {
+    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, event: BasicEnvironmentState) -> impl Future<Output = EventId> + Send {
         async move {
-            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
+            let new_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
             let log = BasicEnvironmentLog {
-                time: time.to_string(),
-                event_id: event_id.clone(),
-                source_event_id: source_event,
+                time: now.to_string(),
+                event_id: new_event_id.clone(),
+                source_event_id,
                 element_name: self.element_name.clone(),
                 element_type: "BasicEnvironment".to_string(),
                 event,
@@ -300,11 +305,7 @@ impl BasicEnvironment {
             self.log_emitter.send(log).await;
             self.next_event_index += 1;
 
-            NotificationMetadata {
-                time,
-                source_event: event_id,
-                message,
-            }
+            new_event_id
         }
     }
 }
@@ -318,8 +319,8 @@ pub enum BasicEnvironmentState {
 #[derive(Clone)]
 pub struct BasicEnvironmentLog {
     pub time: String,
-    pub event_id: String,
-    pub source_event_id: String,
+    pub event_id: EventId,
+    pub source_event_id: EventId,
     pub element_name: String,
     pub element_type: String,
     pub event: BasicEnvironmentState,
@@ -333,6 +334,7 @@ impl Serialize for BasicEnvironmentLog {
         let mut state = serializer.serialize_struct("BasicEnvironmentLog", 5)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("event", match &self.event {
@@ -388,28 +390,28 @@ pub trait Process {
 
     fn set_time_to_next_event(&mut self, time: Option<Duration>);
 
-    fn pre_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {}
     }
 
-    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {}
     }
 
 
-    fn update_state(&mut self, mut notif_meta: NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn update_state(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
-            self.pre_update_state(&mut notif_meta, cx).await;
-            self.update_state_impl(&mut notif_meta, cx).await;
-            self.post_update_state(&mut notif_meta, cx).await;
+            self.pre_update_state(&mut source_event_id, cx).await;
+            self.update_state_impl(&mut source_event_id, cx).await;
+            self.post_update_state(&mut source_event_id, cx).await;
         }
     }
 
-    fn post_update_state (&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send + where Self: Model {
+    fn post_update_state (&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send + where Self: Model {
         async move {}
     }
 
-    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata>;
+    fn log(&mut self, now: MonotonicTime, source_event: EventId, details: Self::LogDetailsType) -> impl Future<Output = EventId>;
 
 }
 
@@ -1150,25 +1152,26 @@ macro_rules! define_model_enums {
         impl $ScheduledEventConfig {
             pub fn schedule_event(&self, time: &$crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: &$ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
                 let time = time.clone();
-                let notif_meta = $crate::prelude::NotificationMetadata {
-                    time,
-                    source_event: "Scheduler_000000".into(),
-                    message: "Scheduled event".into(),
-                };
+                // let notif_meta = $crate::prelude::EventId {
+                //     time,
+                //     source_event: "Scheduler_000000".into(),
+                //     message: "Scheduled event".into(),
+                // };
+                let source_event_id = $crate::prelude::EventId("Scheduler_000000".into());
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::VectorStockF64(addr)) => {
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity.clone(), addr.clone())?;
-                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, notif_meta, addr.clone())?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, source_event_id, addr.clone())?;
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::VectorProcessF64(addr)) => {
                         let distr_instance = df.create(distr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone())?;
-                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, notif_meta, addr.clone())?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, source_event_id, addr.clone())?;
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetEnvironmentState(env_state), $ComponentModelAddress::BasicEnvironment(addr)) => {
-                        scheduler.schedule_event(time, BasicEnvironment::set_state, (env_state.clone(), notif_meta), addr.clone())?;
+                        scheduler.schedule_event(time, BasicEnvironment::set_state, (env_state.clone(), source_event_id), addr.clone())?;
                         Ok(())
                     },
                     (a, b) => {

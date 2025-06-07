@@ -13,12 +13,16 @@ pub struct EventLog {
     pub json_data: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct NotificationMetadata {
-    pub time: MonotonicTime,
-    pub source_event: String,
-    pub message: &'static str,
-}
+// #[derive(Debug, Clone)]
+// pub struct NotificationMetadata {
+//     // pub time: MonotonicTime,
+//     pub source_event: String,
+//     // pub message: &'static str,
+// }
+
+// pub type EventId = String;
+#[derive(Debug, Clone, Serialize)]
+pub struct EventId(pub String);
 
 #[derive(Debug, Clone)]
 pub enum Distribution {

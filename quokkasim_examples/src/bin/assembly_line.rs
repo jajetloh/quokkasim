@@ -111,12 +111,14 @@ fn main() {
 
     let mut source = ComponentModel::ProtoCarSource(DiscreteSource::new()
         .with_name("Source".into())
+        .with_code("A".into())
         .with_process_time_distr(Distribution::Constant(15. * 60.)),
         Mailbox::new()
     );
 
     let mut queue_1 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue1".into())
+        .with_code("B".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
         .with_initial_contents(Vec::new()),
@@ -125,12 +127,14 @@ fn main() {
 
     let mut process_1 = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
         .with_name("Process1".into())
+        .with_code("C".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 10. * 60., max: 25. * 60., mode: 13. * 60. }).unwrap()),
         Mailbox::new()
     );
 
     let mut queue_2 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue2".into())
+        .with_code("D".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
         .with_initial_contents(Vec::new()),
@@ -139,12 +143,14 @@ fn main() {
 
     let mut process_par = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
         .with_name("Process2".into())
+        .with_code("E".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 10. * 60., max: 25. * 60., mode: 13. * 60. }).unwrap()),
         Mailbox::new()
     );
 
     let mut queue_3 = ComponentModel::ProtoCarStock(DiscreteStock::new()
         .with_name("Queue3".into())
+        .with_code("F".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
         .with_initial_contents(Vec::new()),
@@ -153,12 +159,14 @@ fn main() {
 
     let mut sink = ComponentModel::ProtoCarSink(DiscreteSink::new()
         .with_name("Sink".into())
+        .with_code("G".into())
         .with_process_time_distr(Distribution::Constant(15. * 60.)),
         Mailbox::new()
     );
 
     let mut env_controller = ComponentModel::BasicEnvironment(BasicEnvironment::new()
-        .with_name("EnvironmentController".into()),
+        .with_name("EnvironmentController".into())
+        .with_code("Z".into()),
         Mailbox::new()
     );
     let env_addr = env_controller.get_address();
@@ -210,7 +218,8 @@ fn main() {
     let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Normal);
     create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
 
-    simu.step_until(start_time + Duration::from_secs(48 * 3600)).unwrap();
+    // simu.step_until(start_time + Duration::from_secs(24 * 3600)).unwrap();
+    simu.step_until(start_time + Duration::from_secs(2700)).unwrap();
 
     let output_dir = "outputs/assembly_line";
     create_dir_all(output_dir).unwrap();
