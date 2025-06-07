@@ -48,6 +48,8 @@ pub enum TruckingProcessLogType {
     TruckMovementStart { truck_id: String },
     TruckMovementSuccess { truck_id: String },
     TruckMovementFailure { reason: &'static str },
+    WithdrawRequest,
+    PushRequest,
 }
 
 impl Serialize for TruckingProcessLog {

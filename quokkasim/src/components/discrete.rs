@@ -298,6 +298,7 @@ pub struct DiscreteProcess<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
@@ -318,6 +319,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
@@ -481,7 +483,21 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                        
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -624,6 +640,7 @@ pub struct DiscreteSource<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_id: u64,
     pub previous_check_time: MonotonicTime,
     pub item_factory: FactoryType,
@@ -647,6 +664,7 @@ impl<
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_id: 0,
             previous_check_time: MonotonicTime::EPOCH,
             item_factory: FactoryType::default(),
@@ -776,7 +794,21 @@ impl<
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                        
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -822,6 +854,7 @@ pub struct DiscreteSink<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
@@ -843,6 +876,7 @@ impl<
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
@@ -973,7 +1007,21 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                        
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -1021,6 +1069,7 @@ pub struct DiscreteParallelProcess<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<SendType>>,
     time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
@@ -1045,6 +1094,7 @@ impl<
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
@@ -1195,7 +1245,21 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                        
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };

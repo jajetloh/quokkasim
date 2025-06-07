@@ -25,50 +25,12 @@ impl ItemFactory<ProtoCar> for ProtoCarGenerator {
     }
 }
 
-// struct ShiftEventController {
-//     element_name: String,
-//     state: EnvironmentState,
-//     emit_change: Output<NotificationMetadata>,
-// }
-
-// impl Model for ShiftEventController {
-//     fn init(self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
-//         async move {
-//             ctx.schedule_periodic_event(Duration::from_secs(6 * 3600), Duration::from_secs(12 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Stopped).unwrap();
-//             ctx.schedule_periodic_event(Duration::from_secs(6 * 3600 + 1800), Duration::from_secs(12 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Normal).unwrap();
-
-//             ctx.schedule_periodic_event(Duration::from_secs(3 * 3600), Duration::from_secs(6 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Stopped).unwrap();
-//             ctx.schedule_periodic_event(Duration::from_secs(3 * 3600 + 3600), Duration::from_secs(6 * 3600), ShiftEventController::set_shift_state, EnvironmentState::Normal).unwrap();
-            
-//             self.into()
-//         }
-//     }
-// }
-
-// impl ShiftEventController {
-//     fn get_state_async(&mut self) -> impl Future<Output = EnvironmentState> {
-//         async move { self.state.clone() }
-//     }
-
-//     fn set_shift_state(&mut self, state: EnvironmentState, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
-//         async move {
-//             self.state = state;
-//             self.emit_change.send(NotificationMetadata {
-//                 time: cx.time(),
-//                 element_from: self.element_name.clone(),
-//                 message: format!("Shift state changed to {:?}", self.state),
-//             }).await;
-//         }
-//     }
-// }
-
 define_model_enums! {
     pub enum ComponentModel {
         ProtoCarProcess(DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>, Mailbox<DiscreteProcess<(), Option<ProtoCar>, ProtoCar, ProtoCar>>),
         ProtoCarStock(DiscreteStock<ProtoCar>, Mailbox<DiscreteStock<ProtoCar>>),
         ProtoCarSource(DiscreteSource<ProtoCar, ProtoCar, ProtoCarGenerator>, Mailbox<DiscreteSource<ProtoCar, ProtoCar, ProtoCarGenerator>>),
         ProtoCarSink(DiscreteSink<(), Option<ProtoCar>, ProtoCar>, Mailbox<DiscreteSink<(), Option<ProtoCar>, ProtoCar>>),
-        // ShiftEventController(ShiftEventController, Mailbox<ShiftEventController>),
     }
     pub enum ComponentModelAddress {}
     pub enum ComponentLogger {
@@ -199,7 +161,7 @@ fn main() {
         .with_name("EnvironmentController".into()),
         Mailbox::new()
     );
-    let mut env_addr = env_controller.get_address();
+    let env_addr = env_controller.get_address();
 
     connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();

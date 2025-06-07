@@ -286,7 +286,8 @@ pub struct VectorProcess<
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub time_to_next_event: Option<Duration>,
+    time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
@@ -313,6 +314,7 @@ impl<
             
             process_state: None,
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
@@ -422,7 +424,21 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -657,7 +673,8 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub time_to_next_event: Option<Duration>,
+    time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_id: u64,
     pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
     pub previous_check_time: MonotonicTime,
@@ -702,6 +719,7 @@ impl<
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_id: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
@@ -846,7 +864,21 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                        
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -898,7 +930,8 @@ pub struct VectorSplitter<
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub time_to_next_event: Option<Duration>,
+    time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_id: u64,
     pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
     pub previous_check_time: MonotonicTime,
@@ -952,6 +985,7 @@ impl<
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_id: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
@@ -1088,7 +1122,21 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -1135,7 +1183,8 @@ pub struct VectorSource<
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub source_vector: InternalResourceType,
-    pub time_to_next_event: Option<Duration>,
+    time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
@@ -1154,6 +1203,7 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
             process_time_distr: Distribution::default(),
             source_vector: InternalResourceType::default(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_index: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
@@ -1291,7 +1341,21 @@ where
                         panic!("Time until next event is zero!");
                     } else {
                         let next_time = cx.time() + time_until_next;
-                        cx.schedule_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
                     };
                 }
             };
@@ -1337,7 +1401,8 @@ pub struct VectorSink<
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub time_to_next_event: Option<Duration>,
+    time_to_next_event: Option<Duration>,
+    scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_id: u64,
     pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
@@ -1376,6 +1441,7 @@ impl<
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
+            scheduled_event: None,
             next_event_id: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
@@ -1477,6 +1543,37 @@ where
                     self.time_to_next_event = Some(time);
                 }
             }
+        }
+    }
+
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            self.set_previous_check_time(cx.time());
+            match self.time_to_next_event {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + time_until_next;
+
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, notif_meta.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
+                    };
+                }
+            };
         }
     }
 

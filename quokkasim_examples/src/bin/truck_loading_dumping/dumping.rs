@@ -88,7 +88,7 @@ impl DumpingProcess {
                         //     element_from: self.element_name.clone(),
                         //     message: "Truck dumped".into(),
                         // };
-                        notif_meta = self.log(time, log_type)
+                        notif_meta = self.log(time, notif_meta.source_event, "Truck dumped", TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: truck.ore.as_ref().map_or(0., |x| x.total()), ore: truck.ore.clone() }).await;
                         let ore = truck.ore.take();
                         self.push_downstream_trucks.send((truck.clone(), nm.clone())).await;
                         match ore {
