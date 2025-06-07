@@ -446,10 +446,16 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
+    
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            self.scheduled_event = None;
+        }
+    }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            println!("{} | Update state for {}: {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.element_name, source_event_id);
+            println!("{} | ### Update state for {}: {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.element_name, source_event_id);
             let time = cx.time();
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
@@ -467,7 +473,8 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                         self.process_state = Some((process_time_left, resource));
                     }
                 }
-                _ => {}
+                _ => {
+                }
             }
 
             match (&self.env_state, &new_env_state) {
@@ -479,7 +486,8 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
                     self.env_state = BasicEnvironmentState::Normal;
                 }
-                _ => {}
+                _ => {
+                }
             }
             
             match (&self.process_state, &self.env_state) {
@@ -529,16 +537,11 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                 (_, BasicEnvironmentState::Stopped) => {
                     self.time_to_next_event = None;
                 },
-                (Some((time, _)), _) => {
+                (Some((time, resource)), _) => {
                     self.time_to_next_event = Some(*time);
+                    *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
-        }
-    }
-    
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
-        async move {
-            self.scheduled_event = None;
         }
     }
 
@@ -595,6 +598,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
 #[derive(Debug, Clone)]
 pub enum DiscreteProcessLogType<T> {
     ProcessStart { resource: T },
+    ProcessContinue { resource: T },
     ProcessFinish { resource: T },
     ProcessNonStart { reason: &'static str },
     ProcessStopped { reason: &'static str },
@@ -624,6 +628,7 @@ impl<T: Serialize> Serialize for DiscreteProcessLog<T> {
         state.serialize_field("element_type", &self.element_type)?;
         let (event_type, item, reason): (String, Option<String>, Option<&str>) = match &self.event {
             DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), Some(serde_json::to_string(resource).unwrap()), None),
+            DiscreteProcessLogType::ProcessContinue { resource } => ("ProcessContinue".into(), Some(serde_json::to_string(resource).unwrap()), None),
             DiscreteProcessLogType::ProcessFinish { resource } => ("ProcessFinish".into(), Some(serde_json::to_string(resource).unwrap()), None),
             DiscreteProcessLogType::ProcessNonStart { reason } => ("ProcessNonStart".into(), None, Some(reason)),
             DiscreteProcessLogType::ProcessStopped { reason } => ("ProcessStopped".into(), None, Some(reason)),

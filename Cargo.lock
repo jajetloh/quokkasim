@@ -515,9 +515,9 @@ dependencies = [
 
 [[package]]
 name = "nexosim"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "840655bbf5755de98949f1098d0c4cbdd2b64dd932a7734eb00f0df6644715cb"
+checksum = "e8a708d20872a4140f14af9efd81d3eb357e00dbde507001dcd8720a566c2bf7"
 dependencies = [
  "async-event",
  "crossbeam-channel",

@@ -105,7 +105,7 @@ impl CustomLoggerConnection for ComponentLogger {
 fn main() {
 
     let mut df = DistributionFactory {
-        base_seed: 1234,
+        base_seed: 12345,
         next_seed: 0,
     };
 
@@ -157,29 +157,29 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut sink = ComponentModel::ProtoCarSink(DiscreteSink::new()
-        .with_name("Sink".into())
-        .with_code("G".into())
-        .with_process_time_distr(Distribution::Constant(15. * 60.)),
-        Mailbox::new()
-    );
+    // let mut sink = ComponentModel::ProtoCarSink(DiscreteSink::new()
+    //     .with_name("Sink".into())
+    //     .with_code("G".into())
+    //     .with_process_time_distr(Distribution::Constant(15. * 60.)),
+    //     Mailbox::new()
+    // );
 
-    let mut env_controller = ComponentModel::BasicEnvironment(BasicEnvironment::new()
-        .with_name("EnvironmentController".into())
-        .with_code("Z".into()),
-        Mailbox::new()
-    );
-    let env_addr = env_controller.get_address();
+    // let mut env_controller = ComponentModel::BasicEnvironment(BasicEnvironment::new()
+    //     .with_name("EnvironmentController".into())
+    //     .with_code("Z".into()),
+    //     Mailbox::new()
+    // );
+    // let env_addr = env_controller.get_address();
 
     connect_components!(&mut source, &mut queue_1).unwrap();
     connect_components!(&mut queue_1, &mut process_1).unwrap();
     connect_components!(&mut process_1, &mut queue_2).unwrap();
     connect_components!(&mut queue_2, &mut process_par).unwrap();
     connect_components!(&mut process_par, &mut queue_3).unwrap();
-    connect_components!(&mut queue_3, &mut sink).unwrap();
+    // connect_components!(&mut queue_3, &mut sink).unwrap();
 
     // connect_components!(&mut shift_controller, &mut source).unwrap();
-    connect_components!(&mut env_controller, &mut process_1).unwrap();
+    // connect_components!(&mut env_controller, &mut process_1).unwrap();
     // connect_components!(&mut shift_controller, &mut process_par).unwrap();
     // connect_components!(&mut shift_controller, &mut sink).unwrap();
 
@@ -193,8 +193,8 @@ fn main() {
     connect_logger!(&mut process_logger, &mut source).unwrap();
     connect_logger!(&mut process_logger, &mut process_1).unwrap();
     connect_logger!(&mut process_logger, &mut process_par).unwrap();
-    connect_logger!(&mut process_logger, &mut sink).unwrap();
-    connect_logger!(&mut env_logger, &mut env_controller).unwrap();
+    // connect_logger!(&mut process_logger, &mut sink).unwrap();
+    // connect_logger!(&mut env_logger, &mut env_controller).unwrap();
 
     let mut sim_builder = SimInit::new();
     sim_builder = register_component!(sim_builder, source);
@@ -203,20 +203,20 @@ fn main() {
     sim_builder = register_component!(sim_builder, queue_2);
     sim_builder = register_component!(sim_builder, process_par);
     sim_builder = register_component!(sim_builder, queue_3);
-    sim_builder = register_component!(sim_builder, sink);
-    sim_builder = register_component!(sim_builder, env_controller);
+    // sim_builder = register_component!(sim_builder, sink);
+    // sim_builder = register_component!(sim_builder, env_controller);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
 
     let (mut simu, mut sched) = sim_builder.init(start_time.clone()).unwrap();
 
-    let event_time = start_time + Duration::from_secs(3600);
-    let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Stopped);
-    create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
+    // let event_time = start_time + Duration::from_secs(3600);
+    // let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Stopped);
+    // create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
 
-    let event_time = start_time + Duration::from_secs(7200);
-    let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Normal);
-    create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
+    // let event_time = start_time + Duration::from_secs(7200);
+    // let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Normal);
+    // create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
 
     // simu.step_until(start_time + Duration::from_secs(24 * 3600)).unwrap();
     simu.step_until(start_time + Duration::from_secs(2700)).unwrap();

@@ -361,6 +361,11 @@ where
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
+    
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+        async move {}
+    }
+
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
@@ -764,6 +769,10 @@ where
     fn set_time_to_next_event(&mut self, time: Option<Duration>) {
         self.time_to_next_event = time;
     }
+    
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+        async move {}
+    }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
@@ -1018,6 +1027,10 @@ where
         self.time_to_next_event = time;
     }
 
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+        async move {}
+    }
+
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
@@ -1258,6 +1271,10 @@ where
         self.time_to_next_event = time;
     }
 
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+        async move {}
+    }
+
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()>{
         async move {
             let time = cx.time();
@@ -1468,6 +1485,10 @@ where
 
     fn set_time_to_next_event(&mut self, time: Option<Duration>) {
         self.time_to_next_event = time;
+    }
+
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+        async move {}
     }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
