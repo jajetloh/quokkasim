@@ -8,6 +8,7 @@ use crate::truck::Truck;
 
 pub struct DumpingProcess {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_upstream_trucks: Requestor<(), DiscreteStockState>,
     pub req_downstream_trucks: Requestor<(), DiscreteStockState>,
@@ -21,7 +22,7 @@ pub struct DumpingProcess {
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
-    next_event_id: u64,
+    next_event_index: u64,
     pub log_emitter: Output<TruckingProcessLog>,
     pub previous_check_time: MonotonicTime,
 }
@@ -30,6 +31,7 @@ impl DumpingProcess {
     pub fn new() -> Self {
         DumpingProcess {
             element_name: String::new(),
+            element_code: String::new(),
             element_type: String::new(),
             req_upstream_trucks: Requestor::default(),
             req_downstream_ore: Requestor::default(),
@@ -41,7 +43,7 @@ impl DumpingProcess {
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
-            next_event_id: 0,
+            next_event_index: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
@@ -71,7 +73,7 @@ impl DumpingProcess {
 impl Model for DumpingProcess {}
 
 impl DumpingProcess {
-    pub fn update_state<'a> (&'a mut self, notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    pub fn update_state<'a> (&'a mut self, mut notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
         async move {
             let time = cx.time();
 
@@ -81,11 +83,12 @@ impl DumpingProcess {
                     let duration_since_prev_check = time.duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        let nm = NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "Truck dumped".into(),
-                        };
+                        // let nm = NotificationMetadata {
+                        //     time,
+                        //     element_from: self.element_name.clone(),
+                        //     message: "Truck dumped".into(),
+                        // };
+                        notif_meta = self.log(time, log_type)
                         let ore = truck.ore.take();
                         self.push_downstream_trucks.send((truck.clone(), nm.clone())).await;
                         match ore {
@@ -183,17 +186,25 @@ impl DumpingProcess {
 
     }
 
-    pub fn log(&mut self, time: MonotonicTime, log_type: TruckingProcessLogType) -> impl Future<Output = ()> + Send {
+    pub fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, log_type: TruckingProcessLogType) -> impl Future<Output = NotificationMetadata> + Send {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
             let log = TruckingProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: log_type,
             };
             self.log_emitter.send(log).await;
-            self.next_event_id += 1;
+            self.next_event_index += 1;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message: message.into(),
+            }
         }
     }
 }

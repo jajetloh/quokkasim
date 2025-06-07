@@ -185,7 +185,7 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
             event_id: log.event_id,
             element_name: log.element_name,
             element_type: log.element_type,
-            log_type: log.log_type,
+            log_type: log.message,
             truck_id: None,
             resource: log.vector,
         }

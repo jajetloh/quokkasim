@@ -388,24 +388,24 @@ pub trait Process {
 
     fn set_time_to_next_event(&mut self, time: Option<Duration>);
 
-    fn pre_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn pre_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {}
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {}
     }
 
 
-    fn update_state(&mut self, notif_meta: NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
+    fn update_state(&mut self, mut notif_meta: NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
-            self.pre_update_state(&notif_meta, cx).await;
-            self.update_state_impl(&notif_meta, cx).await;
-            self.post_update_state(&notif_meta, cx).await;
+            self.pre_update_state(&mut notif_meta, cx).await;
+            self.update_state_impl(&mut notif_meta, cx).await;
+            self.post_update_state(&mut notif_meta, cx).await;
         }
     }
 
-    fn post_update_state (&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send + where Self: Model {
+    fn post_update_state (&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send + where Self: Model {
         async move {}
     }
 
@@ -1150,28 +1150,25 @@ macro_rules! define_model_enums {
         impl $ScheduledEventConfig {
             pub fn schedule_event(&self, time: &$crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: &$ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
                 let time = time.clone();
+                let notif_meta = $crate::prelude::NotificationMetadata {
+                    time,
+                    source_event: "Scheduler_000000".into(),
+                    message: "Scheduled event".into(),
+                };
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::VectorStockF64(addr)) => {
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity.clone(), addr.clone())?;
-                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, NotificationMetadata {
-                            time,
-                            element_from: "Scheduler".into(),
-                            message: "Low capacity change".into(),
-                        }, addr.clone())?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, notif_meta, addr.clone())?;
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::VectorProcessF64(addr)) => {
                         let distr_instance = df.create(distr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone())?;
-                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, NotificationMetadata {
-                            time,
-                            element_from: "Scheduler".into(),
-                            message: "Process quantity change".into(),
-                        }, addr.clone())?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, notif_meta, addr.clone())?;
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetEnvironmentState(env_state), $ComponentModelAddress::BasicEnvironment(addr)) => {
-                        scheduler.schedule_event(time, BasicEnvironment::set_state, env_state.clone(), addr.clone())?;
+                        scheduler.schedule_event(time, BasicEnvironment::set_state, (env_state.clone(), notif_meta), addr.clone())?;
                         Ok(())
                     },
                     (a, b) => {

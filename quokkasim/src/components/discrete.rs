@@ -163,10 +163,10 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
         }
     }
 
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn emit_change(&mut self, notif_meta: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.state_emitter.send(payload).await;
-            self.log(cx.time(), "Emit Change".to_string()).await;
+            let nm = self.log(cx.time(), notif_meta.source_event, "Emit Change").await;
+            self.state_emitter.send(nm).await;
         }
     }
 
@@ -263,9 +263,10 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
-        let mut state = serializer.serialize_struct("DiscreteStockLog", 6)?;
+        let mut state = serializer.serialize_struct("DiscreteStockLog", 7)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         state.serialize_field("message", &self.message)?;
@@ -382,21 +383,20 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
         self.previous_check_time = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
                 None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
             };
-            let mut notif_meta = notif_meta.clone();
 
             match (self.process_state.take(), &self.env_state) {
                 (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) => {
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        notif_meta = self.log(time, notif_meta.source_event, "ProcessSuccess", DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessSuccess", DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
                         self.push_downstream.send((resource.clone(), notif_meta.clone())).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
@@ -407,11 +407,11 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
 
             match (&self.env_state, &new_env_state) {
                 (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    self.log(time, notif_meta.source_event.clone(), "Stopped by environment", DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                    *notif_meta = self.log(time, notif_meta.source_event.clone(), "Stopped by environment", DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
                     self.env_state = BasicEnvironmentState::Stopped;
                 },
                 (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    self.log(time, notif_meta.source_event.clone(), "Resumed by environment", DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
+                    *notif_meta = self.log(time, notif_meta.source_event.clone(), "Resumed by environment", DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
                     self.env_state = BasicEnvironmentState::Normal;
                 }
                 _ => {}
@@ -426,7 +426,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                             Some(DiscreteStockState::Normal { .. } | DiscreteStockState::Full { .. }),
                             Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }),
                         ) => {
-                            notif_meta = self.log(time, notif_meta.source_event.clone(), "Withdraw request", DiscreteProcessLogType::WithdrawRequest).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Withdraw request", DiscreteProcessLogType::WithdrawRequest).await;
                             let received = self.withdraw_upstream.send(((), notif_meta.clone())).await.next().unwrap();
                             match received {
                                 Some(received_resource) => {
@@ -434,29 +434,29 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                                         panic!("Process time distribution not set for process {}", self.element_name);
                                     }).sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), received_resource.clone()));
-                                    notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessStart", DiscreteProcessLogType::ProcessStart { resource: received_resource }).await;
+                                    *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessStart", DiscreteProcessLogType::ProcessStart { resource: received_resource }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                                 },
                                 None => {
-                                    notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Upstream did not provide resource" }).await;
+                                    *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Upstream did not provide resource" }).await;
                                     self.time_to_next_event = None;
                                 }
                             }
                         },
                         (Some(DiscreteStockState::Empty { .. }), _ ) => {
-                            notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, Some(DiscreteStockState::Full { .. })) => {
-                            notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "ProcessFailure", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         }
                     }
@@ -471,7 +471,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -535,9 +535,10 @@ impl<T: Serialize> Serialize for DiscreteProcessLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer {
-        let mut state = serializer.serialize_struct("DiscreteProcessLog", 7)?;
+        let mut state = serializer.serialize_struct("DiscreteProcessLog", 8)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         let (event_type, item, reason): (String, Option<String>, Option<&str>) = match &self.event {
@@ -716,19 +717,17 @@ impl<
         self.previous_check_time = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
-
-            let mut notif_meta = notif_meta.clone();
 
             match self.process_state.take() {
                 Some((mut process_time_left, resource)) => {
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        notif_meta = self.log(time, notif_meta.source_event, "Resource created", DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), notif_meta)).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Resource created", DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
+                        self.push_downstream.send((resource.clone(), notif_meta.clone())).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
@@ -747,15 +746,15 @@ impl<
                             let next_item = self.item_factory.create_item();
 
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), next_item.clone()));
-                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: next_item.clone() }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process started", DiscreteProcessLogType::ProcessStart { resource: next_item.clone() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         Some(DiscreteStockState::Full { .. }) => {
-                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Downstream is full", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         None => {
-                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Downstream is not connected", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         }
                     }
@@ -767,7 +766,7 @@ impl<
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -814,6 +813,7 @@ pub struct DiscreteSink<
     InternalResourceType: Clone + Send + 'static,
 > {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(RequestParameterType, NotificationMetadata), RequestType>,
@@ -822,7 +822,7 @@ pub struct DiscreteSink<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
-    next_event_id: u64,
+    next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -834,6 +834,7 @@ impl<
     fn default() -> Self {
         DiscreteSink {
             element_name: "DiscreteSink".to_string(),
+            element_code: "DiscreteSink".to_string(),
             element_type: "DiscreteSink".to_string(),
             req_upstream: Requestor::new(),
             withdraw_upstream: Requestor::new(),
@@ -842,7 +843,7 @@ impl<
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
-            next_event_id: 0,
+            next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -879,8 +880,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -903,7 +904,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
         self.previous_check_time = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -912,7 +913,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Sunk resources", DiscreteProcessLogType::ProcessSuccess { resource: resource.clone() }).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
@@ -926,7 +927,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                         Some(DiscreteStockState::Normal { .. } | DiscreteStockState::Full { .. }) => {
                             let moved = self.withdraw_upstream.send(((), NotificationMetadata {
                                 time,
-                                element_from: self.element_name.clone(),
+                                source_event: notif_meta.source_event.clone(),
                                 message: "Withdraw request".into(),
                             })).await.next().unwrap();
                             match moved {
@@ -935,22 +936,22 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                                         panic!("Process time distribution not set for sink {}", self.element_name);
                                     }).sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
-                                    self.log(time, DiscreteProcessLogType::ProcessStart { resource: moved }).await;
+                                    *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process started", DiscreteProcessLogType::ProcessStart { resource: moved }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                                 },
                                 None => {
-                                    self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream did not provide resource" }).await;
+                                    *notif_meta = self.log(time, notif_meta.source_event.clone(), "Upstream did not provide resource", DiscreteProcessLogType::ProcessFailure { reason: "Upstream did not provide resource" }).await;
                                     self.time_to_next_event = None;
                                     return;
                                 }
                             }
                         },
                         Some(DiscreteStockState::Empty { .. }) => {
-                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Upstream is empty", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         }
                         None => {
-                            self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Upstream is not connected", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         }
                     }
@@ -962,7 +963,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -979,17 +980,25 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
-            self.next_event_id += 1;
+            self.next_event_index += 1;
             self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message: message.into(),
+            }
         }
     }
 }
@@ -1012,7 +1021,7 @@ pub struct DiscreteParallelProcess<
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<SendType>>,
     time_to_next_event: Option<Duration>,
-    next_event_id: u64,
+    next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -1036,7 +1045,7 @@ impl<
             process_quantity_distr: None,
             log_emitter: Output::new(),
             time_to_next_event: None,
-            next_event_id: 0,
+            next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -1076,8 +1085,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -1100,7 +1109,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
         self.previous_check_time = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             // First resolve any completed processes
 
@@ -1119,19 +1128,15 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                 let ds_state = self.req_downstream.send(()).await.next();
                 match &ds_state {
                     Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
-                        self.push_downstream.send((item.clone(), NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "ProcessComplete".into(),
-                        })).await;
-                        self.log(time, DiscreteProcessLogType::ProcessSuccess { resource: item.clone() }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process completed", DiscreteProcessLogType::ProcessSuccess { resource: item.clone() }).await;
+                        self.push_downstream.send((item.clone(), notif_meta.clone())).await;
                     },
                     Some(DiscreteStockState::Full { .. }) => {
-                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Downstream is full", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                         break;
                     },
                     None => {
-                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Downstream is not connected", DiscreteProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                         break;
                     }
                 }
@@ -1145,7 +1150,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                     Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
                         let item = self.withdraw_upstream.send(((), NotificationMetadata {
                             time,
-                            element_from: self.element_name.clone(),
+                            source_event: notif_meta.source_event.clone(),
                             message: "Withdraw request".into(),
                         })).await.next().unwrap();
                         if let Some(item) = item {
@@ -1154,18 +1159,18 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                             }).sample());
 
                             self.processes_in_progress.push((process_duration, item.clone()));
-                            self.log(time, DiscreteProcessLogType::ProcessStart { resource: item }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process start", DiscreteProcessLogType::ProcessStart { resource: item }).await;
 
                         } else {
                             break;
                         }
                     },
                     Some(DiscreteStockState::Full { .. }) => {
-                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is full" }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Upstream is full", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is full" }).await;
                         break;
                     },
                     None => {
-                        self.log(time, DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Upstream is not connected", DiscreteProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                         break;
                     }
                 }
@@ -1180,7 +1185,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1197,17 +1202,25 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_name, self.next_event_index);
             let log = DiscreteProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
-            self.next_event_id += 1;
+            self.next_event_index += 1;
             self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message: message.into(),
+            }
         }
     }
 }

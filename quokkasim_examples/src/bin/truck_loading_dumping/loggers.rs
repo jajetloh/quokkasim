@@ -30,7 +30,8 @@ impl Logger for TruckingProcessLogger {
 #[derive(Clone, Debug)]
 pub struct TruckingProcessLog {
     pub time: String,
-    pub event_id: u64,
+    pub event_id: String,
+    pub source_event_id: String,
     pub element_name: String,
     pub element_type: String,
     pub event: TruckingProcessLogType,

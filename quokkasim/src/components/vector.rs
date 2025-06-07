@@ -40,6 +40,7 @@ impl StateEq for VectorStockState {
 
 pub struct VectorStock<T: Clone + Send + 'static> {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub vector: T,
     pub log_emitter: Output<VectorStockLog<T>>,
@@ -54,6 +55,7 @@ impl<T: Clone + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
             element_name: String::new(),
+            element_code: String::new(),
             element_type: String::new(),
             vector: Default::default(),
             low_capacity: 0.0,
@@ -117,26 +119,34 @@ where
         }
     }
 
-    fn emit_change(&mut self, payload: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
+    fn emit_change(&mut self, notif_meta: NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
         async move {
-            self.state_emitter.send(payload).await;
-            self.log(cx.time(), "Emit Change".to_string()).await;
+            let nm = self.log(cx.time(), notif_meta.source_event, "Emit Change").await;
+            self.state_emitter.send(nm).await;
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, log_type: String) -> impl Future<Output =()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_id);
             let log = VectorStockLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
-                log_type,
+                message,
                 state: self.get_state(),
                 vector: self.vector.clone(),
             };
+            self.log_emitter.send(log.clone()).await;
             self.next_event_id += 1;
-            self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
 }
@@ -212,10 +222,11 @@ pub struct VectorStockLogger<T> where T: Send {
 #[derive(Debug, Clone)]
 pub struct VectorStockLog<T> {
     pub time: String,
-    pub event_id: u64,
+    pub event_id: String,
+    pub source_event_id: String,
     pub element_name: String,
     pub element_type: String,
-    pub log_type: String,
+    pub message: &'static str,
     pub state: VectorStockState,
     pub vector: T,
 }
@@ -225,12 +236,13 @@ impl<T: Serialize> Serialize for VectorStockLog<T> {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("VectorStockLog", 7)?;
+        let mut state = serializer.serialize_struct("VectorStockLog", 8)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        state.serialize_field("log_type", &self.log_type)?;
+        state.serialize_field("log_type", &self.message)?;
         state.serialize_field("state", &self.state.get_name())?;
         let vector_json = serde_json::to_string(&self.vector).map_err(serde::ser::Error::custom)?;
         state.serialize_field("vector", &vector_json)?;
@@ -265,6 +277,7 @@ pub struct VectorProcess<
     SendType: Clone + Send + 'static,
 > {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), VectorStockState>,
@@ -274,7 +287,7 @@ pub struct VectorProcess<
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
-    next_event_id: u64,
+    next_event_index: u64,
     pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
 }
@@ -287,6 +300,7 @@ impl<
     fn default() -> Self {
         VectorProcess {
             element_name: String::new(),
+            element_code: String::new(),
             element_type: String::new(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
@@ -299,7 +313,7 @@ impl<
             
             process_state: None,
             time_to_next_event: None,
-            next_event_id: 0,
+            next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -315,8 +329,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -339,7 +353,7 @@ where
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -348,12 +362,8 @@ where
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "Process successful".into(),
-                        })).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process complete", VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                        self.push_downstream.send((resource.clone(), notif_meta.clone())).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
@@ -370,30 +380,27 @@ where
                             Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
                         ) => {
                             let process_quantity = self.process_quantity_distr.sample();
-                            let moved = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: format!("Withdrawing quantity {:?}", process_quantity),
-                            })).await.next().unwrap();
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Req upstream state", VectorProcessLogType::WithdrawRequest).await;
+                            let moved = self.withdraw_upstream.send((process_quantity, notif_meta.clone())).await.next().unwrap();
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
-                            self.log(time, VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process start", VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(VectorStockState::Empty {..} ), _) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, Some(VectorStockState::Full {..} )) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                     }
@@ -405,7 +412,7 @@ where
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -422,17 +429,25 @@ where
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: VectorProcessLogType<T>) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
-            self.next_event_id += 1;
-            self.log_emitter.send(log).await;
+            self.log_emitter.send(log.clone()).await;
+            self.next_event_index += 1;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
 }
@@ -507,12 +522,15 @@ pub enum VectorProcessLogType<T> {
     SplitStart { quantity: f64, vector: T },
     SplitSuccess { quantity: f64, vectors: Vec<T> },
     SplitFailure { reason: &'static str },
+    WithdrawRequest,
+    PushRequest,
 }
 
 #[derive(Debug, Clone)]
 pub struct VectorProcessLog<T> {
     pub time: String,
-    pub event_id: u64,
+    pub event_id: String,
+    pub source_event_id: String,
     pub element_name: String,
     pub element_type: String,
     pub event: VectorProcessLogType<T>,
@@ -523,9 +541,10 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("VectorProcessLog", 9)?;
+        let mut state = serializer.serialize_struct("VectorProcessLog", 10)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         let (event_type, total, inflows, outflows, reason): (&str, Option<f64>, Option<String>, Option<String>, Option<String>);
@@ -593,6 +612,20 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
                 outflows = None;
                 reason = Some(r.to_string());
             },
+            VectorProcessLogType::WithdrawRequest => {
+                event_type = "WithdrawRequest";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = None;
+            },
+            VectorProcessLogType::PushRequest => {
+                event_type = "PushRequest";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = None;
+            },
         }
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
@@ -615,6 +648,7 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
     const M: usize
 > {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_upstreams: [Requestor<(), VectorStockState>; M],
     pub req_downstream: Requestor<(), VectorStockState>,
@@ -641,8 +675,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -658,6 +692,7 @@ impl<
     pub fn new() -> Self {
         VectorCombiner {
             element_name: String::new(),
+            element_code: String::new(),
             element_type: String::new(),
             req_upstreams: std::array::from_fn(|_| Requestor::default()),
             req_downstream: Requestor::default(),
@@ -714,7 +749,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -729,12 +764,8 @@ where
                             total.add(resource.clone());
                         }
 
-                        self.log(time, VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
-                        self.push_downstream.send((total, NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "Process successful".into(),
-                        })).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process complete", VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
+                        self.push_downstream.send((total, notif_meta.clone())).await;
                     } else {
                         self.process_state = Some((process_time_left, resources));
                     }
@@ -743,7 +774,9 @@ where
             }
             match self.process_state {
                 None => {
-                    let iterators = join_all(self.req_upstreams.iter_mut().map(|req| req.send(()))).await;
+                    let iterators = join_all(self.req_upstreams.iter_mut().map(|req| {
+                        req.send(())
+                    })).await;
                     let us_states: Vec<VectorStockState> = iterators.into_iter().flatten().collect();
                     let all_us_available: Option<bool>;
                     if us_states.len() < M {
@@ -760,11 +793,12 @@ where
                             Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
                         ) => {
                             let process_quantity = self.process_quantity_distr.sample();
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Req upstream state", VectorProcessLogType::WithdrawRequest).await;
                             let withdraw_iterators = join_all(self.withdraw_upstreams.iter_mut().map(|req| {
                                 req.send((process_quantity, NotificationMetadata {
                                     time, 
-                                    element_from: self.element_name.clone(),
-                                    message: format!("Withdrawing quantity {:?}", process_quantity),
+                                    source_event: notif_meta.source_event.clone(),
+                                    message: "Withdrawing quantity",
                                 }))
                             })).await;
                             let withdrawn: [T; M] = withdraw_iterators.into_iter()
@@ -774,23 +808,23 @@ where
                                 .unwrap_or_else(|_| panic!("Failed to convert to array"));
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
-                            self.log(time, VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn.into() }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process start", VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn.into() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(false), _) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "At least one upstream is empty" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "At least one upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "No upstreams are connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "No upstreams are connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, Some(VectorStockState::Full {..} )) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                     }
@@ -802,7 +836,7 @@ where
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -819,17 +853,25 @@ where
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_id);
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
+            self.log_emitter.send(log.clone()).await;
             self.next_event_id += 1;
-            self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
 }
@@ -847,6 +889,7 @@ pub struct VectorSplitter<
     const N: usize
 > {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstreams: [Requestor<(), VectorStockState>; N],
@@ -899,6 +942,7 @@ impl<
     fn default() -> Self {
         VectorSplitter {
             element_name: String::new(),
+            element_code: String::new(),
             element_type: String::new(),
             req_upstream: Requestor::default(),
             req_downstreams: std::array::from_fn(|_| Requestor::default()),
@@ -927,8 +971,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -954,7 +998,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -969,15 +1013,11 @@ where
                             let quantity = resource.total() * ratio;
                             resource.clone().remove(quantity)
                         }).collect::<Vec<_>>();
-                        
-                        self.log(time, VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
+
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Split success", VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
 
                         join_all(self.push_downstreams.iter_mut().zip(split_resources).map(|(push, resource)| {
-                            push.send((resource.clone(), NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: "Process successful".into()
-                            }))
+                            push.send((resource.clone(), notif_meta.clone()))
                         })).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
@@ -1006,30 +1046,27 @@ where
                             Some(true),
                         ) => {
                             let process_quantity = self.process_quantity_distr.sample();
-                            let withdrawn = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: format!("Withdrawing quantity {:?}", process_quantity),
-                            })).await.next().unwrap();
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process start", VectorProcessLogType::WithdrawRequest).await;
+                            let withdrawn = self.withdraw_upstream.send((process_quantity, notif_meta.clone())).await.next().unwrap();
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
-                            self.log(time, VectorProcessLogType::SplitStart { quantity: process_quantity, vector: withdrawn }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Split start", VectorProcessLogType::SplitStart { quantity: process_quantity, vector: withdrawn }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (_, Some(false)) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "At least one downstream is full" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "At least one downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, None) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "No downstreams are connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "No downstreams are connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (None, _) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (Some(VectorStockState::Empty {..} ), _) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         },
                     }
@@ -1041,7 +1078,7 @@ where
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1058,17 +1095,25 @@ where
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_id);
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
+            self.log_emitter.send(log.clone()).await;
             self.next_event_id += 1;
-            self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
 }
@@ -1082,6 +1127,7 @@ pub struct VectorSource<
     SendType: Clone + Send + 'static,
 > {
     pub element_name: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_downstream: Requestor<(), VectorStockState>,
     pub push_downstream: Output<(SendType, NotificationMetadata)>,
@@ -1090,7 +1136,7 @@ pub struct VectorSource<
     pub process_time_distr: Distribution,
     pub source_vector: InternalResourceType,
     pub time_to_next_event: Option<Duration>,
-    next_event_id: u64,
+    next_event_index: u64,
     pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
     pub previous_check_time: MonotonicTime,
 }
@@ -1099,6 +1145,7 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
     fn default() -> Self {
         VectorSource {
             element_name: String::new(),
+            element_code: String::new(),
             element_type: String::new(),
             req_downstream: Requestor::default(),
             push_downstream: Output::default(),
@@ -1107,7 +1154,7 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
             process_time_distr: Distribution::default(),
             source_vector: InternalResourceType::default(),
             time_to_next_event: None,
-            next_event_id: 0,
+            next_event_index: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
@@ -1122,8 +1169,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -1183,7 +1230,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()>{
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()>{
         async move {
             let time = cx.time();
 
@@ -1192,12 +1239,8 @@ where
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), NotificationMetadata {
-                            time,
-                            element_from: self.element_name.clone(),
-                            message: "Processed".into(),
-                        })).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process success", VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                        self.push_downstream.send((resource.clone(), notif_meta.clone())).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
@@ -1209,7 +1252,7 @@ where
                     let ds_state = self.req_downstream.send(()).await.next();
                     match ds_state {
                         Some(VectorStockState::Full {..}) => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
                             self.time_to_next_event = None;
                         },
                         Some(VectorStockState::Normal {..}) | Some(VectorStockState::Empty {..}) => {
@@ -1222,11 +1265,11 @@ where
                             created.multiply(process_quantity / created.total());
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), created.clone()));
-                            self.log(time, VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: created }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process start", VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: created }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         None => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                     }
@@ -1238,7 +1281,7 @@ where
         }
     }
 
-    fn post_update_state(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn post_update_state(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
@@ -1255,17 +1298,25 @@ where
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
-            self.next_event_id += 1;
+            self.next_event_index += 1;
             self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
 }
@@ -1301,8 +1352,8 @@ impl<
         async move {
             let notif_meta = NotificationMetadata {
                 time: ctx.time(),
-                element_from: self.element_name.clone(),
-                message: "Initialisation".into(),
+                source_event: "Init_000000".into(),
+                message: "Model Initialisation".into(),
             };
             self.update_state(notif_meta, ctx).await;
             self.into()
@@ -1381,7 +1432,7 @@ where
         self.time_to_next_event = time;
     }
 
-    fn update_state_impl(&mut self, notif_meta: &NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn update_state_impl(&mut self, notif_meta: &mut NotificationMetadata, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
 
@@ -1390,7 +1441,7 @@ where
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        self.log(time, VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                        *notif_meta = self.log(time, notif_meta.source_event.clone(), "Process success", VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
@@ -1403,24 +1454,21 @@ where
                     match us_state {
                         Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}) => {
                             let process_quantity = self.process_quantity_distr.sample();
-                            let withdrawn = self.withdraw_upstream.send((process_quantity, NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: format!("Withdrawing quantity {:?}", process_quantity),
-                            })).await.next().unwrap();
+                            *notif_meta = self.log(time, notif_meta.source_event.clone(), "Withdraw request", VectorProcessLogType::WithdrawRequest).await;
+                            let withdrawn = self.withdraw_upstream.send((process_quantity, notif_meta.clone())).await.next().unwrap();
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
-                            self.log(time, VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: withdrawn }).await;
+                            self.log(time, notif_meta.source_event.clone(), "Process start", VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: withdrawn }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         Some(VectorStockState::Empty {..}) => {
                         }
                         None => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         _ => {
-                            self.log(time, VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            self.log(time, notif_meta.source_event.clone(), "Process failure", VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_event = None;
                         }
                     }
@@ -1432,17 +1480,25 @@ where
         }
     }
 
-    fn log(&mut self, time: MonotonicTime, details: Self::LogDetailsType) -> impl Future<Output = ()> {
+    fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, details: Self::LogDetailsType) -> impl Future<Output = NotificationMetadata> {
         async move {
+            let event_id = format!("{}_{:06}", self.element_name, self.next_event_id);
             let log = VectorProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: self.next_event_id,
+                event_id: event_id.clone(),
+                source_event_id: source_event,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 event: details,
             };
             self.next_event_id += 1;
             self.log_emitter.send(log).await;
+
+            NotificationMetadata {
+                time,
+                source_event: event_id,
+                message,
+            }
         }
     }
 }
