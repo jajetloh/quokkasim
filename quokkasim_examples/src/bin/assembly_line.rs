@@ -218,8 +218,8 @@ fn main() {
     // let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Normal);
     // create_scheduled_event!(&mut sched, &event_time, &sched_event, &env_addr, &mut df);
 
-    // simu.step_until(start_time + Duration::from_secs(24 * 3600)).unwrap();
-    simu.step_until(start_time + Duration::from_secs(2700)).unwrap();
+    simu.step_until(start_time + Duration::from_secs(24 * 3600)).unwrap();
+    // simu.step_until(start_time + Duration::from_secs(2700)).unwrap();
 
     let output_dir = "outputs/assembly_line";
     create_dir_all(output_dir).unwrap();

@@ -449,7 +449,11 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.scheduled_event = None;
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
         }
     }
 
@@ -856,7 +860,11 @@ impl<
 
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.scheduled_event = None;
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
         }
     }
 
@@ -1071,7 +1079,11 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.scheduled_event = None;
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
         }
     }
 
@@ -1311,7 +1323,11 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.scheduled_event = None;
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
         }
     }
 
