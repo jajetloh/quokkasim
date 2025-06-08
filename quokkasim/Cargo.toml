@@ -1,7 +1,7 @@
 [package]
 name = "quokkasim"
 description = "A Rust-based Discrete Event Simulation (DES) framework, which simplifies simulation for beginners, and provides excellent utilities for experience modellers."
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/jajetloh/quokkasim"
 documentation = "https://jajetloh.github.io/quokkasim-book/"
