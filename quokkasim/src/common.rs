@@ -4,18 +4,23 @@ use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize)]
-pub struct EventLog {
-    pub time: String,
-    pub element_name: String,
-    pub element_type: String,
-    pub log_type: String,
-    pub json_data: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
+/// A short, lightweight identifier for an event. Very useful for understanding causal flow of events via log files.
+/// Conventionally of the form `PROC_123456`, with a prefix uniquely identifying the process, and suffix an auto-incrementing number.
 pub struct EventId(pub String);
 
+impl EventId {
+    pub fn from_init() -> EventId {
+        EventId("INIT_000000".to_string())
+    }
+
+    pub fn from_scheduler() -> EventId {
+        EventId("SCH_000000".to_string())
+    }
+}
+
 #[derive(Debug, Clone)]
+/// An instantiated Distribution that can be sampled from via the `sample` method.
+/// Usually constructed via the `DistributionFactory::create` method, though the Constant variant can be constructed directly.
 pub enum Distribution {
     Uniform(Uniform<f64>, SmallRng),
     Triangular(Triangular<f64>, SmallRng),
@@ -27,6 +32,7 @@ pub enum Distribution {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type")]
+/// Serialisable configuration for creating a Distribution instance. Uniquely defines the distribution to be created, excluding the random number generator.
 pub enum DistributionConfig {
     Uniform { min: f64, max: f64},
     Triangular { min: f64, max: f64, mode: f64 },
@@ -36,6 +42,7 @@ pub enum DistributionConfig {
     Exponential { mean: f64 },
 }
 
+/// Factory for creating Distribution instances based on a DistributionConfig. For random distributions, creates SmallRng instances seeded with an incrementing seed value.
 pub struct DistributionFactory {
     pub base_seed: u64,
     pub next_seed: u64,

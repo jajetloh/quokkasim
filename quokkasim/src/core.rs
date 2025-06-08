@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Debug, fs::File, time::Duration};
+use std::{error::Error, fmt::Debug, fs::File};
 use csv::WriterBuilder;
 use crate::prelude::*;
 use serde::{ser::SerializeStruct, Serialize};
@@ -241,7 +241,7 @@ pub struct BasicEnvironment {
 impl Model for BasicEnvironment {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            self.log(cx.time(), EventId("Init_000000".into()), self.state.clone()).await;
+            self.log(cx.time(), EventId::from_init(), self.state.clone()).await;
             self.into()
         }
     }
@@ -1139,12 +1139,7 @@ macro_rules! define_model_enums {
         impl $ScheduledEventConfig {
             pub fn schedule_event(&self, time: &$crate::nexosim::MonotonicTime, scheduler: &mut $crate::nexosim::Scheduler, addr: &$ComponentModelAddress, df: &mut DistributionFactory) -> Result<(), Box<dyn ::std::error::Error>> {
                 let time = time.clone();
-                // let notif_meta = $crate::prelude::EventId {
-                //     time,
-                //     source_event: "Scheduler_000000".into(),
-                //     message: "Scheduled event".into(),
-                // };
-                let source_event_id = $crate::prelude::EventId("Scheduler_000000".into());
+                let source_event_id = $crate::prelude::EventId::from_scheduler();
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::VectorStockF64(addr)) => {
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity.clone(), addr.clone())?;

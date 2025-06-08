@@ -409,7 +409,7 @@ impl<
 > Model for DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId("Init_000000".into());
+            let source_event_id = EventId::from_init();
             self.update_state(source_event_id, ctx).await;
             self.into()
         }
@@ -758,7 +758,7 @@ impl<
 > Model for DiscreteSource<InternalResourceType, SendType, FactoryType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
         async move {
-            let source_event_id = EventId("Init_000000".into());
+            let source_event_id = EventId::from_init();
             self.update_state(source_event_id, ctx).await;
             self.into()
         }
@@ -984,7 +984,7 @@ impl<
 > Model for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
         async move {
-            let source_event_id = EventId("Init_000000".into());
+            let source_event_id = EventId::from_init();
             self.update_state(source_event_id, ctx).await;
             self.into()
         }
@@ -1224,7 +1224,7 @@ impl<
 > Model for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
         async move {
-            let source_event_id = EventId("Init_000000".into());
+            let source_event_id = EventId::from_init();
             self.update_state(source_event_id, ctx).await;
             self.into()
         }

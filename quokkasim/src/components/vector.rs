@@ -376,7 +376,7 @@ impl<
 > Model for VectorProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId("Init_000000".into());
+            let source_event_id = EventId::from_init();
             self.update_state(source_event_id, ctx).await;
             self.into()
         }

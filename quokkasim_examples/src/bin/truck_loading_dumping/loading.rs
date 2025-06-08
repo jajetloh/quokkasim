@@ -56,6 +56,11 @@ impl LoadingProcess {
         self
     }
 
+    pub fn with_code(mut self, code: String) -> Self {
+        self.element_code = code;
+        self
+    }
+
     pub fn with_type(mut self, element_type: String) -> Self {
         self.element_type = element_type;
         self
@@ -72,7 +77,15 @@ impl LoadingProcess {
     }
 }
 
-impl Model for LoadingProcess {}
+impl Model for LoadingProcess {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let source_event_id = EventId::from_init();
+            self.update_state(source_event_id, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl LoadingProcess {
     pub fn update_state(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
