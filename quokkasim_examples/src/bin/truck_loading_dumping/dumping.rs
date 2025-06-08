@@ -14,11 +14,12 @@ pub struct DumpingProcess {
     pub req_downstream_trucks: Requestor<(), DiscreteStockState>,
     pub req_downstream_ore: Requestor<(), VectorStockState>,
 
-    pub withdraw_upstream_trucks: Requestor<((), NotificationMetadata), Option<Truck>>,
-    pub push_downstream_trucks: Output<(Truck, NotificationMetadata)>,
-    pub push_downstream_ore: Output<(IronOre, NotificationMetadata)>,
+    pub withdraw_upstream_trucks: Requestor<((), EventId), Option<Truck>>,
+    pub push_downstream_trucks: Output<(Truck, EventId)>,
+    pub push_downstream_ore: Output<(IronOre, EventId)>,
 
     pub process_state: Option<(Duration, Truck)>,
+    pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub time_to_next_event: Option<Duration>,
@@ -40,6 +41,7 @@ impl DumpingProcess {
             push_downstream_ore: Output::default(),
             push_downstream_trucks: Output::default(),
             process_state: None,
+            scheduled_event: None,
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
@@ -73,9 +75,18 @@ impl DumpingProcess {
 impl Model for DumpingProcess {}
 
 impl DumpingProcess {
-    pub fn update_state<'a> (&'a mut self, mut notif_meta: NotificationMetadata, cx: &'a mut Context<Self>) -> impl Future<Output = ()> + Send + 'a {
+    pub fn update_state(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             let time = cx.time();
+
+            // Pre-update logic
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+
+            // Begin main update logic
 
             // Resolve current dumping action if pending. Take the state - if time still remains before the event is due, we'll put it back
             match self.process_state.take() {
@@ -83,23 +94,18 @@ impl DumpingProcess {
                     let duration_since_prev_check = time.duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
-                        // let nm = NotificationMetadata {
-                        //     time,
-                        //     element_from: self.element_name.clone(),
-                        //     message: "Truck dumped".into(),
-                        // };
-                        notif_meta = self.log(time, notif_meta.source_event, "Truck dumped", TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: truck.ore.as_ref().map_or(0., |x| x.total()), ore: truck.ore.clone() }).await;
+                        
                         let ore = truck.ore.take();
-                        self.push_downstream_trucks.send((truck.clone(), nm.clone())).await;
-                        match ore {
-                            Some(ore) => {
-                                self.push_downstream_ore.send((ore.clone(), nm)).await;
-                                self.log(time, TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: ore.total(), ore: ore.clone() }).await;
-                            },
-                            None => {
-                                self.log(time, TruckingProcessLogType::DumpingSuccess { truck_id: truck.truck_id.clone(), quantity: 0., ore: IronOre::default() }).await;
-                            }
-                        }
+                        let unwrapped_ore = ore.unwrap_or_default(); // Use empty ore if None
+
+                        source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingSuccess {
+                            truck_id: truck.truck_id.clone(),
+                            quantity: unwrapped_ore.total(),
+                            ore: unwrapped_ore.clone()
+                        }).await;
+
+                        self.push_downstream_trucks.send((truck.clone(), source_event_id.clone())).await;
+                        self.push_downstream_ore.send((unwrapped_ore.clone(), source_event_id.clone())).await;
                     } else {
                         self.process_state = Some((process_time_left, truck));
                     }
@@ -123,12 +129,8 @@ impl DumpingProcess {
                             Some(VectorStockState::Empty { .. }) | Some(VectorStockState::Normal { .. }),
                             Some(DiscreteStockState::Empty { .. }) | Some(DiscreteStockState::Normal { .. }),
                         ) => {
-
-                            let mut truck = self.withdraw_upstream_trucks.send(((), NotificationMetadata {
-                                time,
-                                element_from: self.element_name.clone(),
-                                message: "Requesting truck for dumping".into(),
-                            })).await.next().unwrap();
+                            source_event_id = self.log(time, source_event_id, TruckingProcessLogType::WithdrawRequest).await;
+                            let mut truck = self.withdraw_upstream_trucks.send(((), source_event_id.clone())).await.next().unwrap();
 
                             match truck.take() {
                                 Some(truck) => {
@@ -141,70 +143,78 @@ impl DumpingProcess {
                                     let process_duration = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration), truck.clone()));
 
-                                    self.log(time, TruckingProcessLogType::DumpingStart { truck_id: truck.truck_id, quantity: ore.total(), ore: ore.clone() }).await;
+                                    source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingStart { truck_id: truck.truck_id, quantity: ore.total(), ore: ore.clone() }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration));
                                 }
                                 None => {
-                                    self.log(time, TruckingProcessLogType::DumpingFailure { reason: "No truck available upstream" }).await;
+                                    source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "No truck available upstream" }).await;
                                     self.time_to_next_event = None;
                                 }
                             }
                         }
                         (Some(DiscreteStockState::Empty { .. }) | None, _, _) => {
-                            self.log(time, TruckingProcessLogType::DumpingFailure { reason: "Upstream truck stock is empty or not connected" }).await;
+                            source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "Upstream truck stock is empty or not connected" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, Some(VectorStockState::Full { .. }) | None, _) => {
-                            self.log(time, TruckingProcessLogType::DumpingFailure { reason: "No ore can be received downstream" }).await;
+                            source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "No ore can be received downstream" }).await;
                             self.time_to_next_event = None;
                         },
                         (_, _, Some(DiscreteStockState::Full { .. }) | None) => {
-                            self.log(time, TruckingProcessLogType::DumpingFailure { reason: "Downstream truck stock is full or not connected" }).await;
+                            source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "Downstream truck stock is full or not connected" }).await;
                             self.time_to_next_event = None;
                         },
                     }
-
-                    self.previous_check_time = time;
-                    match self.time_to_next_event {
-                        Some(time_until_next) if time_until_next > Duration::ZERO => {
-                            let next_time = time + time_until_next;
-                            let notif_meta = NotificationMetadata {
-                                time: next_time,
-                                element_from: self.element_name.clone(),
-                                message: "Scheduling next dumping process check".into(),
-                            };
-                            cx.schedule_event(next_time, Self::update_state, notif_meta).unwrap();
-                        }
-                        _ => {
-                            // No further events scheduled
-                            self.time_to_next_event = None;
-                        }
-                    }
                 }
             }
+
+            // Post-update logic
+
+            match self.time_to_next_event {
+                None => {},
+                Some(time_until_next) => {
+                    if time_until_next.is_zero() {
+                        panic!("Time until next event is zero!");
+                    } else {
+                        let next_time = cx.time() + time_until_next;
+                        
+                        // Schedule event if sooner. If so, cancel previous event.
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                            if next_time < scheduled_time {
+                                action_key.cancel();
+                                let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
+                                self.scheduled_event = Some((next_time, new_event_key));
+                            } else {
+                                // Put the event back
+                                self.scheduled_event = Some((scheduled_time, action_key));
+                            }
+                        } else {
+                            let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
+                            self.scheduled_event = Some((next_time, new_event_key));
+                        }
+                    };
+                }
+            };
+            self.previous_check_time = cx.time();
         }
 
     }
 
-    pub fn log(&mut self, time: MonotonicTime, source_event: String, message: &'static str, log_type: TruckingProcessLogType) -> impl Future<Output = NotificationMetadata> + Send {
+    pub fn log(&mut self, time: MonotonicTime, source_event_id: EventId, details: TruckingProcessLogType) -> impl Future<Output = EventId> + Send {
         async move {
-            let event_id = format!("{}_{:06}", self.element_code, self.next_event_index);
+            let event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
             let log = TruckingProcessLog {
                 time: time.to_chrono_date_time(0).unwrap().to_string(),
                 event_id: event_id.clone(),
-                source_event_id: source_event,
+                source_event_id,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
-                event: log_type,
+                event: details,
             };
             self.log_emitter.send(log).await;
             self.next_event_index += 1;
 
-            NotificationMetadata {
-                time,
-                source_event: event_id,
-                message: message.into(),
-            }
+            event_id
         }
     }
 }

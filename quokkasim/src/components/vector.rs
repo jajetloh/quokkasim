@@ -261,9 +261,6 @@ pub struct VectorStockLog<T> {
     pub element_name: String,
     pub element_type: String,
     pub details: VectorStockLogType<T>,
-    // pub message: &'static str,
-    // pub state: VectorStockState,
-    // pub vector: T,
 }
 
 #[derive(Clone)]

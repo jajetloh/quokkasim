@@ -111,13 +111,18 @@ impl CustomLoggerConnection for ComponentLogger {
                 process.log_emitter.filter_map_connect_sink(|x| {
                     let event = match &x.event {
                         DiscreteProcessLogType::ProcessStart { resource } => TruckingProcessLogType::TruckMovementStart { truck_id: resource.truck_id.clone() },
-                        DiscreteProcessLogType::ProcessSuccess { resource } => TruckingProcessLogType::TruckMovementSuccess { truck_id: resource.truck_id.clone() },
-                        DiscreteProcessLogType::ProcessFailure { reason } => TruckingProcessLogType::TruckMovementFailure { reason },
+                        DiscreteProcessLogType::ProcessFinish { resource } => TruckingProcessLogType::TruckMovementSuccess { truck_id: resource.truck_id.clone() },
+                        DiscreteProcessLogType::ProcessNonStart { reason } => TruckingProcessLogType::TruckMovementFailure { reason },
+                        DiscreteProcessLogType::WithdrawRequest => TruckingProcessLogType::WithdrawRequest,
+                        x => {
+                            panic!("Unexpected log event in DiscreteParallelProcessTruck: {:?}", x);
+                        }
                     };
                     Some(TruckingProcessLog {
                         element_name: x.element_name.clone(),
                         element_type: x.element_type.clone(),
-                        event_id: x.event_id,
+                        event_id: x.event_id.clone(),
+                        source_event_id: x.source_event_id.clone(),
                         time: x.time.clone(),
                         event,
                     })

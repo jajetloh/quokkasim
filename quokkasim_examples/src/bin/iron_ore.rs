@@ -5,7 +5,7 @@ use quokkasim::prelude::*;
 use quokkasim::define_model_enums;
 use serde::{Serialize, ser::SerializeStruct};
 
-/**
+/*
  * A representation of Iron Ore, primarily through iron content (Fe) and other elements.
  * Other relevant properties (e.g. mass comprised of magnetite, hematite, limonite minerals) are
  * also tracked.
@@ -87,10 +87,10 @@ impl ResourceMultiply<f64> for IronOre {
 
 struct IronOreProcessLog {
     time: String,
-    event_id: u64,
+    event_id: EventId,
+    source_event_id: EventId,
     element_name: String,
     element_type: String,
-    truck_id: Option<u32>,
     event: VectorProcessLogType<IronOre>,
 }
 impl Serialize for IronOreProcessLog {
@@ -98,12 +98,12 @@ impl Serialize for IronOreProcessLog {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreProcessLog", 15)?;
+        let mut state = serializer.serialize_struct("IronOreProcessLog", 16)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        state.serialize_field("truck_id", &self.truck_id)?;
 
         let (event_type, total, fe, other_elements, fe_pc, magnetite, hematite, limonite, message) = match &self.event {
             VectorProcessLogType::ProcessStart { quantity, vector } => {
@@ -115,8 +115,11 @@ impl Serialize for IronOreProcessLog {
             VectorProcessLogType::ProcessFailure { reason, .. } => {
                 ("ProcessFailure", None, None, None, None, None, None, None, Some(reason))
             },
-            _ => {
-                unimplemented!()
+            VectorProcessLogType::WithdrawRequest => {
+                ("WithdrawRequest", None, None, None, None, None, None, None, None)
+            }
+            x => {
+               panic!("Unhandled VectorProcessLogType {:?}", x);
             }
         };
         state.serialize_field("event_type", &event_type)?;
@@ -132,14 +135,17 @@ impl Serialize for IronOreProcessLog {
     }
 }
 
+/*
+ * Defines a way to convert a `VectorProcessLog<IronOre>` into a custom `IronOreProcessLog` using `.into()`.
+ */
 impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
     fn from(log: VectorProcessLog<IronOre>) -> Self {
         IronOreProcessLog {
             time: log.time,
             event_id: log.event_id,
+            source_event_id: log.source_event_id,
             element_name: log.element_name,
             element_type: log.element_type,
-            truck_id: None,
             event: log.event,
         }
     }
@@ -147,12 +153,11 @@ impl From<VectorProcessLog<IronOre>> for IronOreProcessLog {
 
 struct IronOreStockLog {
     time: String,
-    event_id: u64,
+    event_id: EventId,
+    source_event_id: EventId,
     element_name: String,
     element_type: String,
-    log_type: String,
-    truck_id: Option<u32>,
-    resource: IronOre,
+    details: VectorStockLogType<IronOre>,
 }
 
 impl Serialize for IronOreStockLog {
@@ -160,20 +165,35 @@ impl Serialize for IronOreStockLog {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("IronOreStockLog", 13)?;
+        let mut state = serializer.serialize_struct("IronOreStockLog", 12)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        state.serialize_field("log_type", &self.log_type)?;
-        state.serialize_field("truck_id", &self.truck_id)?;
-        state.serialize_field("total", &self.resource.total())?;
-        state.serialize_field("fe", &self.resource.fe)?;
-        state.serialize_field("other_elements", &self.resource.other_elements)?;
-        state.serialize_field("fe_%", &(self.resource.fe / self.resource.total()))?;
-        state.serialize_field("magnetite", &self.resource.magnetite)?;
-        state.serialize_field("hematite", &self.resource.hematite)?;
-        state.serialize_field("limonite", &self.resource.limonite)?;
+
+        let (log_type, total, fe, other_elements, fe_pc, magnetite, hematite, limonite) = match &self.details {
+            VectorStockLogType::Add { quantity, vector } => {
+                ("Add", Some(vector.total()), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite))
+            },
+            VectorStockLogType::Remove { quantity, vector } => {
+                ("Remove", Some(vector.total()), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite))
+            },
+            VectorStockLogType::EmitChange => {
+                ("StateChange", None, None, None, None, None, None, None)
+            },
+            _ => {
+                unimplemented!()
+            }
+        };
+        state.serialize_field("log_type", &log_type)?;
+        state.serialize_field("total", &total)?;
+        state.serialize_field("fe", &fe)?;
+        state.serialize_field("other_elements", &other_elements)?;
+        state.serialize_field("fe_%", &fe_pc)?;
+        state.serialize_field("magnetite", &magnetite)?;
+        state.serialize_field("hematite", &hematite)?;
+        state.serialize_field("limonite", &limonite)?;
         state.end()
     }
 }
@@ -183,11 +203,10 @@ impl From<VectorStockLog<IronOre>> for IronOreStockLog {
         IronOreStockLog {
             time: log.time,
             event_id: log.event_id,
+            source_event_id: log.source_event_id,
             element_name: log.element_name,
             element_type: log.element_type,
-            log_type: log.message,
-            truck_id: None,
-            resource: log.vector,
+            details: log.details,
         }
     }
 }
@@ -284,6 +303,14 @@ impl CustomLoggerConnection for ComponentLogger {
     type ComponentType = ComponentModel;
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b, n) {
+            /*
+             * As we are using the `VectorProcess<T>` and `VectorStock<T>` components, logs returned are `VectorProcessLog<T>` and `VectorStockLog<T>`
+             * respectively.
+             * 
+             * These can be cumbersome as they nest properties into a single JSON-like field, so we can instead choose to convert these log structs into
+             * our own custom `IronOreProcessLog` and `IronOreStockLog` structs. We can then implement a custom serialisation for these structs
+             * to output fields in a flat format.
+             */
             (ComponentLogger::IronOreProcessLogger(a), ComponentModel::IronOreProcess(b, _), _) => {
                 b.log_emitter.map_connect_sink(|c| <VectorProcessLog<IronOre>>::into(c.clone()), &a.buffer);
                 Ok(())
@@ -305,6 +332,7 @@ fn main() {
     let mut stock1 = ComponentModel::IronOreStock(
         VectorStock::new()
             .with_name("MyStock1".into())
+            .with_code("SP1".into())
             .with_type("IronOreStock".into())
             .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
             .with_low_capacity(10.)
@@ -315,6 +343,7 @@ fn main() {
     let mut process1 = ComponentModel::IronOreProcess(
         VectorProcess::new()
             .with_name("MyProcess1".into())
+            .with_code("P1".into())
             .with_type("IronOreProcess".into())
             .with_process_quantity_distr(df.create(DistributionConfig::Uniform { min: 2., max: 8. }).unwrap())
             .with_process_time_distr(Distribution::Constant(10.)),
@@ -325,6 +354,7 @@ fn main() {
     let mut stock2 = ComponentModel::IronOreStock(
         VectorStock::new()
             .with_name("MyStock2".into())
+            .with_code("SP2".into())
             .with_type("IronOreStock".into())
             .with_initial_vector(IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 })
             .with_low_capacity(10.)

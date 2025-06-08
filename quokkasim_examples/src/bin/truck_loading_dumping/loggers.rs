@@ -30,8 +30,8 @@ impl Logger for TruckingProcessLogger {
 #[derive(Clone, Debug)]
 pub struct TruckingProcessLog {
     pub time: String,
-    pub event_id: String,
-    pub source_event_id: String,
+    pub event_id: EventId,
+    pub source_event_id: EventId,
     pub element_name: String,
     pub element_type: String,
     pub event: TruckingProcessLogType,
@@ -91,8 +91,11 @@ impl Serialize for TruckingProcessLog {
             TruckingProcessLogType::TruckMovementFailure { reason, .. } => {
                 ("TruckMovementFailure", None, None, None, None, None, None, None, None, Some(reason))
             },
+            TruckingProcessLogType::WithdrawRequest => {
+                ("WithdrawRequest", None, None, None, None, None, None, None, None, None)
+            },
             _ => {
-                unimplemented!()
+                panic!("Serialisation not yet implemented for: {:?}", self.event);
             }
         };
         state.serialize_field("event_type", &event_type)?;
