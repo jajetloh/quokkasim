@@ -163,25 +163,11 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
             let previous_state = self.prev_state.clone();
             let current_state = self.get_state().clone();
             if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state) {
-                // TODO: Make sure new_event_id is set in add_impl!!!
                 // Send 1ns in future to avoid infinite loops with processes
                 let next_time = cx.time() + Duration::from_nanos(1);
-                println!("{} | Wanting to Emitting state change for {}: {:?}, scheduling for {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.element_name, payload.1, next_time.to_chrono_date_time(0).unwrap());
                 cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
             }
             self.prev_state = Some(current_state);
-
-            // match previous_state {
-            //     None => {},
-            //     Some(prev_state) => {
-            //         if !prev_state.is_same_state(&current_state) {
-            //             // TODO: Make sure new_event_id is set in add_impl!!!
-            //             // let new_event_id = self.log(cx.time(), payload.1.clone(), DiscreteStockLogType::<T>::Add(payload.0.clone())).await;
-            //             // Send 1ns in future to avoid infinite loops with processes
-            //             cx.schedule_event(cx.time() + Duration::from_nanos(1), Self::emit_change, payload.1.clone()).unwrap();
-            //         }
-            //     }
-            // }
         }
     }
 
@@ -205,7 +191,6 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
                 Some(prev_state) => {
                     if !prev_state.is_same_state(&current_state) {
                         let next_time = cx.time() + Duration::from_nanos(1);
-                        println!("{} | Wanting to Emitting state change for {}: {:?}, scheduling for {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.element_name, payload.1, next_time.to_chrono_date_time(0).unwrap());
                         cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
                     }
                 }
@@ -217,7 +202,6 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
         async move {
             let state = self.get_state().clone();
             let nm = self.log(cx.time(), source_event_id, DiscreteStockLogType::<T>::StateChange(state)).await;
-            println!("{} | Emitting state change for {}: {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.element_name, nm);
             self.state_emitter.send(nm).await;
         }
     }
@@ -459,7 +443,6 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            println!("{} | ### Update state for {}: {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.element_name, source_event_id);
             let time = cx.time();
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
@@ -476,9 +459,8 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
-                }
-                _ => {
-                }
+                },
+                _ => {}
             }
 
             match (&self.env_state, &new_env_state) {
@@ -551,7 +533,6 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -577,6 +558,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                     };
                 }
             };
+            self.set_previous_check_time(cx.time());
         }
     }
 
@@ -704,12 +686,14 @@ pub struct DiscreteSource<
     FactoryType: ItemFactory<InternalResourceType>,
 > {
     pub element_name: String,
-    element_code: String,
+    pub element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub push_downstream: Output<(SendType, EventId)>,
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
@@ -731,9 +715,11 @@ impl<
             element_code: "DiscreteSource".to_string(),
             element_type: "DiscreteSource".to_string(),
             req_upstream: Requestor::new(),
+            req_environment: Requestor::new(),
             req_downstream: Requestor::new(),
             push_downstream: Output::new(),
             process_state: None,
+            env_state: BasicEnvironmentState::Normal,
             process_time_distr: None,
             process_quantity_distr: None,
             log_emitter: Output::new(),
@@ -809,12 +795,26 @@ impl<
         self.previous_check_time = time;
     }
 
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
+    }
+
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
+            let new_env_state = match self.req_environment.send(()).await.next() {
+                Some(x) => x,
+                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+            };
 
-            match self.process_state.take() {
-                Some((mut process_time_left, resource)) => {
+            match (self.process_state.take(), &self.env_state) {
+                (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) => {
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
@@ -824,10 +824,24 @@ impl<
                         self.process_state = Some((process_time_left, resource));
                     }
                 }
-                None => {}
+                _ => {}
             }
-            match self.process_state {
-                None => {
+
+            match (&self.env_state, &new_env_state) {
+                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                    self.env_state = BasicEnvironmentState::Stopped;
+                },
+                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
+                    self.env_state = BasicEnvironmentState::Normal;
+                }
+                _ => {
+                }
+            }
+
+            match (&self.process_state, &new_env_state) {
+                (None, BasicEnvironmentState::Normal) => {
                     let ds_state = self.req_downstream.send(()).await.next();
                     match &ds_state {
                         Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
@@ -851,18 +865,12 @@ impl<
                         }
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
-                }
-            }
-        }
-    }
-
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
-        async move {
-            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
-                if *scheduled_time <= cx.time() {
-                    self.scheduled_event = None;
+                (_, BasicEnvironmentState::Stopped) => {
+                    self.time_to_next_event = None;
+                },
+                (Some((time, resource)), _) => {
+                    self.time_to_next_event = Some(*time);
+                    *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
         }
@@ -870,7 +878,6 @@ impl<
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            println!("Post update state for DiscreteSource at time: {} | {:?}", cx.time().to_chrono_date_time(0).unwrap(), self.time_to_next_event);
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -881,7 +888,6 @@ impl<
                         
                         // Schedule event if sooner. If so, cancel previous event.
                         if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
-                            println!("Scheduled event: {:?} | Next time: {:?}", scheduled_time.to_chrono_date_time(0), next_time.to_chrono_date_time(0));
                             if next_time < scheduled_time {
                                 action_key.cancel();
                                 let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, source_event_id.clone()).unwrap();
@@ -889,7 +895,6 @@ impl<
                             } else {
                                 // Put the event back
                                 self.scheduled_event = Some((scheduled_time, action_key));
-                                println!("Keeping scheduled event: {:?}", self.scheduled_event);
                             }
                         } else {
                             let new_event_key =  cx.schedule_keyed_event(next_time, <Self as Process>::update_state, source_event_id.clone()).unwrap();
@@ -931,8 +936,10 @@ pub struct DiscreteSink<
     pub element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(RequestParameterType, EventId), RequestType>,
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
@@ -953,8 +960,10 @@ impl<
             element_code: "DiscreteSink".to_string(),
             element_type: "DiscreteSink".to_string(),
             req_upstream: Requestor::new(),
+            req_environment: Requestor::new(),
             withdraw_upstream: Requestor::new(),
             process_state: None,
+            env_state: BasicEnvironmentState::Normal,
             process_time_distr: None,
             process_quantity_distr: None,
             log_emitter: Output::new(),
@@ -1020,13 +1029,27 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     fn set_previous_check_time(&mut self, time: MonotonicTime) {
         self.previous_check_time = time;
     }
+    
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
+    }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
+            let new_env_state = match self.req_environment.send(()).await.next() {
+                Some(x) => x,
+                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+            };
 
-            match self.process_state.take() {
-                Some((mut process_time_left, resource)) => {
+            match (self.process_state.take(), &self.env_state) {
+                (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) => {
                     let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
                     process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                     if process_time_left.is_zero() {
@@ -1034,11 +1057,25 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                     } else {
                         self.process_state = Some((process_time_left, resource));
                     }
-                }
-                None => {}
+                },
+                _ => {}
             }
-            match self.process_state {
-                None => {
+
+            match (&self.env_state, &new_env_state) {
+                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                    self.env_state = BasicEnvironmentState::Stopped;
+                },
+                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
+                    self.env_state = BasicEnvironmentState::Normal;
+                }
+                _ => {
+                }
+            }
+
+            match (&self.process_state, &new_env_state) {
+                (None, BasicEnvironmentState::Normal) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     match &us_state {
                         Some(DiscreteStockState::Normal { .. } | DiscreteStockState::Full { .. }) => {
@@ -1070,18 +1107,12 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                         }
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
-                }
-            }
-        }
-    }
-    
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
-        async move {
-            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
-                if *scheduled_time <= cx.time() {
-                    self.scheduled_event = None;
+                (_, BasicEnvironmentState::Stopped) => {
+                    self.time_to_next_event = None;
+                },
+                (Some((time, resource)), _) => {
+                    self.time_to_next_event = Some(*time);
+                    *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
         }
@@ -1089,7 +1120,6 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            // println!("Post update state for sink {} at time {} | {:?}", self.element_name, cx.time().to_chrono_date_time(0).unwrap(), self.time_to_next_event);
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -1148,10 +1178,12 @@ pub struct DiscreteParallelProcess<
     pub element_code: String,
     pub element_type: String,
     pub req_upstream: Requestor<(), DiscreteStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub push_downstream: Output<(SendType, EventId)>,
     pub processes_in_progress: Vec<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
     pub processes_complete: VecDeque<SendType>,
     pub process_time_distr: Option<Distribution>,
     pub process_quantity_distr: Option<Distribution>,
@@ -1174,10 +1206,12 @@ impl<
             element_code: "DiscreteParallelProcess".to_string(),
             element_type: "DiscreteParallelProcess".to_string(),
             req_upstream: Requestor::new(),
+            req_environment: Requestor::new(),
             req_downstream: Requestor::new(),
             withdraw_upstream: Requestor::new(),
             push_downstream: Output::new(),
             processes_in_progress: Vec::new(),
+            env_state: BasicEnvironmentState::Normal,
             processes_complete: VecDeque::new(),
             process_time_distr: None,
             process_quantity_distr: None,
@@ -1254,15 +1288,26 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-            self.processes_in_progress.retain_mut(|(process_time_left, item)| {
-                *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    self.processes_complete.push_back(item.clone());
-                    false
-                } else {
-                    true
-                }
-            });
+            let new_env_state = match self.req_environment.send(()).await.next() {
+                Some(x) => x,
+                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+            };
+
+            match &self.env_state {
+                BasicEnvironmentState::Normal => {
+                    self.processes_in_progress.retain_mut(|(process_time_left, item)| {
+                        *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            self.processes_complete.push_back(item.clone());
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                },
+                BasicEnvironmentState::Stopped => {}
+            }
+
             while let Some(item) = self.processes_complete.pop_front() {
                 let ds_state = self.req_downstream.send(()).await.next();
                 match &ds_state {
@@ -1281,43 +1326,64 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                 }
             }
 
-            // Then check for any processes to start
-
-            loop {
-                let us_state = self.req_upstream.send(()).await.next();
-                match &us_state {
-                    Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::WithdrawRequest).await;
-                        let item = self.withdraw_upstream.send(((), source_event_id.clone())).await.next().unwrap();
-                        if let Some(item) = item {
-                            let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                panic!("Process time distribution not set for process {}", self.element_name);
-                            }).sample());
-
-                            self.processes_in_progress.push((process_duration, item.clone()));
-                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: item }).await;
-
-                        } else {
-                            break;
-                        }
-                    },
-                    Some(DiscreteStockState::Full { .. }) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is full" }).await;
-                        break;
-                    },
-                    None => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is not connected" }).await;
-                        break;
-                    }
+            match (&self.env_state, &new_env_state) {
+                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                    self.env_state = BasicEnvironmentState::Stopped;
+                },
+                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
+                    self.env_state = BasicEnvironmentState::Normal;
+                }
+                _ => {
                 }
             }
-            self.time_to_next_event = if self.processes_in_progress.is_empty() {
-                None
-            } else {
-                // Find the minimum time to next event
-                let min_time = self.processes_in_progress.iter().map(|(time, _)| *time).min().unwrap();
-                Some(min_time)
-            };
+
+            // Then check for any processes to start
+
+            match &self.env_state {
+                BasicEnvironmentState::Stopped => {
+                    self.time_to_next_event = None;
+                },
+                BasicEnvironmentState::Normal => {
+                    loop {
+                        let us_state = self.req_upstream.send(()).await.next();
+                        match &us_state {
+                            Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::WithdrawRequest).await;
+                                let item = self.withdraw_upstream.send(((), source_event_id.clone())).await.next().unwrap();
+                                if let Some(item) = item {
+                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
+                                        panic!("Process time distribution not set for process {}", self.element_name);
+                                    }).sample());
+
+                                    self.processes_in_progress.push((process_duration, item.clone()));
+                                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: item }).await;
+
+                                } else {
+                                    break;
+                                }
+                            },
+                            Some(DiscreteStockState::Full { .. }) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is full" }).await;
+                                break;
+                            },
+                            None => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is not connected" }).await;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    self.time_to_next_event = if self.processes_in_progress.is_empty() {
+                        None
+                    } else {
+                        // Find the minimum time to next event
+                        let min_time = self.processes_in_progress.iter().map(|(time, _)| *time).min().unwrap();
+                        Some(min_time)
+                    };
+                }
+            }
         }
     }
     
