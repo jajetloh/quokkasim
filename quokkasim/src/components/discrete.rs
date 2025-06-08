@@ -183,9 +183,8 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
 
     fn post_remove(&mut self, payload: &mut ((), EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
           async move {
-            self.prev_state = Some(self.get_state());
-            let current_state = self.get_state().clone();
             let previous_state = self.prev_state.clone();
+            let current_state = self.get_state().clone();
             match previous_state {
                 None => {},
                 Some(prev_state) => {
@@ -195,6 +194,7 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
                     }
                 }
             }
+            self.prev_state = Some(self.get_state());
         }
     }
 
