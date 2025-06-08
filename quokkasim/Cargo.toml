@@ -8,7 +8,7 @@ documentation = "https://jajetloh.github.io/quokkasim-book/"
 license = "MIT"
 license-file = "LICENCE"
 authors = ["Ja-Jet Loh and other QuokkaSim contributors"]
-categories = ["simulation", "asynchronous", "science", "stochastic"]
+categories = ["simulation", "asynchronous", "science"]
 keywords = ["discrete-event", "logistics", "digital-twin", "framework", "stochastic"]
 
 [lib]
