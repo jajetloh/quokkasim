@@ -4,7 +4,12 @@ description = "A Rust-based Discrete Event Simulation (DES) framework, which sim
 version = "0.0.1"
 edition = "2024"
 repository = "https://github.com/jajetloh/quokkasim"
+documentation = "https://jajetloh.github.io/quokkasim-book/"
 license = "MIT"
+license-file = "LICENCE"
+authors = ["Ja-Jet Loh and other QuokkaSim contributors"]
+categories = ["simulation", "asynchronous", "science", "stochastic"]
+keywords = ["discrete-event", "logistics", "digital-twin", "framework", "stochastic"]
 
 [lib]
 name = "quokkasim"
