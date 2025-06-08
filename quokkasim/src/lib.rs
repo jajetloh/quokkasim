@@ -1,4 +1,4 @@
-#[allow(clippy::manual_async_fn)]
+#![allow(clippy::manual_async_fn)]
 
 pub mod prelude;
 pub mod common;

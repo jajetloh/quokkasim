@@ -1,4 +1,4 @@
-#[allow(clippy::manual_async_fn)]
+#![allow(clippy::manual_async_fn)]
 
 use quokkasim::prelude::*;
 use serde::{ser::SerializeStruct, Serialize};
