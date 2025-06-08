@@ -112,6 +112,6 @@ fn main() {
 
     let output_dir = "outputs/discrete_queue";
     create_dir_all(output_dir).unwrap();
-    queue_logger.write_csv(output_dir.into()).unwrap();
-    process_logger.write_csv(output_dir.into()).unwrap();
+    queue_logger.write_csv(output_dir).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
 }

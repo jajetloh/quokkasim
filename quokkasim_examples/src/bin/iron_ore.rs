@@ -351,7 +351,7 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(10.)),
         Mailbox::new(),
     );
-    let mut process1_addr = process1.get_address();
+    let process1_addr = process1.get_address();
 
     let mut stock2 = ComponentModel::IronOreStock(
         VectorStock::new()
@@ -386,7 +386,7 @@ fn main() {
     let output_dir = "outputs/iron_ore";
 
     create_dir_all(output_dir).unwrap();
-    process_logger.write_csv(output_dir.into()).unwrap();
-    stock_logger.write_csv(output_dir.into()).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
+    stock_logger.write_csv(output_dir).unwrap();
 
 }

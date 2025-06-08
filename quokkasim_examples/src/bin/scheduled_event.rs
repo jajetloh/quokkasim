@@ -77,7 +77,7 @@ fn main() {
     sim_builder = register_component!(sim_builder, stock_2);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
-    let (mut simu, mut scheduler) = sim_builder.init(start_time.clone()).unwrap();
+    let (mut simu, mut scheduler) = sim_builder.init(start_time).unwrap();
 
     let capacity_change = ScheduledEventConfig::SetLowCapacity(10.);
 
@@ -86,13 +86,13 @@ fn main() {
         next_seed: 0,
     };
 
-    let event_time = start_time.clone() + Duration::from_secs(60);
+    let event_time = start_time + Duration::from_secs(60);
     
     create_scheduled_event!(&mut scheduler, &event_time, &capacity_change, &stock_1_addr, &mut df).unwrap();
     simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 
     let output_dir = "outputs/scheduled_event";
     create_dir_all(output_dir).unwrap();
-    stock_logger.write_csv(&output_dir).unwrap();
-    process_logger.write_csv(&output_dir).unwrap();
+    stock_logger.write_csv(output_dir).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
 }

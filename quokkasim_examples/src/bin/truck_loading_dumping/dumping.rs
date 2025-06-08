@@ -30,6 +30,12 @@ pub struct DumpingProcess {
     pub previous_check_time: MonotonicTime,
 }
 
+impl Default for DumpingProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DumpingProcess {
     pub fn new() -> Self {
         DumpingProcess {
@@ -104,28 +110,25 @@ impl DumpingProcess {
             // Begin main update logic
 
             // Resolve current dumping action if pending. Take the state - if time still remains before the event is due, we'll put it back
-            match self.process_state.take() {
-                Some((mut process_time_left, mut truck)) => {
-                    let duration_since_prev_check = time.duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        
-                        let ore = truck.ore.take();
-                        let unwrapped_ore = ore.unwrap_or_default(); // Use empty ore if None
+            if let Some((mut process_time_left, mut truck)) = self.process_state.take() {
+                let duration_since_prev_check = time.duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    
+                    let ore = truck.ore.take();
+                    let unwrapped_ore = ore.unwrap_or_default(); // Use empty ore if None
 
-                        source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingSuccess {
-                            truck_id: truck.truck_id.clone(),
-                            quantity: unwrapped_ore.total(),
-                            ore: unwrapped_ore.clone()
-                        }).await;
+                    source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingSuccess {
+                        truck_id: truck.truck_id.clone(),
+                        quantity: unwrapped_ore.total(),
+                        ore: unwrapped_ore.clone()
+                    }).await;
 
-                        self.push_downstream_trucks.send((truck.clone(), source_event_id.clone())).await;
-                        self.push_downstream_ore.send((unwrapped_ore.clone(), source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, truck));
-                    }
+                    self.push_downstream_trucks.send((truck.clone(), source_event_id.clone())).await;
+                    self.push_downstream_ore.send((unwrapped_ore.clone(), source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, truck));
                 }
-                None => {}
             }
 
             // Check if we can start a new dumping event

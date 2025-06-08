@@ -92,9 +92,9 @@ impl ResourceMultiply<f64> for Vector3 {
     }
 }
 
-impl Into<Vector3> for [f64; 3] {
-    fn into(self) -> Vector3 {
-        Vector3 { values: self }
+impl From<[f64; 3]> for Vector3 {
+    fn from(val: [f64; 3]) -> Self {
+        Vector3 { values: val }
     }
 }
 
@@ -244,6 +244,12 @@ impl Model for BasicEnvironment {
             self.log(cx.time(), EventId::from_init(), self.state.clone()).await;
             self.into()
         }
+    }
+}
+
+impl Default for BasicEnvironment {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

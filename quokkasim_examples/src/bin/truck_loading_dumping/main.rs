@@ -284,15 +284,15 @@ fn main() {
     sim_builder = register_component!(sim_builder, dumped_truck_movements);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 5, 1, 0, 0, 0, 0).unwrap();
-    let mut simu = sim_builder.init(start_time.clone()).unwrap().0;
+    let mut simu = sim_builder.init(start_time).unwrap().0;
 
     simu.step_until(start_time + Duration::from_secs_f64(7200.)).unwrap();
 
     let output_dir = "outputs/truck_loading_dumping";
     create_dir_all(output_dir).unwrap();
 
-    ore_stock_logger.write_csv(output_dir.into()).unwrap();
-    truck_stock_logger.write_csv(output_dir.into()).unwrap();
-    truck_process_logger.write_csv(output_dir.into()).unwrap();
+    ore_stock_logger.write_csv(output_dir).unwrap();
+    truck_stock_logger.write_csv(output_dir).unwrap();
+    truck_process_logger.write_csv(output_dir).unwrap();
 
 }

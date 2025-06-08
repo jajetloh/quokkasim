@@ -9,15 +9,11 @@ struct ProtoCar {
     id: usize,
 }
 
+#[derive(Default)]
 struct ProtoCarGenerator {
     next_id: usize
 }
 
-impl Default for ProtoCarGenerator {
-    fn default() -> Self {
-        ProtoCarGenerator { next_id: 0 }
-    }
-}
 
 impl ItemFactory<ProtoCar> for ProtoCarGenerator {
     fn create_item(&mut self) -> ProtoCar {
@@ -242,7 +238,7 @@ fn main() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
 
-    let (mut simu, mut sched) = sim_builder.init(start_time.clone()).unwrap();
+    let (mut simu, mut sched) = sim_builder.init(start_time).unwrap();
 
     let event_time = start_time + Duration::from_secs(3600);
     let sched_event = ScheduledEvent::SetEnvironmentState(BasicEnvironmentState::Stopped);
@@ -256,7 +252,7 @@ fn main() {
 
     let output_dir = "outputs/assembly_line";
     create_dir_all(output_dir).unwrap();
-    queue_logger.write_csv(output_dir.into()).unwrap();
-    process_logger.write_csv(output_dir.into()).unwrap();
-    env_logger.write_csv(output_dir.into()).unwrap();
+    queue_logger.write_csv(output_dir).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
+    env_logger.write_csv(output_dir).unwrap();
 }

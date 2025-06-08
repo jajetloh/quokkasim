@@ -437,18 +437,15 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                 None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
             };
 
-            match (self.process_state.take(), &self.env_state) {
-                (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
-                },
-                _ => {}
+            if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
+                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, resource));
+                }
             }
 
             match (&self.env_state, &new_env_state) {
@@ -480,7 +477,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                                     let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
                                         panic!("Process time distribution not set for process {}", self.element_name);
                                     }).sample();
-                                    self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), received_resource.clone()));
+                                    self.process_state = Some((Duration::from_secs_f64(process_duration_secs), received_resource.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: received_resource }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                                 },
@@ -664,7 +661,7 @@ impl ItemFactory<String> for StringItemFactory {
     fn create_item(&mut self) -> String {
         let item = format!("{}_{:0>width$}", self.prefix, self.next_index, width = self.num_digits);
         self.next_index += 1;
-        String::from(item)
+        item
     }
 }
 
@@ -789,18 +786,15 @@ impl<
                 None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
             };
 
-            match (self.process_state.take(), &self.env_state) {
-                (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
+            if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
+                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, resource));
                 }
-                _ => {}
             }
 
             match (&self.env_state, &new_env_state) {
@@ -827,7 +821,7 @@ impl<
 
                             let next_item = self.item_factory.create_item();
 
-                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), next_item.clone()));
+                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs), next_item.clone()));
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: next_item.clone() }).await;
                             self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
@@ -1012,17 +1006,14 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                 None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
             };
 
-            match (self.process_state.take(), &self.env_state) {
-                (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
-                },
-                _ => {}
+            if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
+                } else {
+                    self.process_state = Some((process_time_left, resource));
+                }
             }
 
             match (&self.env_state, &new_env_state) {
@@ -1050,14 +1041,13 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                                     let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
                                         panic!("Process time distribution not set for sink {}", self.element_name);
                                     }).sample();
-                                    self.process_state = Some((Duration::from_secs_f64(process_duration_secs.clone()), moved.clone()));
+                                    self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: moved }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
                                 },
                                 None => {
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream did not provide resource" }).await;
                                     self.time_to_next_event = None;
-                                    return;
                                 }
                             }
                         },

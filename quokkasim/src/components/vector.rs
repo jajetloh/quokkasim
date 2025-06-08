@@ -130,7 +130,7 @@ where
     ) -> impl Future<Output=T> {
         async move {
             self.prev_state = Some(self.get_state());
-            let result = self.vector.remove(payload.0.clone());
+            let result = self.vector.remove(payload.0);
             payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Remove { quantity: payload.0, vector: result.clone() }).await;
             result
         }
@@ -402,18 +402,15 @@ where
         async move {
             let time = cx.time();
 
-            match self.process_state.take() {
-                Some((mut process_time_left, resource)) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
-                },
-                None => {}
+            if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, resource));
+                }
             }
             match self.process_state {
                 None => {
@@ -747,6 +744,16 @@ impl<
     T: Clone + Send + 'static,
     U: Clone + Send,
     const M: usize
+> Default for VectorCombiner<U, T, [T; M], T, M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<
+    T: Clone + Send + 'static,
+    U: Clone + Send,
+    const M: usize
 > VectorCombiner<U, T, [T; M], T, M> {
     pub fn new() -> Self {
         VectorCombiner {
@@ -818,24 +825,21 @@ where
         async move {
             let time = cx.time();
 
-            match self.process_state.take() {
-                Some((mut process_time_left, mut resources)) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        let mut total: T = Default::default();
+            if let Some((mut process_time_left, resources)) = self.process_state.take() {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    let mut total: T = Default::default();
 
-                        for resource in resources.iter() {
-                            total.add(resource.clone());
-                        }
-
-                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
-                        self.push_downstream.send((total, source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resources));
+                    for resource in resources.iter() {
+                        total.add(resource.clone());
                     }
-                },
-                None => {}
+
+                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
+                    self.push_downstream.send((total, source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, resources));
+                }
             }
             match self.process_state {
                 None => {
@@ -1076,29 +1080,26 @@ where
         async move {
             let time = cx.time();
 
-            match self.process_state.take() {
-                Some((mut process_time_left, resource)) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+            if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                            process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
 
-                    if process_time_left.is_zero() {
-    
-                        let split_resources = self.split_ratios.iter().map(|ratio| {
-                            let quantity = resource.total() * ratio;
-                            resource.clone().remove(quantity)
-                        }).collect::<Vec<_>>();
+                            if process_time_left.is_zero() {
+            
+                                let split_resources = self.split_ratios.iter().map(|ratio| {
+                                    let quantity = resource.total() * ratio;
+                                    resource.clone().remove(quantity)
+                                }).collect::<Vec<_>>();
 
-                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
+                                *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
 
-                        join_all(self.push_downstreams.iter_mut().zip(split_resources).map(|(push, resource)| {
-                            push.send((resource.clone(), source_event_id.clone()))
-                        })).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
-                },
-                None => {}
-            }
+                                join_all(self.push_downstreams.iter_mut().zip(split_resources).map(|(push, resource)| {
+                                    push.send((resource.clone(), source_event_id.clone()))
+                                })).await;
+                            } else {
+                                self.process_state = Some((process_time_left, resource));
+                            }
+                        }
             match self.process_state {
                 None => {
                     let us_state = self.req_upstream.send(()).await.next();
@@ -1321,18 +1322,15 @@ where
         async move {
             let time = cx.time();
 
-            match self.process_state.take() {
-                Some((mut process_time_left, resource)) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                        self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
-                },
-                None => {}
+            if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, resource));
+                }
             }
             match self.process_state {
                 None => {
@@ -1538,17 +1536,14 @@ where
         async move {
             let time = cx.time();
 
-            match self.process_state.take() {
-                Some((mut process_time_left, resource)) => {
-                    let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                    } else {
-                        self.process_state = Some((process_time_left, resource));
-                    }
-                },
-                None => {}
+            if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                } else {
+                    self.process_state = Some((process_time_left, resource));
+                }
             }
             match self.process_state {
                 None => {

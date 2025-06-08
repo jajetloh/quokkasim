@@ -34,7 +34,7 @@ fn main() {
 
     let mut process_logger = ComponentLogger::VectorProcessLoggerVector3(VectorProcessLogger::new("ProcessLogger".into()));
     let mut stock_logger = ComponentLogger::VectorStockLoggerVector3(VectorStockLogger::new("StockLogger".into()));
-    let mut df = DistributionFactory {
+    let df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
     };
@@ -164,14 +164,14 @@ fn main() {
     sim_builder = register_component!(sim_builder, output_stockpile_2);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
-    let (mut simu, mut scheduler) = sim_builder.init(start_time).unwrap();
+    let (mut simu, scheduler) = sim_builder.init(start_time).unwrap();
 
-    simu.step_until(start_time + Duration::from_secs(60 * 60 * 1))
+    simu.step_until(start_time + Duration::from_secs(60 * 60))
         .unwrap();
 
     let output_dir= "outputs/material_blending";
     create_dir_all(output_dir).unwrap();
 
-    process_logger.write_csv(output_dir.into()).unwrap();
-    stock_logger.write_csv(output_dir.into()).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
+    stock_logger.write_csv(output_dir).unwrap();
 }

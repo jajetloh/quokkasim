@@ -30,6 +30,12 @@ pub struct LoadingProcess {
     pub previous_check_time: MonotonicTime,
 }
 
+impl Default for LoadingProcess {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LoadingProcess {
     pub fn new() -> Self {
         LoadingProcess {
@@ -106,26 +112,22 @@ impl LoadingProcess {
             let time = cx.time();
 
             // Resolve current loading action if pending. Take the state - if time still remains before the event is due, we'll put it back
-            match self.process_state.take() {
-                Some((mut process_time_left, mut truck, ore_to_load)) => {
-                    let duration_since_prev_check = time.duration_since(self.previous_check_time);
-                    process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                    if process_time_left.is_zero() {
-                        source_event_id = self.log(time, source_event_id, TruckingProcessLogType::LoadingSuccess { truck_id: truck.truck_id.clone(), quantity: ore_to_load.total(), ore: ore_to_load.clone() }).await;
-                        match &mut truck.ore {
-                            Some(existing_ore) => {
-                                existing_ore.add(ore_to_load);
-                            },
-                            None => {
-                                truck.ore = Some(ore_to_load);
-                            }
+            if let Some((mut process_time_left, mut truck, ore_to_load)) = self.process_state.take() {
+                let duration_since_prev_check = time.duration_since(self.previous_check_time);
+                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                if process_time_left.is_zero() {
+                    source_event_id = self.log(time, source_event_id, TruckingProcessLogType::LoadingSuccess { truck_id: truck.truck_id.clone(), quantity: ore_to_load.total(), ore: ore_to_load.clone() }).await;
+                    match &mut truck.ore {
+                        Some(existing_ore) => {
+                            existing_ore.add(ore_to_load);
+                        },
+                        None => {
+                            truck.ore = Some(ore_to_load);
                         }
-                        self.push_downstream_trucks.send((truck, source_event_id.clone())).await;
-                    } else {
-                        self.process_state = Some((process_time_left, truck, ore_to_load));
                     }
-                }
-                None => {
+                    self.push_downstream_trucks.send((truck, source_event_id.clone())).await;
+                } else {
+                    self.process_state = Some((process_time_left, truck, ore_to_load));
                 }
             }
 

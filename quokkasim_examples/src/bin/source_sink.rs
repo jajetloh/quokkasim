@@ -99,12 +99,12 @@ fn main() {
     sim_builder = register_component!(sim_builder, sink);
 
     let start_time = MonotonicTime::try_from_date_time(2025, 1, 1, 0, 0, 0, 0).unwrap();
-    let (mut simu, mut scheduler) = sim_builder.init(start_time.clone()).unwrap();
+    let (mut simu, scheduler) = sim_builder.init(start_time).unwrap();
 
     simu.step_until(start_time + Duration::from_secs(120)).unwrap();
 
     let output_dir = "outputs/source_sink";
     create_dir_all(output_dir).unwrap();
-    stock_logger.write_csv(&output_dir).unwrap();
-    process_logger.write_csv(&output_dir).unwrap();
+    stock_logger.write_csv(output_dir).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
 }
