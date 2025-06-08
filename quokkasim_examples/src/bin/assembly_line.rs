@@ -1,3 +1,5 @@
+#[allow(clippy::manual_async_fn)]
+
 use std::{error::Error, fs::create_dir_all, time::Duration};
 use quokkasim::{define_model_enums, prelude::*};
 use serde::Serialize;

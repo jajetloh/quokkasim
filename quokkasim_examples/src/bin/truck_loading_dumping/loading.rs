@@ -1,3 +1,5 @@
+#[allow(clippy::manual_async_fn)]
+
 use std::time::Duration;
 
 use quokkasim::prelude::*;
