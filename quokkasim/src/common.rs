@@ -1,5 +1,4 @@
 use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}};
-use nexosim::time::MonotonicTime;
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
 use serde::{Deserialize, Serialize};
@@ -13,14 +12,6 @@ pub struct EventLog {
     pub json_data: String,
 }
 
-// #[derive(Debug, Clone)]
-// pub struct NotificationMetadata {
-//     // pub time: MonotonicTime,
-//     pub source_event: String,
-//     // pub message: &'static str,
-// }
-
-// pub type EventId = String;
 #[derive(Debug, Clone, Serialize)]
 pub struct EventId(pub String);
 

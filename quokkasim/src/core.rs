@@ -384,35 +384,19 @@ impl Logger for BasicEnvironmentLogger {
 pub trait Process {
     type LogDetailsType;
 
-    fn set_previous_check_time(&mut self, time: MonotonicTime);
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration>;
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>);
-
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model;
-    //  {
-    //     async move {}
-    // }
 
-    fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
-        async move {}
-    }
-
+    fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model;
 
     fn update_state(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
             self.pre_update_state(&mut source_event_id, cx).await;
             self.update_state_impl(&mut source_event_id, cx).await;
-            // println!("{} | ### 3.??? : {:?}", cx.time().to_chrono_date_time(0).unwrap(), source_event_id);
             self.post_update_state(&mut source_event_id, cx).await;
         }
     }
 
-    fn post_update_state (&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send + where Self: Model;
-    //  {
-    //     async move {}
-    // }
+    fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model;
 
     fn log(&mut self, now: MonotonicTime, source_event: EventId, details: Self::LogDetailsType) -> impl Future<Output = EventId>;
 

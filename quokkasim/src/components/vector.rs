@@ -106,17 +106,50 @@ where
         async move {
             self.prev_state = Some(self.get_state().clone());
             self.vector.add(payload.0.clone());
+            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Add { quantity: payload.0.total(), vector: payload.0.clone() }).await;
+        }
+    }
+
+    fn post_add(&mut self, payload: &mut (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+        async move {
+            let previous_state = self.prev_state.clone();
+            let current_state = self.get_state().clone();
+            if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state) {
+                // Send 1ns in future to avoid infinite loops with processes
+                let next_time = cx.time() + Duration::from_nanos(1);
+                cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
+            }
+            self.prev_state = Some(current_state);
         }
     }
 
     fn remove_impl(
         &mut self,
-        data: &mut (f64, EventId),
+        payload: &mut (f64, EventId),
         cx: &mut ::nexosim::model::Context<Self>
     ) -> impl Future<Output=T> {
         async move {
             self.prev_state = Some(self.get_state());
-            self.vector.remove(data.0.clone())
+            let result = self.vector.remove(payload.0.clone());
+            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Remove { quantity: payload.0, vector: result.clone() }).await;
+            result
+        }
+    }
+
+    fn post_remove(&mut self, payload: &mut (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+          async move {
+            let previous_state = self.prev_state.clone();
+            let current_state = self.get_state().clone();
+            match previous_state {
+                None => {},
+                Some(prev_state) => {
+                    if !prev_state.is_same_state(&current_state) {
+                        let next_time = cx.time() + Duration::from_nanos(1);
+                        cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
+                    }
+                }
+            }
+            self.prev_state = Some(current_state);
         }
     }
 
@@ -163,14 +196,21 @@ where
     }
 
     pub fn with_name(self, name: String) -> Self {
-        VectorStock {
+        Self {
             element_name: name,
             ..self
         }
     }
 
+    pub fn with_code(self, code: String) -> Self {
+        Self {
+            element_code: code,
+            ..self
+        }
+    }
+
     pub fn with_type(self, element_type: String) -> Self {
-        VectorStock {
+        Self {
             element_type,
             ..self
         }
@@ -181,7 +221,7 @@ where
     }
 
     pub fn with_low_capacity(self, low_capacity: f64) -> Self {
-        VectorStock {
+        Self {
             low_capacity,
             ..self
         }
@@ -192,14 +232,14 @@ where
     }
 
     pub fn with_max_capacity(self, max_capacity: f64) -> Self {
-        VectorStock {
+        Self {
             max_capacity,
             ..self
         }
     }
 
     pub fn with_initial_vector(self, vector: T) -> Self {
-        VectorStock {
+        Self {
             vector,
             ..self
         }
@@ -351,21 +391,16 @@ where
     T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>,
 {
     type LogDetailsType = VectorProcessLogType<T>;
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event 
-    }
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
     
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
-        async move {}
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
     }
-
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
@@ -427,7 +462,6 @@ where
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -453,6 +487,7 @@ where
                     };
                 }
             };
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -483,8 +518,15 @@ impl<T: Clone + Send> VectorProcess<f64, T, T, T> {
         }
     }
 
+    pub fn with_code(self, code: String) -> Self {
+        Self {
+            element_code: code,
+            ..self
+        }
+    }
+
     pub fn with_type(self, element_type: String) -> Self {
-        VectorProcess {
+        Self {
             element_type,
             ..self
         }
@@ -495,7 +537,7 @@ impl<T: Clone + Send> VectorProcess<f64, T, T, T> {
     }
 
     pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        VectorProcess {
+        Self {
             process_quantity_distr,
             ..self
         }
@@ -731,21 +773,28 @@ impl<
     }
 
     pub fn with_name(self, name: String) -> Self {
-        VectorCombiner {
+        Self {
             element_name: name,
             ..self
         }
     }
 
+    pub fn with_code(self, code: String) -> Self {
+        Self {
+            element_code: code,
+            ..self
+        }
+    }
+
     pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        VectorCombiner {
+        Self {
             process_quantity_distr,
             ..self
         }
     }
 
     pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        VectorCombiner {
+        Self {
             process_time_distr,
             ..self
         }
@@ -758,20 +807,14 @@ where
 {
     type LogDetailsType = VectorProcessLogType<T>;
 
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-    
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
-        async move {}
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
     }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
@@ -859,7 +902,6 @@ where
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -885,6 +927,7 @@ where
                     };
                 }
             };
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -943,21 +986,28 @@ impl<T: Send + 'static + Clone + Default, const N: usize> VectorSplitter<f64, T,
     }
     
     pub fn with_name(self, name: String) -> Self {
-        VectorSplitter {
+        Self {
             element_name: name,
             ..self
         }
     }
 
+    pub fn with_code(self, code: String) -> Self {
+        Self {
+            element_code: code,
+            ..self
+        }
+    }
+
     pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        VectorSplitter {
+        Self {
             process_quantity_distr,
             ..self
         }
     }
 
     pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        VectorSplitter {
+        Self {
             process_time_distr,
             ..self
         }
@@ -1014,21 +1064,15 @@ where
     T: ResourceRemove<f64, T> + ResourceTotal<f64>,
 {
     type LogDetailsType = VectorProcessLogType<T>;
-    
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
 
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
-        async move {}
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
     }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
@@ -1113,7 +1157,6 @@ where
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -1139,6 +1182,7 @@ where
                     };
                 }
             };
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -1225,28 +1269,35 @@ impl<InternalResourceType: Send + 'static + Clone + Default, SendType: Send + 's
     }
     
     pub fn with_name(self, name: String) -> Self {
-        VectorSource {
+        Self {
             element_name: name,
             ..self
         }
     }
 
+    pub fn with_code(self, code: String) -> Self {
+        Self {
+            element_code: code,
+            ..self
+        }
+    }
+
     pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        VectorSource {
+        Self {
             process_quantity_distr,
             ..self
         }
     }
 
     pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        VectorSource {
+        Self {
             process_time_distr,
             ..self
         }
     }
 
     pub fn with_source_vector(self, source_vector: InternalResourceType) -> Self {
-        VectorSource {
+        Self {
             source_vector,
             ..self
         }
@@ -1259,20 +1310,14 @@ where
 {
     type LogDetailsType = VectorProcessLogType<T>;
 
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
-        async move {}
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
     }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()>{
@@ -1328,7 +1373,6 @@ where
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -1354,6 +1398,7 @@ where
                     };
                 }
             };
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -1448,21 +1493,28 @@ impl<
     }
 
     pub fn with_name(self, name: String) -> Self {
-        VectorSink {
+        Self {
             element_name: name,
             ..self
         }
     }
 
+    pub fn with_code(self, code: String) -> Self {
+        Self {
+            element_code: code,
+            ..self
+        }
+    }
+
     pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        VectorSink {
+        Self {
             process_quantity_distr,
             ..self
         }
     }
 
     pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        VectorSink {
+        Self {
             process_time_distr,
             ..self
         }
@@ -1475,20 +1527,14 @@ where
 {
     type LogDetailsType = VectorProcessLogType<T>;
 
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
-        async move {}
+    fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+                if *scheduled_time <= cx.time() {
+                    self.scheduled_event = None;
+                }
+            }
+        }
     }
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
@@ -1541,7 +1587,6 @@ where
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -1567,6 +1612,7 @@ where
                     };
                 }
             };
+            self.previous_check_time = cx.time();
         }
     }
 

@@ -40,6 +40,7 @@ fn main() {
     let mut stockpile_1 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Stockpile 1".into())
+            .with_code("SP1".into())
             .with_low_capacity(100.)
             .with_max_capacity(10_000.)
             .with_initial_vector([8000., 2000., 0.].into()),
@@ -49,6 +50,7 @@ fn main() {
     let mut stockpile_2 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Stockpile 2".into())
+            .with_code("SP2".into())
             .with_low_capacity(100.)
             .with_max_capacity(10_000.)
             .with_initial_vector([0., 6000., 2000.].into()),
@@ -58,6 +60,7 @@ fn main() {
     let mut stockpile_3 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Stockpile 3".into())
+            .with_code("SP3".into())
             .with_low_capacity(100.)
             .with_max_capacity(10_000.)
             .with_initial_vector([5000., 5000., 0.].into()),
@@ -67,6 +70,7 @@ fn main() {
     let mut reclaimer_1 = ComponentModel::VectorCombiner2Vector3(
         VectorCombiner::new()
             .with_name("Reclaimer 1".into())
+            .with_code("RC1".into())
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
@@ -75,6 +79,7 @@ fn main() {
     let mut output_stockpile_1 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Output Stockpile 1".into())
+            .with_code("OSP1".into())
             .with_low_capacity(100.)
             .with_max_capacity(15_000.)
             .with_initial_vector([0., 0., 0.].into()),
@@ -84,6 +89,7 @@ fn main() {
     let mut output_stockpile_2 = ComponentModel::VectorStockVector3(
         VectorStock::new()
             .with_name("Output Stockpile 2".into())
+            .with_code("OSP2".into())
             .with_low_capacity(100.)
             .with_max_capacity(15_000.)
             .with_initial_vector([0., 0., 0.].into()),
@@ -93,6 +99,7 @@ fn main() {
     let mut reclaimer_2 = ComponentModel::VectorCombiner2Vector3(
         VectorCombiner::new()
             .with_name("Reclaimer 2".into())
+            .with_code("RC2".into())
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
@@ -101,6 +108,7 @@ fn main() {
     let mut reclaimer_3 = ComponentModel::VectorCombiner1Vector3(
         VectorCombiner::new() 
             .with_name("Reclaimer 3".into())
+            .with_code("RC3".into())
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(60.)),
         Mailbox::new()
@@ -109,6 +117,7 @@ fn main() {
     let mut stacker = ComponentModel::VectorSplitter2Vector3(
         VectorSplitter::new()
             .with_name("Stacker".into())
+            .with_code("STK".into())
             .with_process_quantity_distr(Distribution::Constant(600.))
             .with_process_time_distr(Distribution::Constant(360.)),
         Mailbox::new()

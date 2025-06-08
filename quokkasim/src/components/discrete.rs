@@ -309,7 +309,7 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
         state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let (details_type, item, reason): (String, Option<String>, Option<&'static str>) = match &self.details {
+        let (log_type, item, reason): (String, Option<String>, Option<&'static str>) = match &self.details {
             DiscreteStockLogType::Add(item) => ("Add".into(), Some(serde_json::to_string(item).unwrap()), None),
             DiscreteStockLogType::Remove(item) => ("Remove".into(), Some(serde_json::to_string(item).unwrap()), None),
             DiscreteStockLogType::StateChange(state) => {
@@ -317,7 +317,7 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
                 ("StateChange".into(), Some(state_str), None)
             },
         };
-        state.serialize_field("details_type", &details_type)?;
+        state.serialize_field("log_type", &log_type)?;
         state.serialize_field("item", &item)?;
         state.serialize_field("reason", &reason)?;
         state.end()
@@ -418,18 +418,6 @@ impl<
 
 impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
@@ -558,7 +546,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                     };
                 }
             };
-            self.set_previous_check_time(cx.time());
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -783,18 +771,6 @@ impl<
 > Process for DiscreteSource<T, T, FactoryType> {
     type LogDetailsType = DiscreteProcessLogType<T>;
 
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
-
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
@@ -903,7 +879,7 @@ impl<
                     };
                 }
             };
-            self.set_previous_check_time(cx.time());
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -1017,18 +993,6 @@ impl<
 
 impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
-
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> {
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
@@ -1145,7 +1109,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                     };
                 }
             };
-            self.set_previous_check_time(cx.time());
+            self.previous_check_time = cx.time();
         }
     }
 
@@ -1270,18 +1234,6 @@ impl<
 impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
     type LogDetailsType = DiscreteProcessLogType<U>;
 
-    fn get_time_to_next_event(&mut self) -> &Option<Duration> { 
-        &self.time_to_next_event
-    }
-
-    fn set_time_to_next_event(&mut self, time: Option<Duration>) {
-        self.time_to_next_event = time;
-    }
-
-    fn set_previous_check_time(&mut self, time: MonotonicTime) {
-        self.previous_check_time = time;
-    }
-
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             // First resolve any completed processes
@@ -1335,8 +1287,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
                     self.env_state = BasicEnvironmentState::Normal;
                 }
-                _ => {
-                }
+                _ => {}
             }
 
             // Then check for any processes to start
@@ -1399,7 +1350,6 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            self.set_previous_check_time(cx.time());
             match self.time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -1425,6 +1375,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                     };
                 }
             };
+            self.previous_check_time = cx.time();
         }
     }
 
