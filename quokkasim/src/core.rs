@@ -112,6 +112,9 @@ pub trait ResourceRemove<T, U> {
     fn remove(&mut self, arg: T) -> U;
 }
 
+pub trait ResourceRemoveAll<U> {
+    fn remove_all(&mut self) -> U;
+}
 pub trait ResourceTotal<C> {
     fn total(&self) -> C;
 }
@@ -473,6 +476,7 @@ macro_rules! define_model_enums {
 
         use ::quokkasim::strum_macros::Display;
         use ::quokkasim::core::Logger;
+        use ::quokkasim::components::vector_container::{F64Container, F64ContainerFactory, Vector3Container, Vector3ContainerFactory};
 
         $(#[$components_enum_meta])*
         #[derive(Display)]
@@ -510,6 +514,16 @@ macro_rules! define_model_enums {
             DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             DiscreteSourceString($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             DiscreteSinkString($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+            DiscreteStockF64Container($crate::components::discrete::DiscreteStock<F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<F64Container>>),
+            DiscreteProcessF64Container($crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>>),
+            DiscreteParallelProcessF64Container($crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>>),
+            DiscreteSourceF64Container($crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>>),
+            DiscreteSinkF64Container($crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>>),
+            DiscreteStockVector3Container($crate::components::discrete::DiscreteStock<Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<Vector3Container>>),
+            DiscreteProcessVector3Container($crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            DiscreteParallelProcessVector3Container($crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            DiscreteSourceVector3Container($crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>>),
+            DiscreteSinkVector3Container($crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>>),
             BasicEnvironment(BasicEnvironment, $crate::nexosim::Mailbox<BasicEnvironment>),
             $(
                 $(#[$components_var_meta])*

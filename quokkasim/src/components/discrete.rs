@@ -434,7 +434,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
             let time = cx.time();
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
             };
 
             if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
@@ -783,7 +783,7 @@ impl<
             let time = cx.time();
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
             };
 
             if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
@@ -1003,7 +1003,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
             let time = cx.time();
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
             };
 
             if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
@@ -1232,7 +1232,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
             let new_env_state = match self.req_environment.send(()).await.next() {
                 Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if not connected shared process state
+                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
             };
 
             match &self.env_state {
