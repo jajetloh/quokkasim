@@ -2,7 +2,7 @@ use futures::{future::join_all};
 use nexosim::{model::Model, ports::{EventQueue, Output, Requestor}};
 use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
-use std::{fmt::Debug, time::Duration};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use crate::prelude::*;
 
@@ -333,6 +333,7 @@ pub struct VectorProcess<
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
+    pub delay_modes: DelayModes,
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
@@ -352,6 +353,7 @@ impl<
             element_type: String::new(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
+            delay_modes: DelayModes::default(),
 
             req_upstream: Requestor::default(),
             req_downstream: Requestor::default(),
@@ -401,19 +403,45 @@ where
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let Some((mut process_time_left, resource)) = self.process_state.take() {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                } else {
-                    self.process_state = Some((process_time_left, resource));
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
+
+                if !is_in_delay {
+                    if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                            self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
+                        }
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if is_in_delay || is_in_process {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
-            match self.process_state {
-                None => {
+
+            // Update internal state
+            let has_active_delay = self.delay_modes.active_delay().is_some();
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     let ds_state = self.req_downstream.send(()).await.next();
                     match (&us_state, &ds_state) {
@@ -447,8 +475,11 @@ where
                         },
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
+                (Some((time, _)), false) => {
+                    self.time_to_next_event = Some(*time);
+                },
+                (_, true) => {
+                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
             }
         }
@@ -547,7 +578,18 @@ impl<T: Clone + Send> VectorProcess<f64, T, T, T> {
             ..self
         }
     }
-}
+
+    /// Adds a delay if provided, or attempts to remove it if `None`
+    pub fn with_delay(mut self, delay_mode_change: DelayModeChange) -> Self {
+        self.delay_modes.modify(delay_mode_change);
+        self
+    }
+
+    /// Adds a delay if provided, or attempts to remove it if `None`
+    pub fn with_delay_inplace(&mut self, delay_mode_change: DelayModeChange) {
+        self.delay_modes.modify(delay_mode_change);
+    }
+} 
 
 pub struct VectorProcessLogger<T> where T: Send {
     pub name: String,
@@ -583,6 +625,8 @@ pub enum VectorProcessLogType<T> {
     SplitFailure { reason: &'static str },
     WithdrawRequest,
     PushRequest,
+    DelayStart { delay_name: String },
+    DelayEnd { delay_name: String },
 }
 
 #[derive(Debug, Clone)]
@@ -684,6 +728,20 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
                 inflows = None;
                 outflows = None;
                 reason = None;
+            },
+            VectorProcessLogType::DelayStart { delay_name } => {
+                event_type = "DelayStart";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = Some(delay_name.clone());
+            },
+            VectorProcessLogType::DelayEnd { delay_name } => {
+                event_type = "DelayEnd";
+                total = None;
+                inflows = None;
+                outflows = None;
+                reason = Some(delay_name.clone());
             },
         }
         state.serialize_field("event_type", &event_type)?;
