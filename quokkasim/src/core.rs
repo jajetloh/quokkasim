@@ -782,6 +782,44 @@ macro_rules! define_model_enums {
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
+
+                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteProcessVector3Container(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, am.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteParallelProcessVector3Container(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteParallelProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, am.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteSourceVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::discrete::DiscreteSource::<Vector3Container, Vector3Container, Vector3ContainerFactory>::update_state, am.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteSinkVector3Container(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::discrete::DiscreteSink::<(), Option<Vector3Container>, Vector3Container>::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::remove, am.address());
+                        Ok(())
+                    },
+
                     ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::DiscreteLoadProcessVector3Container(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, bm.address());
                         b.req_us_resource.connect($crate::components::vector::VectorStock::get_state_async, am.address());
