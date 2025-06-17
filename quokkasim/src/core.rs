@@ -981,6 +981,41 @@ macro_rules! define_model_enums {
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
+                    $ComponentModel::DiscreteStockVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
+                    $ComponentModel::DiscreteProcessVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
+                    $ComponentModel::DiscreteParallelProcessVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
+                    $ComponentModel::DiscreteSourceVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
+                    $ComponentModel::DiscreteSinkVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
+                    $ComponentModel::DiscreteLoadProcessVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
+                    $ComponentModel::DiscreteUnloadProcessVector3Container(a, mb) => {
+                        let name = a.element_name.clone();
+                        let addr = mb.address();
+                        sim_init = sim_init.add_model(a, mb, name);
+                    },
                     $ComponentModel::BasicEnvironment(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
