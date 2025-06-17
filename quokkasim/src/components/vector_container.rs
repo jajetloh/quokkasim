@@ -200,6 +200,40 @@ impl<
 impl<
     ContainerType: Clone + Send + ResourceAdd<ResourceType> + 'static,
     ResourceType: Clone + Send + 'static,
+> ContainerLoadingProcess<ContainerType, ResourceType> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.element_name = name;
+        self
+    }
+
+    pub fn with_code(mut self, code: String) -> Self {
+        self.element_code = code;
+        self
+    }
+
+    pub fn with_type(mut self, element_type: String) -> Self {
+        self.element_type = element_type;
+        self
+    }
+
+    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
+        self.process_time_distr = Some(distr);
+        self
+    }
+
+    pub fn with_process_quantity_distr(mut self, distr: Distribution) -> Self {
+        self.process_quantity_distr = Some(distr);
+        self
+    }
+}
+
+impl<
+    ContainerType: Clone + Send + ResourceAdd<ResourceType> + 'static,
+    ResourceType: Clone + Send + 'static,
 > Model for ContainerLoadingProcess<ContainerType, ResourceType> {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -455,6 +489,35 @@ impl<
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
+    }
+}
+
+impl<
+    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + 'static,
+    ResourceType: Clone + Send + 'static,
+> ContainerUnloadingProcess<ContainerType, ResourceType> {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.element_name = name;
+        self
+    }
+
+    pub fn with_code(mut self, code: String) -> Self {
+        self.element_code = code;
+        self
+    }
+
+    pub fn with_type(mut self, element_type: String) -> Self {
+        self.element_type = element_type;
+        self
+    }
+
+    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
+        self.process_time_distr = Some(distr);
+        self
     }
 }
 
