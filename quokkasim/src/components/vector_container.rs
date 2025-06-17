@@ -1,5 +1,7 @@
 use std::{collections::VecDeque, time::Duration};
 
+use serde::{ser::SerializeStruct, Serialize};
+
 use crate::prelude::*;
 
 #[derive(Debug, Clone, Default)]
@@ -35,7 +37,7 @@ pub struct F64ContainerFactory {
     pub next_index: u64,
     pub num_digits: usize,
     pub create_quantity_distr: Option<Distribution>,
-    pub bundle_capacity: f64,
+    pub container_capacity: f64,
 }
 
 impl ItemFactory<F64Container> for F64ContainerFactory {
@@ -50,7 +52,7 @@ impl ItemFactory<F64Container> for F64ContainerFactory {
         F64Container {
             id,
             resource,
-            capacity: self.bundle_capacity,
+            capacity: self.container_capacity,
         }
     }
 }
@@ -62,7 +64,38 @@ pub struct Vector3Container {
     pub capacity: f64,
 }
 
+impl ResourceRemoveAll<Vector3> for Vector3Container {
+    fn remove_all(&mut self) -> Vector3 {
+        if let Some(resource) = self.resource.take() {
+            resource
+        } else {
+            Vector3::default()
+        }
+    }
+}
 
+impl ResourceAdd<Vector3> for Vector3Container {
+    fn add(&mut self, arg: Vector3) {
+        if let Some(resource) = &mut self.resource {
+            resource.add(arg);
+        } else {
+            self.resource = Some(arg);
+        }
+    }
+}
+
+impl Serialize for Vector3Container {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Vector3Container", 3)?;
+        state.serialize_field("id", &self.id)?;
+        state.serialize_field("resource", &self.resource)?;
+        state.serialize_field("capacity", &self.capacity)?;
+        state.end()
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct Vector3ContainerFactory {
@@ -104,7 +137,7 @@ pub struct ContainerLoadingProcess<
     pub element_code: String,
     pub element_type: String,
     pub req_us_containers: Requestor<(), DiscreteStockState>,
-    pub req_us_resource: Requestor<(), ResourceType>,
+    pub req_us_resource: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
 
     pub req_environment: Requestor<(), BasicEnvironmentState>,

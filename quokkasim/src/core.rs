@@ -29,6 +29,14 @@ impl ResourceMultiply<f64> for f64 {
     }
 }
 
+impl ResourceRemoveAll<f64> for f64 {
+    fn remove_all(&mut self) -> f64 {
+        let removed = *self;
+        *self = 0.0;
+        removed
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Vector3 {
     pub values: [f64; 3],
@@ -92,6 +100,14 @@ impl ResourceMultiply<f64> for Vector3 {
     }
 }
 
+impl ResourceRemoveAll<Vector3> for Vector3 {
+    fn remove_all(&mut self) -> Vector3 {
+        let removed = self.clone();
+        *self = Vector3::default();
+        removed
+    }
+}
+
 impl From<[f64; 3]> for Vector3 {
     fn from(val: [f64; 3]) -> Self {
         Vector3 { values: val }
@@ -103,6 +119,7 @@ impl Default for Vector3 {
         Vector3 { values: [0.0, 0.0, 0.0] }
     }
 }
+
 
 pub trait ResourceAdd<T> {
     fn add(&mut self, arg: T);
@@ -524,6 +541,8 @@ macro_rules! define_model_enums {
             DiscreteParallelProcessVector3Container($crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
             DiscreteSourceVector3Container($crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>>),
             DiscreteSinkVector3Container($crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>>),
+            DiscreteLoadProcessVector3Container($crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
+            DiscreteUnloadProcessVector3Container($crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
             BasicEnvironment(BasicEnvironment, $crate::nexosim::Mailbox<BasicEnvironment>),
             $(
                 $(#[$components_var_meta])*
@@ -763,6 +782,42 @@ macro_rules! define_model_enums {
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
+                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::DiscreteLoadProcessVector3Container(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, bm.address());
+                        b.req_us_resource.connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_us_resource.connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteLoadProcessVector3Container(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, bm.address());
+                        b.req_us_containers.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
+                        b.withdraw_us_containers.connect($crate::components::discrete::DiscreteStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteLoadProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, am.address());
+                        a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteUnloadProcessVector3Container(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector_container::ContainerUnloadingProcess::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteUnloadProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector_container::ContainerUnloadingProcess::update_state, am.address());
+                        a.req_ds_containers.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
+                        a.push_ds_containers.connect($crate::components::discrete::DiscreteStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::DiscreteUnloadProcessVector3Container(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector_container::ContainerUnloadingProcess::update_state, am.address());
+                        a.req_ds_resource.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_ds_resource.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
                     (a,b,n) => {
                         <$ComponentModel as CustomComponentConnection>::connect_components(a, b, n)
                     }
@@ -942,6 +997,13 @@ macro_rules! define_model_enums {
                     $ComponentModel::DiscreteParallelProcessString(_, mb) => $ComponentModelAddress::DiscreteParallelProcessString(mb.address()),
                     $ComponentModel::DiscreteSourceString(_, mb) => $ComponentModelAddress::DiscreteSourceString(mb.address()),
                     $ComponentModel::DiscreteSinkString(_, mb) => $ComponentModelAddress::DiscreteSinkString(mb.address()),
+
+                    $ComponentModel::DiscreteLoadProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteLoadProcessVector3Container(mb.address()),
+                    $ComponentModel::DiscreteUnloadProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteUnloadProcessVector3Container(mb.address()),
+                    $ComponentModel::DiscreteStockVector3Container(_, mb) => $ComponentModelAddress::DiscreteStockVector3Container(mb.address()),
+                    $ComponentModel::DiscreteProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteProcessVector3Container(mb.address()),
+                    $ComponentModel::DiscreteParallelProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteParallelProcessVector3Container(mb.address()),
+
                     $ComponentModel::BasicEnvironment(_, mb) => $ComponentModelAddress::BasicEnvironment(mb.address()),
                     $(
                         $(#[$components_var_meta])*
@@ -991,6 +1053,13 @@ macro_rules! define_model_enums {
             DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+
+            DiscreteLoadProcessVector3Container($crate::nexosim::Address<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
+            DiscreteUnloadProcessVector3Container($crate::nexosim::Address<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
+            DiscreteStockVector3Container($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<Vector3Container>>),
+            DiscreteProcessVector3Container($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            DiscreteParallelProcessVector3Container($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+
             BasicEnvironment($crate::nexosim::Address<BasicEnvironment>),
             $(
                 $R $( ($crate::nexosim::Address<$RT>) )?
@@ -1008,6 +1077,9 @@ macro_rules! define_model_enums {
 
             DiscreteStockLoggerString($crate::components::discrete::DiscreteStockLogger<String>),
             DiscreteProcessLoggerString($crate::components::discrete::DiscreteProcessLogger<String>),
+
+            DiscreteStockLoggerVector3Container($crate::components::discrete::DiscreteStockLogger<Vector3Container>),
+            DiscreteProcessLoggerVector3Container($crate::components::discrete::DiscreteProcessLogger<Vector3Container>),
 
             BasicEnvironmentLogger(BasicEnvironmentLogger),
             $(
@@ -1114,6 +1186,28 @@ macro_rules! define_model_enums {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
+
+                    ($ComponentLogger::DiscreteStockLoggerVector3Container(a), $ComponentModel::DiscreteStockVector3Container(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteProcessVector3Container(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteParallelProcessVector3Container(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteLoadProcessVector3Container(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteUnloadProcessVector3Container(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+
                     ($ComponentLogger::BasicEnvironmentLogger(a), $ComponentModel::BasicEnvironment(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
@@ -1132,6 +1226,9 @@ macro_rules! define_model_enums {
 
                     $ComponentLogger::DiscreteStockLoggerString(a) => { a.write_csv(dir.to_string()) },
                     $ComponentLogger::DiscreteProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
+
+                    $ComponentLogger::DiscreteStockLoggerVector3Container(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::DiscreteProcessLoggerVector3Container(a) => { a.write_csv(dir.to_string()) },
 
                     $ComponentLogger::BasicEnvironmentLogger(a) => { a.write_csv(dir.to_string()) },
 
