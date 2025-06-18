@@ -28,6 +28,9 @@ pub struct DumpingProcess {
     next_event_index: u64,
     pub log_emitter: Output<TruckingProcessLog>,
     pub previous_check_time: MonotonicTime,
+    pub my_callback: Option<Box<dyn FnMut(i32) -> i32 + Send>>,
+    pub my_callback_2: Option<Box<dyn FnMut(i32, String) -> i32 + Send>>,
+    pub my_callback_3: Option<Box<dyn FnMut(i32) -> Box<dyn Future<Output = i32> + Send>>>,
 }
 
 impl Default for DumpingProcess {
@@ -56,6 +59,9 @@ impl DumpingProcess {
             next_event_index: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
+            my_callback: None,
+            my_callback_2: None,
+            my_callback_3: None,
         }
     }
 

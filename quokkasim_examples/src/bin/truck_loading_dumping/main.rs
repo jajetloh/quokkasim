@@ -216,12 +216,23 @@ fn main() {
         Mailbox::new(),
     );
 
-    let mut dumping_process = ComponentModel::DumpingProcess(DumpingProcess::new()
+    let mut d = DumpingProcess::new()
         .with_name("dumping_process".into())
         .with_code("PR-DUMPING".into())
         .with_type("DumpingProcess".into())
         .with_process_quantity_distr(df.create(DistributionConfig::Constant(5.)).unwrap())
-        .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap()),
+        .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap());
+    d.my_callback = Some(Box::new(|x| x + 1));
+    d.my_callback_2 = Some(Box::new(|x, y| x * 2));
+    let mut counter = 0;
+    d.my_callback_3 = Some(Box::new(move |x: i32| {
+        counter += 1; // Mutate state
+        Box::new(async move {
+            counter + x
+        })
+    }));
+    let mut dumping_process = ComponentModel::DumpingProcess(
+        d,
         Mailbox::new(),
     );
 
