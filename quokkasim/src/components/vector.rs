@@ -772,6 +772,7 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
     pub withdraw_upstreams: [Requestor<(ReceiveParameterType, EventId), ReceiveType>; M],
     pub push_downstream: Output<(SendType, EventId)>,
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub delay_modes: DelayModes,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     time_to_next_event: Option<Duration>,
@@ -823,6 +824,7 @@ impl<
             withdraw_upstreams: std::array::from_fn(|_| Requestor::default()),
             push_downstream: Output::default(),
             process_state: None,
+            delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
@@ -882,25 +884,52 @@ where
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let Some((mut process_time_left, resources)) = self.process_state.take() {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    let mut total: T = Default::default();
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
 
-                    for resource in resources.iter() {
-                        total.add(resource.clone());
+                if !is_in_delay {
+                    if let Some((mut process_time_left, resources)) = self.process_state.take() {
+                        
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            let mut total: T = Default::default();
+
+                            for resource in resources.iter() {
+                                total.add(resource.clone());
+                            }
+
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
+                            self.push_downstream.send((total, source_event_id.clone())).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resources));
+                        }
                     }
+                }
 
-                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::CombineSuccess { quantity: resources.iter().map(|x| x.total()).sum(), vector: total.clone() }).await;
-                    self.push_downstream.send((total, source_event_id.clone())).await;
-                } else {
-                    self.process_state = Some((process_time_left, resources));
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if is_in_delay || is_in_process {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
-            match self.process_state {
-                None => {
+
+            // Update internal states
+            let has_active_delay = self.delay_modes.active_delay().is_some();
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let iterators = join_all(self.req_upstreams.iter_mut().map(|req| {
                         req.send(())
                     })).await;
@@ -952,8 +981,11 @@ where
                         },
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
+                (Some((time, _)), false) => {
+                    self.time_to_next_event = Some(*time);
+                },
+                (_, true) => {
+                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
             }
         }
@@ -1029,6 +1061,7 @@ pub struct VectorSplitter<
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub push_downstreams: [Output<(SendType, EventId)>; N],
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub delay_modes: DelayModes,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     time_to_next_event: Option<Duration>,
@@ -1090,6 +1123,7 @@ impl<
             withdraw_upstream: Requestor::default(),
             push_downstreams: std::array::from_fn(|_| Output::default()),
             process_state: None,
+            delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
@@ -1137,29 +1171,55 @@ where
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let Some((mut process_time_left, resource)) = self.process_state.take() {
-                            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                            process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
 
-                            if process_time_left.is_zero() {
-            
-                                let split_resources = self.split_ratios.iter().map(|ratio| {
-                                    let quantity = resource.total() * ratio;
-                                    resource.clone().remove(quantity)
-                                }).collect::<Vec<_>>();
+                if !is_in_delay {
+                    if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
 
-                                *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
+                        if process_time_left.is_zero() {
+        
+                            let split_resources = self.split_ratios.iter().map(|ratio| {
+                                let quantity = resource.total() * ratio;
+                                resource.clone().remove(quantity)
+                            }).collect::<Vec<_>>();
 
-                                join_all(self.push_downstreams.iter_mut().zip(split_resources).map(|(push, resource)| {
-                                    push.send((resource.clone(), source_event_id.clone()))
-                                })).await;
-                            } else {
-                                self.process_state = Some((process_time_left, resource));
-                            }
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::SplitSuccess { quantity: resource.total(), vectors: split_resources.clone() }).await;
+
+                            join_all(self.push_downstreams.iter_mut().zip(split_resources).map(|(push, resource)| {
+                                push.send((resource.clone(), source_event_id.clone()))
+                            })).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
                         }
-            match self.process_state {
-                None => {
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if is_in_delay || is_in_process {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
+                }
+            }
+
+            // Update internal states
+            let has_active_delay = self.delay_modes.active_delay().is_some();
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     let ds_states = join_all(self.req_downstreams.iter_mut().map(|req| req.send(()))).await.iter_mut().map(|x| {
                         x.next()
@@ -1204,8 +1264,11 @@ where
                         },
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
+                (Some((time, _)), false) => {
+                    self.time_to_next_event = Some(*time);
+                },
+                (_, true) => {
+                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
             }
         }
@@ -1275,6 +1338,7 @@ pub struct VectorSource<
     pub req_downstream: Requestor<(), VectorStockState>,
     pub push_downstream: Output<(SendType, EventId)>,
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub delay_modes: DelayModes,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub source_vector: InternalResourceType,
@@ -1294,6 +1358,7 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
             req_downstream: Requestor::default(),
             push_downstream: Output::default(),
             process_state: None,
+            delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             source_vector: InternalResourceType::default(),
@@ -1379,19 +1444,46 @@ where
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()>{
         async move {
             let time = cx.time();
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let Some((mut process_time_left, resource)) = self.process_state.take() {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                } else {
-                    self.process_state = Some((process_time_left, resource));
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
+
+                if !is_in_delay {
+                    if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                        let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                            self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
+                        }
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if is_in_delay || is_in_process {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
-            match self.process_state {
-                None => {
+
+            // Update internal states
+            let has_active_delay = self.delay_modes.active_delay().is_some();
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let ds_state = self.req_downstream.send(()).await.next();
                     match ds_state {
                         Some(VectorStockState::Full {..}) => {
@@ -1417,8 +1509,11 @@ where
                         },
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
+                (Some((time, _)), false) => {
+                    self.time_to_next_event = Some(*time);
+                },
+                (_, true) => {
+                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
             }
         }
@@ -1489,6 +1584,7 @@ pub struct VectorSink<
     pub req_upstream: Requestor<(), VectorStockState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub delay_modes: DelayModes,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     time_to_next_event: Option<Duration>,
@@ -1525,6 +1621,7 @@ impl<
             req_upstream: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             process_state: None,
+            delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             time_to_next_event: None,
@@ -1593,18 +1690,46 @@ where
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let Some((mut process_time_left, resource)) = self.process_state.take() {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                } else {
-                    self.process_state = Some((process_time_left, resource));
+
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
+
+                if !is_in_delay {
+                    if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                        let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
+                        }
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if is_in_delay || is_in_process {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
-            match self.process_state {
-                None => {
+
+            // Update internal states
+            let has_active_delay = self.delay_modes.active_delay().is_some();
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     match us_state {
                         Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}) => {
@@ -1628,8 +1753,11 @@ where
                         }
                     }
                 },
-                Some((time, _)) => {
-                    self.time_to_next_event = Some(time);
+                (Some((time, _)), false) => {
+                    self.time_to_next_event = Some(*time);
+                },
+                (_, true) => {
+                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
             }
         }
