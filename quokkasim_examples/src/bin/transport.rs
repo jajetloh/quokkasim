@@ -30,7 +30,7 @@ impl CustomLoggerConnection for ComponentLogger {
 fn main() {
     // Declarations
 
-    // let mut source = ComponentModel::VectorSourceVector3(
+    // let mut source = ComponentModel::Vector3Source(
     //     VectorSource::new()
     //         .with_name("Source".into())
     //         .with_process_quantity_distr(Distribution::Constant(1.))
@@ -41,7 +41,7 @@ fn main() {
 
     let mut df = DistributionFactory::new(1234);
 
-    let mut stock_1 = ComponentModel::VectorStockVector3(
+    let mut stock_1 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Stock 1".into())
             .with_low_capacity(10.)
@@ -49,7 +49,7 @@ fn main() {
             .with_initial_vector([ 99., 0., 0. ].into()),
         Mailbox::new()
     );
-    let mut process = ComponentModel::VectorProcessVector3(
+    let mut process = ComponentModel::Vector3Process(
         VectorProcess::new()
             .with_name("Process".into())
             .with_process_quantity_distr(Distribution::Constant(1.))
@@ -66,7 +66,7 @@ fn main() {
             })),
         Mailbox::new()
     );
-    let mut stock_2 = ComponentModel::VectorStockVector3(
+    let mut stock_2 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Stock 2".into())
             .with_low_capacity(10.)
@@ -75,7 +75,7 @@ fn main() {
         Mailbox::new()
     );
 
-    // let mut sink = ComponentModel::VectorSinkVector3(
+    // let mut sink = ComponentModel::Vector3Sink(
     //     VectorSink::new()
     //         .with_name("Sink".into())
     //         .with_process_quantity_distr(Distribution::Constant(1.))
@@ -83,8 +83,8 @@ fn main() {
     //     Mailbox::new()
     // );
 
-    let mut process_logger = ComponentLogger::VectorProcessLoggerVector3(VectorProcessLogger::new("ProcessLogger".into()));
-    let mut stock_logger = ComponentLogger::VectorStockLoggerVector3(VectorStockLogger::new("StockLogger".into()));
+    let mut process_logger = ComponentLogger::Vector3ProcessLogger(VectorProcessLogger::new("ProcessLogger".into()));
+    let mut stock_logger = ComponentLogger::Vector3StockLogger(VectorStockLogger::new("StockLogger".into()));
 
     // Connect components
     // connect_components!(&mut source, &mut stock_1).unwrap();

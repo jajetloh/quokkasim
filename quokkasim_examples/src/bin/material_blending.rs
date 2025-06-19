@@ -32,14 +32,14 @@ impl CustomLoggerConnection for ComponentLogger {
 fn main() {
     // Declarations
 
-    let mut process_logger = ComponentLogger::VectorProcessLoggerVector3(VectorProcessLogger::new("ProcessLogger".into()));
-    let mut stock_logger = ComponentLogger::VectorStockLoggerVector3(VectorStockLogger::new("StockLogger".into()));
+    let mut process_logger = ComponentLogger::Vector3ProcessLogger(VectorProcessLogger::new("ProcessLogger".into()));
+    let mut stock_logger = ComponentLogger::Vector3StockLogger(VectorStockLogger::new("StockLogger".into()));
     let df = DistributionFactory {
         base_seed: 1234,
         next_seed: 0,
     };
 
-    let mut stockpile_1 = ComponentModel::VectorStockVector3(
+    let mut stockpile_1 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Stockpile 1".into())
             .with_code("SP1".into())
@@ -49,7 +49,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut stockpile_2 = ComponentModel::VectorStockVector3(
+    let mut stockpile_2 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Stockpile 2".into())
             .with_code("SP2".into())
@@ -59,7 +59,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut stockpile_3 = ComponentModel::VectorStockVector3(
+    let mut stockpile_3 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Stockpile 3".into())
             .with_code("SP3".into())
@@ -69,7 +69,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut reclaimer_1 = ComponentModel::VectorCombiner2Vector3(
+    let mut reclaimer_1 = ComponentModel::Vector3Combiner2(
         VectorCombiner::new()
             .with_name("Reclaimer 1".into())
             .with_code("RC1".into())
@@ -78,7 +78,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut output_stockpile_1 = ComponentModel::VectorStockVector3(
+    let mut output_stockpile_1 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Output Stockpile 1".into())
             .with_code("OSP1".into())
@@ -88,7 +88,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut output_stockpile_2 = ComponentModel::VectorStockVector3(
+    let mut output_stockpile_2 = ComponentModel::Vector3Stock(
         VectorStock::new()
             .with_name("Output Stockpile 2".into())
             .with_code("OSP2".into())
@@ -98,7 +98,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut reclaimer_2 = ComponentModel::VectorCombiner2Vector3(
+    let mut reclaimer_2 = ComponentModel::Vector3Combiner2(
         VectorCombiner::new()
             .with_name("Reclaimer 2".into())
             .with_code("RC2".into())
@@ -107,7 +107,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut reclaimer_3 = ComponentModel::VectorCombiner1Vector3(
+    let mut reclaimer_3 = ComponentModel::Vector3Combiner1(
         VectorCombiner::new() 
             .with_name("Reclaimer 3".into())
             .with_code("RC3".into())
@@ -116,7 +116,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut stacker = ComponentModel::VectorSplitter2Vector3(
+    let mut stacker = ComponentModel::Vector3Splitter2(
         VectorSplitter::new()
             .with_name("Stacker".into())
             .with_code("STK".into())

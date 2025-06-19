@@ -32,7 +32,7 @@ impl CustomLoggerConnection for ComponentLogger {
 fn main() {
     // Declarations
 
-    let mut stock_1 = ComponentModel::VectorStockF64(
+    let mut stock_1 = ComponentModel::F64Stock(
         VectorStock::new()
             .with_name("Stock 1".into())
             .with_low_capacity(50.)
@@ -41,7 +41,7 @@ fn main() {
         Mailbox::new()
     );
     let stock_1_addr = stock_1.get_address();
-    let mut stock_2 = ComponentModel::VectorStockF64(
+    let mut stock_2 = ComponentModel::F64Stock(
         VectorStock::new()
             .with_name("Stock 2".into())
             .with_low_capacity(50.)
@@ -49,7 +49,7 @@ fn main() {
             .with_initial_vector(0.),
         Mailbox::new()
     );
-    let mut process = ComponentModel::VectorProcessF64(
+    let mut process = ComponentModel::F64Process(
         VectorProcess::new()
             .with_name("Process".into())
             .with_process_quantity_distr(Distribution::Constant(1.))

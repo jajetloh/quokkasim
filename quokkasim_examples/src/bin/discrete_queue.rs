@@ -35,9 +35,9 @@ fn main() {
         next_seed: 0,
     };
 
-    let mut source = ComponentModel::DiscreteSourceString(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
+    let mut source = ComponentModel::StringSource(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
 
-    let mut queue_1 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+    let mut queue_1 = ComponentModel::StringStock(DiscreteStock::new()
         .with_name("Queue1".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -45,13 +45,13 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_1 = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
+    let mut process_1 = ComponentModel::StringProcess(DiscreteProcess::new()
         .with_name("Process1".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
 
-    let mut queue_2 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+    let mut queue_2 = ComponentModel::StringStock(DiscreteStock::new()
         .with_name("Queue2".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -59,13 +59,13 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut process_par = ComponentModel::DiscreteProcessString(DiscreteProcess::new()
+    let mut process_par = ComponentModel::StringProcess(DiscreteProcess::new()
         .with_name("Process2".into())
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
 
-    let mut queue_3 = ComponentModel::DiscreteStockString(DiscreteStock::new()
+    let mut queue_3 = ComponentModel::StringStock(DiscreteStock::new()
         .with_name("Queue3".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
@@ -73,7 +73,7 @@ fn main() {
         Mailbox::new()
     );
 
-    let mut sink = ComponentModel::DiscreteSinkString(DiscreteSink::new()
+    let mut sink = ComponentModel::StringSink(DiscreteSink::new()
         .with_name("Sink".into())
         .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
@@ -86,8 +86,8 @@ fn main() {
     connect_components!(&mut process_par, &mut queue_3).unwrap();
     connect_components!(&mut queue_3, &mut sink).unwrap();
 
-    let mut queue_logger = ComponentLogger::DiscreteStockLoggerString(DiscreteStockLogger::new("QueueLogger".into()));
-    let mut process_logger = ComponentLogger::DiscreteProcessLoggerString(DiscreteProcessLogger::new("ProcessLogger".into()));
+    let mut queue_logger = ComponentLogger::StringStockLogger(DiscreteStockLogger::new("QueueLogger".into()));
+    let mut process_logger = ComponentLogger::StringProcessLogger(DiscreteProcessLogger::new("ProcessLogger".into()));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();

@@ -498,51 +498,52 @@ macro_rules! define_model_enums {
         $(#[$components_enum_meta])*
         #[derive(Display)]
         pub enum $ComponentModel {
-            VectorStockF64($crate::components::vector::VectorStock<f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<f64>>),
-            VectorProcessF64($crate::components::vector::VectorProcess<f64, f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, f64, f64, f64>>),
-            VectorSourceF64($crate::components::vector::VectorSource<f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSource<f64, f64>>),
-            VectorSinkF64($crate::components::vector::VectorSink<f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSink<f64, f64, f64>>),
-            VectorCombiner1F64($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 1], 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>>),
-            VectorCombiner2F64($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 2], 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>>),
-            VectorCombiner3F64($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 3], 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>>),
-            VectorCombiner4F64($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 4], 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>>),
-            VectorCombiner5F64($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 5], 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>>),
-            VectorSplitter1F64($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>>),
-            VectorSplitter2F64($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>>),
-            VectorSplitter3F64($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>>),
-            VectorSplitter4F64($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>>),
-            VectorSplitter5F64($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>>),
-            VectorStockVector3($crate::components::vector::VectorStock<Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<Vector3>>),
-            VectorProcessVector3($crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>>),
-            VectorSourceVector3($crate::components::vector::VectorSource<Vector3, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSource<Vector3, Vector3>>),
-            VectorSinkVector3($crate::components::vector::VectorSink<f64, Vector3, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSink<f64, Vector3, Vector3>>),
-            VectorCombiner1Vector3($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 1], Vector3, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 1], Vector3, 1>>),
-            VectorCombiner2Vector3($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 2], Vector3, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 2], Vector3, 2>>),
-            VectorCombiner3Vector3($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 3], Vector3, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 3], Vector3, 3>>),
-            VectorCombiner4Vector3($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 4], Vector3, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 4], Vector3, 4>>),
-            VectorCombiner5Vector3($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 5], Vector3, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 5], Vector3, 5>>),
-            VectorSplitter1Vector3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 1>>),
-            VectorSplitter2Vector3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 2>>),
-            VectorSplitter3Vector3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>>),
-            VectorSplitter4Vector3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>>),
-            VectorSplitter5Vector3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>>),
-            DiscreteStockString($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
-            DiscreteProcessString($crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
-            DiscreteParallelProcessString($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
-            DiscreteSourceString($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
-            DiscreteSinkString($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
-            DiscreteStockF64Container($crate::components::discrete::DiscreteStock<F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<F64Container>>),
-            DiscreteProcessF64Container($crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>>),
-            DiscreteParallelProcessF64Container($crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>>),
-            DiscreteSourceF64Container($crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>>),
-            DiscreteSinkF64Container($crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>>),
-            DiscreteStockVector3Container($crate::components::discrete::DiscreteStock<Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<Vector3Container>>),
-            DiscreteProcessVector3Container($crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
-            DiscreteParallelProcessVector3Container($crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
-            DiscreteSourceVector3Container($crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>>),
-            DiscreteSinkVector3Container($crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>>),
-            DiscreteLoadProcessVector3Container($crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
-            DiscreteUnloadProcessVector3Container($crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
+            F64Stock($crate::components::vector::VectorStock<f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<f64>>),
+            F64Process($crate::components::vector::VectorProcess<f64, f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, f64, f64, f64>>),
+            F64Source($crate::components::vector::VectorSource<f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSource<f64, f64>>),
+            F64Sink($crate::components::vector::VectorSink<f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSink<f64, f64, f64>>),
+            F64Combiner1($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 1], 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>>),
+            F64Combiner2($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 2], 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>>),
+            F64Combiner3($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 3], 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>>),
+            F64Combiner4($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 4], 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>>),
+            F64Combiner5($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 5], 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>>),
+            F64Splitter1($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>>),
+            F64Splitter2($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>>),
+            F64Splitter3($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>>),
+            F64Splitter4($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>>),
+            F64Splitter5($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>>),
+            
+            Vector3Stock($crate::components::vector::VectorStock<Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorStock<Vector3>>),
+            Vector3Process($crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>>),
+            Vector3Source($crate::components::vector::VectorSource<Vector3, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSource<Vector3, Vector3>>),
+            Vector3Sink($crate::components::vector::VectorSink<f64, Vector3, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSink<f64, Vector3, Vector3>>),
+            Vector3Combiner1($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 1], Vector3, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 1], Vector3, 1>>),
+            Vector3Combiner2($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 2], Vector3, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 2], Vector3, 2>>),
+            Vector3Combiner3($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 3], Vector3, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 3], Vector3, 3>>),
+            Vector3Combiner4($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 4], Vector3, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 4], Vector3, 4>>),
+            Vector3Combiner5($crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 5], Vector3, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 5], Vector3, 5>>),
+            Vector3Splitter1($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 1>>),
+            Vector3Splitter2($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 2>>),
+            Vector3Splitter3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>>),
+            Vector3Splitter4($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>>),
+            Vector3Splitter5($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>>),
+            StringStock($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
+            StringProcess($crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
+            StringParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
+            StringSource($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
+            StringSink($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+            F64ContainerStock($crate::components::discrete::DiscreteStock<F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<F64Container>>),
+            F64ContainerProcess($crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>>),
+            F64ContainerParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>>),
+            F64ContainerSource($crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>>),
+            F64ContainerSink($crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>>),
+            Vector3ContainerStock($crate::components::discrete::DiscreteStock<Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<Vector3Container>>),
+            Vector3ContainerProcess($crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            Vector3ContainerParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            Vector3ContainerSource($crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>>),
+            Vector3ContainerSink($crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>>),
+            Vector3ContainerLoadProcess($crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
+            Vector3ContainerUnloadProcess($crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
             BasicEnvironment(BasicEnvironment, $crate::nexosim::Mailbox<BasicEnvironment>),
             $(
                 $(#[$components_var_meta])*
@@ -558,187 +559,187 @@ macro_rules! define_model_enums {
             ) -> Result<(), Box<dyn ::std::error::Error>>{
                 use $crate::core::CustomComponentConnection;
                 match (a, b, n) {
-                    ($ComponentModel::VectorStockF64(a, ad), $ComponentModel::VectorProcessF64(b, bd), _) => {
+                    ($ComponentModel::F64Stock(a, ad), $ComponentModel::F64Process(b, bd), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorProcessF64(a, ad), $ComponentModel::VectorStockF64(b, bd), _) => {
+                    ($ComponentModel::F64Process(a, ad), $ComponentModel::F64Stock(b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
                         Ok(())
                     },
 
-                    // VectorSourceF64
-                    ($ComponentModel::VectorSourceF64(a, am), $ComponentModel::VectorStockF64(b, bm), _) => {
+                    // F64Source
+                    ($ComponentModel::F64Source(a, am), $ComponentModel::F64Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorSource::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
-                    // VectorSinkF64
-                    ($ComponentModel::VectorStockF64(a, am), $ComponentModel::VectorSinkF64(b, bm), _) => {
+                    // F64Sink
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Sink(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSink::update_state, bm.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
 
-                    ($ComponentModel::VectorStockVector3(a, ad), $ComponentModel::VectorProcessVector3(b, bd), _) => {
+                    ($ComponentModel::Vector3Stock(a, ad), $ComponentModel::Vector3Process(b, bd), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, ad.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorProcessVector3(a, ad), $ComponentModel::VectorStockVector3(b, bd), _) => {
+                    ($ComponentModel::Vector3Process(a, ad), $ComponentModel::Vector3Stock(b, bd), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
                         Ok(())
                     },
-                    // VectorSourceVector3
-                    ($ComponentModel::VectorSourceVector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    // Vector3Source
+                    ($ComponentModel::Vector3Source(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorSource::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
-                    // VectorSinkVector3
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorSinkVector3(b, bm), _) => {
+                    // Vector3Sink
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3Sink(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSink::update_state, bm.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
 
-                    // VectorCombiner1Vector3
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner1Vector3(b, bm), Some(n)) => {
+                    // Vector3Combiner1
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3Combiner1(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorCombiner1Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::Vector3Combiner1(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
-                    // VectorCombiner2Vector3
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner2Vector3(b, bm), Some(n)) => {
+                    // Vector3Combiner2
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3Combiner2(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorCombiner2Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::Vector3Combiner2(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
-                    // VectorCombiner3Vector3
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner3Vector3(b, bm), Some(n)) => {
+                    // Vector3Combiner3
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3Combiner3(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorCombiner3Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::Vector3Combiner3(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
-                    // VectorCombiner4Vector3
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner4Vector3(b, bm), Some(n)) => {
+                    // Vector3Combiner4
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3Combiner4(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorCombiner4Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::Vector3Combiner4(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
-                    // VectorCombiner5Vector3
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::VectorCombiner5Vector3(b, bm), Some(n)) => {
+                    // Vector3Combiner5
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3Combiner5(b, bm), Some(n)) => {
                         a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
                         b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorCombiner5Vector3(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::Vector3Combiner5(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
                         a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
 
-                    // VectorSplitter1Vector3
-                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter1Vector3(b, bmb), _) => {
+                    // Vector3Splitter1
+                    ($ComponentModel::Vector3Stock(a, amb), $ComponentModel::Vector3Splitter1(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorSplitter1Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::Vector3Splitter1(a, amb), $ComponentModel::Vector3Stock(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
-                    // VectorSplitter2Vector3
-                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter2Vector3(b, bmb), _) => {
+                    // Vector3Splitter2
+                    ($ComponentModel::Vector3Stock(a, amb), $ComponentModel::Vector3Splitter2(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorSplitter2Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::Vector3Splitter2(a, amb), $ComponentModel::Vector3Stock(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
-                    // VectorSplitter3Vector3
-                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter3Vector3(b, bmb), _) => {
+                    // Vector3Splitter3
+                    ($ComponentModel::Vector3Stock(a, amb), $ComponentModel::Vector3Splitter3(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorSplitter3Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::Vector3Splitter3(a, amb), $ComponentModel::Vector3Stock(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
-                    // VectorSplitter4Vector3
-                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter4Vector3(b, bmb), _) => {
+                    // Vector3Splitter4
+                    ($ComponentModel::Vector3Stock(a, amb), $ComponentModel::Vector3Splitter4(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorSplitter4Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::Vector3Splitter4(a, amb), $ComponentModel::Vector3Stock(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
                         Ok(())
                     },
-                    // VectorSplitter5Vector3
-                    ($ComponentModel::VectorStockVector3(a, amb), $ComponentModel::VectorSplitter5Vector3(b, bmb), _) => {
+                    // Vector3Splitter5
+                    ($ComponentModel::Vector3Stock(a, amb), $ComponentModel::Vector3Splitter5(b, bmb), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bmb.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, amb.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, amb.address());
                         Ok(())
                     },
-                    ($ComponentModel::VectorSplitter5Vector3(a, amb), $ComponentModel::VectorStockVector3(b, bmb), Some(n)) => {
+                    ($ComponentModel::Vector3Splitter5(a, amb), $ComponentModel::Vector3Stock(b, bmb), Some(n)) => {
                         b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, amb.address());
                         a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bmb.address());
                         a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bmb.address());
@@ -746,111 +747,111 @@ macro_rules! define_model_enums {
                     },
 
                     // Discrete
-                    ($ComponentModel::DiscreteStockString(a, ad), $ComponentModel::DiscreteProcessString(b, bd), _) => {
+                    ($ComponentModel::StringStock(a, ad), $ComponentModel::StringProcess(b, bd), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, bd.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, ad.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, ad.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteProcessString(a, ad), $ComponentModel::DiscreteStockString(b, bd), _) => {
+                    ($ComponentModel::StringProcess(a, ad), $ComponentModel::StringStock(b, bd), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, ad.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bd.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bd.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteStockString(a, am), $ComponentModel::DiscreteParallelProcessString(b, bm), _) => {
+                    ($ComponentModel::StringStock(a, am), $ComponentModel::StringParallelProcess(b, bm), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, bm.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteParallelProcessString(a, am), $ComponentModel::DiscreteStockString(b, bm), _) => {
+                    ($ComponentModel::StringParallelProcess(a, am), $ComponentModel::StringStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteSourceString(a, am), $ComponentModel::DiscreteStockString(b, bm), _) => {
+                    ($ComponentModel::StringSource(a, am), $ComponentModel::StringStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteSource::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteStockString(a, am), $ComponentModel::DiscreteSinkString(b, bm), _) => {
+                    ($ComponentModel::StringStock(a, am), $ComponentModel::StringSink(b, bm), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteSink::update_state, bm.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
 
-                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteProcessVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerStock(a, am), $ComponentModel::Vector3ContainerProcess(b, bm), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, bm.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerProcess(a, am), $ComponentModel::Vector3ContainerStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteProcess::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteParallelProcessVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerStock(a, am), $ComponentModel::Vector3ContainerParallelProcess(b, bm), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, bm.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteParallelProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerParallelProcess(a, am), $ComponentModel::Vector3ContainerStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteParallelProcess::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteSourceVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerSource(a, am), $ComponentModel::Vector3ContainerStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::discrete::DiscreteSource::<Vector3Container, Vector3Container, Vector3ContainerFactory>::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteSinkVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerStock(a, am), $ComponentModel::Vector3ContainerSink(b, bm), _) => {
                         a.state_emitter.connect($crate::components::discrete::DiscreteSink::<(), Option<Vector3Container>, Vector3Container>::update_state, bm.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::<Vector3Container>::remove, am.address());
                         Ok(())
                     },
 
-                    ($ComponentModel::VectorStockVector3(a, am), $ComponentModel::DiscreteLoadProcessVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3Stock(a, am), $ComponentModel::Vector3ContainerLoadProcess(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, bm.address());
                         b.req_us_resource.connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_us_resource.connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteLoadProcessVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerStock(a, am), $ComponentModel::Vector3ContainerLoadProcess(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, bm.address());
                         b.req_us_containers.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
                         b.withdraw_us_containers.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteLoadProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerLoadProcess(a, am), $ComponentModel::Vector3ContainerStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector_container::ContainerLoadingProcess::update_state, am.address());
                         a.req_downstream.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_downstream.connect($crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteStockVector3Container(a, am), $ComponentModel::DiscreteUnloadProcessVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerStock(a, am), $ComponentModel::Vector3ContainerUnloadProcess(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector_container::ContainerUnloadingProcess::update_state, bm.address());
                         b.req_upstream.connect($crate::components::discrete::DiscreteStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::discrete::DiscreteStock::remove, am.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteUnloadProcessVector3Container(a, am), $ComponentModel::DiscreteStockVector3Container(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerUnloadProcess(a, am), $ComponentModel::Vector3ContainerStock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector_container::ContainerUnloadingProcess::update_state, am.address());
                         a.req_ds_containers.connect($crate::components::discrete::DiscreteStock::get_state_async, bm.address());
                         a.push_ds_containers.connect($crate::components::discrete::DiscreteStock::add, bm.address());
                         Ok(())
                     },
-                    ($ComponentModel::DiscreteUnloadProcessVector3Container(a, am), $ComponentModel::VectorStockVector3(b, bm), _) => {
+                    ($ComponentModel::Vector3ContainerUnloadProcess(a, am), $ComponentModel::Vector3Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector_container::ContainerUnloadingProcess::update_state, am.address());
                         a.req_ds_resource.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
                         a.push_ds_resource.connect($crate::components::vector::VectorStock::add, bm.address());
@@ -865,153 +866,153 @@ macro_rules! define_model_enums {
             pub fn register_component(mut sim_init: $crate::nexosim::SimInit, component: Self) -> $crate::nexosim::SimInit {
                 
                 match component {
-                    $ComponentModel::VectorProcessF64(a, mb) => {
+                    $ComponentModel::F64Process(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorStockF64(a, mb) => {
+                    $ComponentModel::F64Stock(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSourceF64(a, mb) => {
+                    $ComponentModel::F64Source(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSinkF64(a, mb) => {
+                    $ComponentModel::F64Sink(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
                     // TODO: Add combiners and splitters for f64
-                    $ComponentModel::VectorStockVector3(a, mb) => {
+                    $ComponentModel::Vector3Stock(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorProcessVector3(a, mb) => {
+                    $ComponentModel::Vector3Process(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSourceVector3(a, mb) => {
+                    $ComponentModel::Vector3Source(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSinkVector3(a, mb) => {
+                    $ComponentModel::Vector3Sink(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorCombiner1Vector3(a, mb) => {
+                    $ComponentModel::Vector3Combiner1(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorCombiner2Vector3(a, mb) => {
+                    $ComponentModel::Vector3Combiner2(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorCombiner3Vector3(a, mb) => {
+                    $ComponentModel::Vector3Combiner3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorCombiner4Vector3(a, mb) => {
+                    $ComponentModel::Vector3Combiner4(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorCombiner5Vector3(a, mb) => {
+                    $ComponentModel::Vector3Combiner5(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSplitter1Vector3(a, mb) => {
+                    $ComponentModel::Vector3Splitter1(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSplitter2Vector3(a, mb) => {
+                    $ComponentModel::Vector3Splitter2(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSplitter3Vector3(a, mb) => {
+                    $ComponentModel::Vector3Splitter3(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSplitter4Vector3(a, mb) => {
+                    $ComponentModel::Vector3Splitter4(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::VectorSplitter5Vector3(a, mb) => {
+                    $ComponentModel::Vector3Splitter5(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteStockString(a, mb) => {
+                    $ComponentModel::StringStock(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteProcessString(a, mb) => {
+                    $ComponentModel::StringProcess(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteParallelProcessString(a, mb) => {
+                    $ComponentModel::StringParallelProcess(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteSourceString(a, mb) => {
+                    $ComponentModel::StringSource(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteSinkString(a, mb) => {
+                    $ComponentModel::StringSink(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteStockVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerStock(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteProcessVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerProcess(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteParallelProcessVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerParallelProcess(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteSourceVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerSource(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteSinkVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerSink(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteLoadProcessVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerLoadProcess(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
                     },
-                    $ComponentModel::DiscreteUnloadProcessVector3Container(a, mb) => {
+                    $ComponentModel::Vector3ContainerUnloadProcess(a, mb) => {
                         let name = a.element_name.clone();
                         let addr = mb.address();
                         sim_init = sim_init.add_model(a, mb, name);
@@ -1037,45 +1038,45 @@ macro_rules! define_model_enums {
 
             pub fn get_address(&self) -> $ComponentModelAddress {
                 match self {
-                    $ComponentModel::VectorStockF64(_, mb) => $ComponentModelAddress::VectorStockF64(mb.address()),
-                    $ComponentModel::VectorProcessF64(_, mb) => $ComponentModelAddress::VectorProcessF64(mb.address()),
-                    $ComponentModel::VectorSourceF64(_, mb) => $ComponentModelAddress::VectorSourceF64(mb.address()),
-                    $ComponentModel::VectorSinkF64(_, mb) => $ComponentModelAddress::VectorSinkF64(mb.address()),
-                    $ComponentModel::VectorCombiner1F64(_, mb) => $ComponentModelAddress::VectorCombiner1F64(mb.address()),
-                    $ComponentModel::VectorCombiner2F64(_, mb) => $ComponentModelAddress::VectorCombiner2F64(mb.address()),
-                    $ComponentModel::VectorCombiner3F64(_, mb) => $ComponentModelAddress::VectorCombiner3F64(mb.address()),
-                    $ComponentModel::VectorCombiner4F64(_, mb) => $ComponentModelAddress::VectorCombiner4F64(mb.address()),
-                    $ComponentModel::VectorCombiner5F64(_, mb) => $ComponentModelAddress::VectorCombiner5F64(mb.address()),
-                    $ComponentModel::VectorSplitter1F64(_, mb) => $ComponentModelAddress::VectorSplitter1F64(mb.address()),
-                    $ComponentModel::VectorSplitter2F64(_, mb) => $ComponentModelAddress::VectorSplitter2F64(mb.address()),
-                    $ComponentModel::VectorSplitter3F64(_, mb) => $ComponentModelAddress::VectorSplitter3F64(mb.address()),
-                    $ComponentModel::VectorSplitter4F64(_, mb) => $ComponentModelAddress::VectorSplitter4F64(mb.address()),
-                    $ComponentModel::VectorSplitter5F64(_, mb) => $ComponentModelAddress::VectorSplitter5F64(mb.address()),
-                    $ComponentModel::VectorStockVector3(_, mb) => $ComponentModelAddress::VectorStockVector3(mb.address()),
-                    $ComponentModel::VectorProcessVector3(_, mb) => $ComponentModelAddress::VectorProcessVector3(mb.address()),
-                    $ComponentModel::VectorSourceVector3(_, mb) => $ComponentModelAddress::VectorSourceVector3(mb.address()),
-                    $ComponentModel::VectorSinkVector3(_, mb) => $ComponentModelAddress::VectorSinkVector3(mb.address()),
-                    $ComponentModel::VectorCombiner1Vector3(_, mb) => $ComponentModelAddress::VectorCombiner1Vector3(mb.address()),
-                    $ComponentModel::VectorCombiner2Vector3(_, mb) => $ComponentModelAddress::VectorCombiner2Vector3(mb.address()),
-                    $ComponentModel::VectorCombiner3Vector3(_, mb) => $ComponentModelAddress::VectorCombiner3Vector3(mb.address()),
-                    $ComponentModel::VectorCombiner4Vector3(_, mb) => $ComponentModelAddress::VectorCombiner4Vector3(mb.address()),
-                    $ComponentModel::VectorCombiner5Vector3(_, mb) => $ComponentModelAddress::VectorCombiner5Vector3(mb.address()),
-                    $ComponentModel::VectorSplitter1Vector3(_, mb) => $ComponentModelAddress::VectorSplitter1Vector3(mb.address()),
-                    $ComponentModel::VectorSplitter2Vector3(_, mb) => $ComponentModelAddress::VectorSplitter2Vector3(mb.address()),
-                    $ComponentModel::VectorSplitter3Vector3(_, mb) => $ComponentModelAddress::VectorSplitter3Vector3(mb.address()),
-                    $ComponentModel::VectorSplitter4Vector3(_, mb) => $ComponentModelAddress::VectorSplitter4Vector3(mb.address()),
-                    $ComponentModel::VectorSplitter5Vector3(_, mb) => $ComponentModelAddress::VectorSplitter5Vector3(mb.address()),
-                    $ComponentModel::DiscreteStockString(_, mb) => $ComponentModelAddress::DiscreteStockString(mb.address()),
-                    $ComponentModel::DiscreteProcessString(_, mb) => $ComponentModelAddress::DiscreteProcessString(mb.address()),
-                    $ComponentModel::DiscreteParallelProcessString(_, mb) => $ComponentModelAddress::DiscreteParallelProcessString(mb.address()),
-                    $ComponentModel::DiscreteSourceString(_, mb) => $ComponentModelAddress::DiscreteSourceString(mb.address()),
-                    $ComponentModel::DiscreteSinkString(_, mb) => $ComponentModelAddress::DiscreteSinkString(mb.address()),
+                    $ComponentModel::F64Stock(_, mb) => $ComponentModelAddress::F64Stock(mb.address()),
+                    $ComponentModel::F64Process(_, mb) => $ComponentModelAddress::F64Process(mb.address()),
+                    $ComponentModel::F64Source(_, mb) => $ComponentModelAddress::F64Source(mb.address()),
+                    $ComponentModel::F64Sink(_, mb) => $ComponentModelAddress::F64Sink(mb.address()),
+                    $ComponentModel::F64Combiner1(_, mb) => $ComponentModelAddress::F64Combiner1(mb.address()),
+                    $ComponentModel::F64Combiner2(_, mb) => $ComponentModelAddress::F64Combiner2(mb.address()),
+                    $ComponentModel::F64Combiner3(_, mb) => $ComponentModelAddress::F64Combiner3(mb.address()),
+                    $ComponentModel::F64Combiner4(_, mb) => $ComponentModelAddress::F64Combiner4(mb.address()),
+                    $ComponentModel::F64Combiner5(_, mb) => $ComponentModelAddress::F64Combiner5(mb.address()),
+                    $ComponentModel::F64Splitter1(_, mb) => $ComponentModelAddress::F64Splitter1(mb.address()),
+                    $ComponentModel::F64Splitter2(_, mb) => $ComponentModelAddress::F64Splitter2(mb.address()),
+                    $ComponentModel::F64Splitter3(_, mb) => $ComponentModelAddress::F64Splitter3(mb.address()),
+                    $ComponentModel::F64Splitter4(_, mb) => $ComponentModelAddress::F64Splitter4(mb.address()),
+                    $ComponentModel::F64Splitter5(_, mb) => $ComponentModelAddress::F64Splitter5(mb.address()),
+                    $ComponentModel::Vector3Stock(_, mb) => $ComponentModelAddress::Vector3Stock(mb.address()),
+                    $ComponentModel::Vector3Process(_, mb) => $ComponentModelAddress::Vector3Process(mb.address()),
+                    $ComponentModel::Vector3Source(_, mb) => $ComponentModelAddress::Vector3Source(mb.address()),
+                    $ComponentModel::Vector3Sink(_, mb) => $ComponentModelAddress::Vector3Sink(mb.address()),
+                    $ComponentModel::Vector3Combiner1(_, mb) => $ComponentModelAddress::Vector3Combiner1(mb.address()),
+                    $ComponentModel::Vector3Combiner2(_, mb) => $ComponentModelAddress::Vector3Combiner2(mb.address()),
+                    $ComponentModel::Vector3Combiner3(_, mb) => $ComponentModelAddress::Vector3Combiner3(mb.address()),
+                    $ComponentModel::Vector3Combiner4(_, mb) => $ComponentModelAddress::Vector3Combiner4(mb.address()),
+                    $ComponentModel::Vector3Combiner5(_, mb) => $ComponentModelAddress::Vector3Combiner5(mb.address()),
+                    $ComponentModel::Vector3Splitter1(_, mb) => $ComponentModelAddress::Vector3Splitter1(mb.address()),
+                    $ComponentModel::Vector3Splitter2(_, mb) => $ComponentModelAddress::Vector3Splitter2(mb.address()),
+                    $ComponentModel::Vector3Splitter3(_, mb) => $ComponentModelAddress::Vector3Splitter3(mb.address()),
+                    $ComponentModel::Vector3Splitter4(_, mb) => $ComponentModelAddress::Vector3Splitter4(mb.address()),
+                    $ComponentModel::Vector3Splitter5(_, mb) => $ComponentModelAddress::Vector3Splitter5(mb.address()),
+                    $ComponentModel::StringStock(_, mb) => $ComponentModelAddress::StringStock(mb.address()),
+                    $ComponentModel::StringProcess(_, mb) => $ComponentModelAddress::StringProcess(mb.address()),
+                    $ComponentModel::StringParallelProcess(_, mb) => $ComponentModelAddress::StringParallelProcess(mb.address()),
+                    $ComponentModel::StringSource(_, mb) => $ComponentModelAddress::StringSource(mb.address()),
+                    $ComponentModel::StringSink(_, mb) => $ComponentModelAddress::StringSink(mb.address()),
 
-                    $ComponentModel::DiscreteLoadProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteLoadProcessVector3Container(mb.address()),
-                    $ComponentModel::DiscreteUnloadProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteUnloadProcessVector3Container(mb.address()),
-                    $ComponentModel::DiscreteStockVector3Container(_, mb) => $ComponentModelAddress::DiscreteStockVector3Container(mb.address()),
-                    $ComponentModel::DiscreteProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteProcessVector3Container(mb.address()),
-                    $ComponentModel::DiscreteParallelProcessVector3Container(_, mb) => $ComponentModelAddress::DiscreteParallelProcessVector3Container(mb.address()),
+                    $ComponentModel::Vector3ContainerLoadProcess(_, mb) => $ComponentModelAddress::Vector3ContainerLoadProcess(mb.address()),
+                    $ComponentModel::Vector3ContainerUnloadProcess(_, mb) => $ComponentModelAddress::Vector3ContainerUnloadProcess(mb.address()),
+                    $ComponentModel::Vector3ContainerStock(_, mb) => $ComponentModelAddress::Vector3ContainerStock(mb.address()),
+                    $ComponentModel::Vector3ContainerProcess(_, mb) => $ComponentModelAddress::Vector3ContainerProcess(mb.address()),
+                    $ComponentModel::Vector3ContainerParallelProcess(_, mb) => $ComponentModelAddress::Vector3ContainerParallelProcess(mb.address()),
 
                     $ComponentModel::BasicEnvironment(_, mb) => $ComponentModelAddress::BasicEnvironment(mb.address()),
                     $(
@@ -1093,45 +1094,45 @@ macro_rules! define_model_enums {
 
         #[derive(Display)]
         pub enum $ComponentModelAddress {
-            VectorStockF64($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
-            VectorProcessF64($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64, f64>>),
-            VectorSourceF64($crate::nexosim::Address<$crate::components::vector::VectorSource<f64, f64>>),
-            VectorSinkF64($crate::nexosim::Address<$crate::components::vector::VectorSink<f64, f64, f64>>),
-            VectorCombiner1F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>>),
-            VectorCombiner2F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>>),
-            VectorCombiner3F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>>),
-            VectorCombiner4F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>>),
-            VectorCombiner5F64($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>>),
-            VectorSplitter1F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>>),
-            VectorSplitter2F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>>),
-            VectorSplitter3F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>>),
-            VectorSplitter4F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>>),
-            VectorSplitter5F64($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>>),
-            VectorStockVector3($crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
-            VectorProcessVector3($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>>),
-            VectorSourceVector3($crate::nexosim::Address<$crate::components::vector::VectorSource<Vector3, Vector3>>),
-            VectorSinkVector3($crate::nexosim::Address<$crate::components::vector::VectorSink<f64, Vector3, Vector3>>),
-            VectorCombiner1Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 1], Vector3, 1>>),
-            VectorCombiner2Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 2], Vector3, 2>>),
-            VectorCombiner3Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 3], Vector3, 3>>),
-            VectorCombiner4Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 4], Vector3, 4>>),
-            VectorCombiner5Vector3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 5], Vector3, 5>>),
-            VectorSplitter1Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 1>>),
-            VectorSplitter2Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 2>>),
-            VectorSplitter3Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>>),
-            VectorSplitter4Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>>),
-            VectorSplitter5Vector3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>>),
-            DiscreteStockString($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
-            DiscreteProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
-            DiscreteParallelProcessString($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
-            DiscreteSourceString($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
-            DiscreteSinkString($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+            F64Stock($crate::nexosim::Address<$crate::components::vector::VectorStock<f64>>),
+            F64Process($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, f64, f64, f64>>),
+            F64Source($crate::nexosim::Address<$crate::components::vector::VectorSource<f64, f64>>),
+            F64Sink($crate::nexosim::Address<$crate::components::vector::VectorSink<f64, f64, f64>>),
+            F64Combiner1($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>>),
+            F64Combiner2($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>>),
+            F64Combiner3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>>),
+            F64Combiner4($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>>),
+            F64Combiner5($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>>),
+            F64Splitter1($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>>),
+            F64Splitter2($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>>),
+            F64Splitter3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>>),
+            F64Splitter4($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>>),
+            F64Splitter5($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>>),
+            Vector3Stock($crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
+            Vector3Process($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>>),
+            Vector3Source($crate::nexosim::Address<$crate::components::vector::VectorSource<Vector3, Vector3>>),
+            Vector3Sink($crate::nexosim::Address<$crate::components::vector::VectorSink<f64, Vector3, Vector3>>),
+            Vector3Combiner1($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 1], Vector3, 1>>),
+            Vector3Combiner2($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 2], Vector3, 2>>),
+            Vector3Combiner3($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 3], Vector3, 3>>),
+            Vector3Combiner4($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 4], Vector3, 4>>),
+            Vector3Combiner5($crate::nexosim::Address<$crate::components::vector::VectorCombiner<f64, Vector3, [Vector3; 5], Vector3, 5>>),
+            Vector3Splitter1($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 1>>),
+            Vector3Splitter2($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 2>>),
+            Vector3Splitter3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>>),
+            Vector3Splitter4($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>>),
+            Vector3Splitter5($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>>),
+            StringStock($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
+            StringProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
+            StringParallelProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
+            StringSource($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
+            StringSink($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
 
-            DiscreteLoadProcessVector3Container($crate::nexosim::Address<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
-            DiscreteUnloadProcessVector3Container($crate::nexosim::Address<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
-            DiscreteStockVector3Container($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<Vector3Container>>),
-            DiscreteProcessVector3Container($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
-            DiscreteParallelProcessVector3Container($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            Vector3ContainerLoadProcess($crate::nexosim::Address<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
+            Vector3ContainerUnloadProcess($crate::nexosim::Address<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
+            Vector3ContainerStock($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<Vector3Container>>),
+            Vector3ContainerProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            Vector3ContainerParallelProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
 
             BasicEnvironment($crate::nexosim::Address<BasicEnvironment>),
             $(
@@ -1145,14 +1146,14 @@ macro_rules! define_model_enums {
             VectorStockLoggerF64($crate::components::vector::VectorStockLogger<f64>),
             VectorProcessLoggerF64($crate::components::vector::VectorProcessLogger<f64>),
 
-            VectorStockLoggerVector3($crate::components::vector::VectorStockLogger<Vector3>),
-            VectorProcessLoggerVector3($crate::components::vector::VectorProcessLogger<Vector3>),
+            Vector3StockLogger($crate::components::vector::VectorStockLogger<Vector3>),
+            Vector3ProcessLogger($crate::components::vector::VectorProcessLogger<Vector3>),
 
-            DiscreteStockLoggerString($crate::components::discrete::DiscreteStockLogger<String>),
-            DiscreteProcessLoggerString($crate::components::discrete::DiscreteProcessLogger<String>),
+            StringStockLogger($crate::components::discrete::DiscreteStockLogger<String>),
+            StringProcessLogger($crate::components::discrete::DiscreteProcessLogger<String>),
 
-            DiscreteStockLoggerVector3Container($crate::components::discrete::DiscreteStockLogger<Vector3Container>),
-            DiscreteProcessLoggerVector3Container($crate::components::discrete::DiscreteProcessLogger<Vector3Container>),
+            Vector3ContainerStockLogger($crate::components::discrete::DiscreteStockLogger<Vector3Container>),
+            Vector3ContainerProcessLogger($crate::components::discrete::DiscreteProcessLogger<Vector3Container>),
 
             BasicEnvironmentLogger(BasicEnvironmentLogger),
             $(
@@ -1165,118 +1166,118 @@ macro_rules! define_model_enums {
             pub fn connect_logger(a: &mut $ComponentLogger, b: &mut $ComponentModel, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
                 use $crate::core::CustomLoggerConnection;
                 match (a, b, n) {
-                    ($ComponentLogger::VectorStockLoggerF64(a), $ComponentModel::VectorStockF64(b, bd), _) => {
+                    ($ComponentLogger::VectorStockLoggerF64(a), $ComponentModel::F64Stock(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::VectorProcessF64(b, bd), _) => {
+                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::F64Process(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::VectorSourceF64(b, bd), _) => {
+                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::F64Source(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::VectorSinkF64(b, bd), _) => {
+                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::F64Sink(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
                     // TODO: Add f64 combiners splitters
-                    ($ComponentLogger::VectorStockLoggerVector3(a), $ComponentModel::VectorStockVector3(b, bd), _) => {
+                    ($ComponentLogger::Vector3StockLogger(a), $ComponentModel::Vector3Stock(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorProcessVector3(b, bd), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Process(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSourceVector3(b, bd), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Source(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSinkVector3(b, bd), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Sink(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner1Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner1(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner2Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner2(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner3Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner3(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner4Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner4(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorCombiner5Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner5(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter1Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter1(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter2Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter2(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter3Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter3(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter4Vector3(b, bmb), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter4(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::VectorProcessLoggerVector3(a), $ComponentModel::VectorSplitter5Vector3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-
-                    ($ComponentLogger::DiscreteStockLoggerString(a), $ComponentModel::DiscreteStockString(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteProcessString(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteParallelProcessString(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteSourceString(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::DiscreteProcessLoggerString(a), $ComponentModel::DiscreteSinkString(b, bd), _) => {
+                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter5(b, bmb), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
 
-                    ($ComponentLogger::DiscreteStockLoggerVector3Container(a), $ComponentModel::DiscreteStockVector3Container(b, bd), _) => {
+                    ($ComponentLogger::StringStockLogger(a), $ComponentModel::StringStock(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteProcessVector3Container(b, bd), _) => {
+                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringProcess(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteParallelProcessVector3Container(b, bd), _) => {
+                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringParallelProcess(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteLoadProcessVector3Container(b, bd), _) => {
+                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringSource(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
-                    ($ComponentLogger::DiscreteProcessLoggerVector3Container(a), $ComponentModel::DiscreteUnloadProcessVector3Container(b, bd), _) => {
+                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringSink(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+
+                    ($ComponentLogger::Vector3ContainerStockLogger(a), $ComponentModel::Vector3ContainerStock(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerProcess(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerParallelProcess(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerLoadProcess(b, bd), _) => {
+                        b.log_emitter.connect_sink(&a.buffer);
+                        Ok(())
+                    },
+                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerUnloadProcess(b, bd), _) => {
                         b.log_emitter.connect_sink(&a.buffer);
                         Ok(())
                     },
@@ -1294,14 +1295,14 @@ macro_rules! define_model_enums {
                     $ComponentLogger::VectorStockLoggerF64(a) => { a.write_csv(dir.to_string()) },
                     $ComponentLogger::VectorProcessLoggerF64(a) => { a.write_csv(dir.to_string()) },
 
-                    $ComponentLogger::VectorStockLoggerVector3(a) => { a.write_csv(dir.to_string()) },
-                    $ComponentLogger::VectorProcessLoggerVector3(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::Vector3StockLogger(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::Vector3ProcessLogger(a) => { a.write_csv(dir.to_string()) },
 
-                    $ComponentLogger::DiscreteStockLoggerString(a) => { a.write_csv(dir.to_string()) },
-                    $ComponentLogger::DiscreteProcessLoggerString(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::StringStockLogger(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::StringProcessLogger(a) => { a.write_csv(dir.to_string()) },
 
-                    $ComponentLogger::DiscreteStockLoggerVector3Container(a) => { a.write_csv(dir.to_string()) },
-                    $ComponentLogger::DiscreteProcessLoggerVector3Container(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::Vector3ContainerStockLogger(a) => { a.write_csv(dir.to_string()) },
+                    $ComponentLogger::Vector3ContainerProcessLogger(a) => { a.write_csv(dir.to_string()) },
 
                     $ComponentLogger::BasicEnvironmentLogger(a) => { a.write_csv(dir.to_string()) },
 
@@ -1331,12 +1332,12 @@ macro_rules! define_model_enums {
                 let time = time.clone();
                 let source_event_id = $crate::prelude::EventId::from_scheduler();
                 match (self, addr) {
-                    ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::VectorStockF64(addr)) => {
+                    ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::F64Stock(addr)) => {
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity.clone(), addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, source_event_id, addr.clone())?;
                         Ok(())
                     },
-                    ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::VectorProcessF64(addr)) => {
+                    ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::F64Process(addr)) => {
                         let distr_instance = df.create(distr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::with_process_quantity_distr_inplace, distr_instance, addr.clone())?;
                         scheduler.schedule_event(time, $crate::components::vector::VectorProcess::<f64, f64, f64, f64>::update_state, source_event_id, addr.clone())?;
