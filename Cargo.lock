@@ -724,6 +724,7 @@ dependencies = [
  "indexmap",
  "nexosim",
  "paste",
+ "quokkasim_derive_macros",
  "rand",
  "rand_distr",
  "serde",
@@ -731,6 +732,15 @@ dependencies = [
  "strum",
  "strum_macros",
  "tai-time",
+]
+
+[[package]]
+name = "quokkasim_derive_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

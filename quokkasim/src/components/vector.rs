@@ -317,6 +317,7 @@ impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
  * Process
  */
 
+#[derive(WithMethods)]
 pub struct VectorProcess<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
@@ -534,62 +535,6 @@ where
         }
     }
 }
-
-impl<T: Clone + Send> VectorProcess<f64, T, T, T> {
-    pub fn with_name(self, name: String) -> Self {
-        VectorProcess {
-            element_name: name,
-            ..self
-        }
-    }
-
-    pub fn with_code(self, code: String) -> Self {
-        Self {
-            element_code: code,
-            ..self
-        }
-    }
-
-    pub fn with_type(self, element_type: String) -> Self {
-        Self {
-            element_type,
-            ..self
-        }
-    }
-
-    pub fn new() -> Self where T: Default {
-        Self::default()
-    }
-
-    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        Self {
-            process_quantity_distr,
-            ..self
-        }
-    }
-
-    pub fn with_process_quantity_distr_inplace(&mut self, process_quantity_distr: Distribution) {
-        self.process_quantity_distr = process_quantity_distr;
-    }
-
-    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        VectorProcess {
-            process_time_distr,
-            ..self
-        }
-    }
-
-    /// Adds a delay if provided, or attempts to remove it if `None`
-    pub fn with_delay(mut self, delay_mode_change: DelayModeChange) -> Self {
-        self.delay_modes.modify(delay_mode_change);
-        self
-    }
-
-    /// Adds a delay if provided, or attempts to remove it if `None`
-    pub fn with_delay_inplace(&mut self, delay_mode_change: DelayModeChange) {
-        self.delay_modes.modify(delay_mode_change);
-    }
-} 
 
 pub struct VectorProcessLogger<T> where T: Send {
     pub name: String,
