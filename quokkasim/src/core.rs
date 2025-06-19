@@ -458,6 +458,57 @@ pub trait CustomLoggerConnection {
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>>;
 }
 
+#[macro_export]
+macro_rules! register_component_arms {
+    ($component:ident, $sim_init:ident, $($variant:ident),* $(,)?) => {
+        match $component {
+            $(
+                ComponentModel::$variant(a, mb) => {
+                    let name = a.element_name.clone();
+                    let addr = mb.address();
+                    $sim_init = $sim_init.add_model(a, mb, name);
+                }
+            ),*
+            _ => {
+                panic!("Component type not implemented for registration");
+            }
+
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! get_address_arms {
+    ($component:ident, $($variant:ident),* $(,)?) => {
+        match $component {
+            $(
+                ComponentModel::$variant(_, mb) => ComponentModelAddress::$variant(mb.address()),
+            )*
+            _ => {
+                panic!("Component type not implemented for address retrieval");
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! connect_logger_arms {
+    (
+        $a:ident, $b:ident, $n:ident, $(
+            $logger_variant:ident => [ $($component_variant:ident),* $(,)? ]
+        ),* $(,)?
+    ) => {
+        match ($a, $b, $n) {
+            $($(
+                (ComponentLogger::$logger_variant(a), ComponentModel::$component_variant(b, _), _) => {
+                    b.log_emitter.connect_sink(&a.buffer);
+                    Ok(())
+                },
+            )*)*
+            ($a, $b, $n) => <ComponentLogger as CustomLoggerConnection>::connect_logger($a, $b, $n)
+        }
+    };
+}
 // Components and loggers enums must be defined together as logger enum connector method requires the components enum
 #[macro_export]
 macro_rules! define_model_enums {
@@ -527,16 +578,19 @@ macro_rules! define_model_enums {
             Vector3Splitter3($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>>),
             Vector3Splitter4($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>>),
             Vector3Splitter5($crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>>),
+            
             StringStock($crate::components::discrete::DiscreteStock<String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<String>>),
             StringProcess($crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
             StringParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             StringSource($crate::components::discrete::DiscreteSource<String, String, StringItemFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             StringSink($crate::components::discrete::DiscreteSink<(), Option<String>, String>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+            
             F64ContainerStock($crate::components::discrete::DiscreteStock<F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<F64Container>>),
             F64ContainerProcess($crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>>),
             F64ContainerParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>>),
             F64ContainerSource($crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>>),
             F64ContainerSink($crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>>),
+            
             Vector3ContainerStock($crate::components::discrete::DiscreteStock<Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<Vector3Container>>),
             Vector3ContainerProcess($crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
             Vector3ContainerParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
@@ -864,231 +918,35 @@ macro_rules! define_model_enums {
             }
 
             pub fn register_component(mut sim_init: $crate::nexosim::SimInit, component: Self) -> $crate::nexosim::SimInit {
-                
-                match component {
-                    $ComponentModel::F64Process(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::F64Stock(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::F64Source(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::F64Sink(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    // TODO: Add combiners and splitters for f64
-                    $ComponentModel::Vector3Stock(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Process(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Source(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Sink(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Combiner1(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Combiner2(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Combiner3(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Combiner4(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Combiner5(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Splitter1(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Splitter2(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Splitter3(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Splitter4(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3Splitter5(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::StringStock(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::StringProcess(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::StringParallelProcess(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::StringSource(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::StringSink(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerStock(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerProcess(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerParallelProcess(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerSource(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerSink(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerLoadProcess(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::Vector3ContainerUnloadProcess(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $ComponentModel::BasicEnvironment(a, mb) => {
-                        let name = a.element_name.clone();
-                        let addr = mb.address();
-                        sim_init = sim_init.add_model(a, mb, name);
-                    },
-                    $(
-                        $ComponentModel::$R(a, mb) => {
-                            let name = a.element_name.clone();
-                            let addr = mb.address();
-                            sim_init = sim_init.add_model(a, mb, name);
-                        }
-                    ),*
-                    _ => {
-                        panic!("Component type {} not implemented for registration", component);
-                    }
-                };
+                use $crate::register_component_arms;
+                register_component_arms!(component, sim_init,
+                    F64Process, F64Stock, F64Source, F64Sink,
+                    Vector3Stock, Vector3Process, Vector3Source, Vector3Sink,
+                    Vector3Combiner1, Vector3Combiner2, Vector3Combiner3, Vector3Combiner4, Vector3Combiner5,
+                    Vector3Splitter1, Vector3Splitter2, Vector3Splitter3, Vector3Splitter4, Vector3Splitter5,
+                    StringStock, StringProcess, StringParallelProcess, StringSource, StringSink,
+                    Vector3ContainerStock, Vector3ContainerProcess, Vector3ContainerParallelProcess,
+                    Vector3ContainerSource, Vector3ContainerSink, Vector3ContainerLoadProcess, Vector3ContainerUnloadProcess,
+                    BasicEnvironment,
+                    $($R),*
+                );
                 sim_init
             }
 
             pub fn get_address(&self) -> $ComponentModelAddress {
-                match self {
-                    $ComponentModel::F64Stock(_, mb) => $ComponentModelAddress::F64Stock(mb.address()),
-                    $ComponentModel::F64Process(_, mb) => $ComponentModelAddress::F64Process(mb.address()),
-                    $ComponentModel::F64Source(_, mb) => $ComponentModelAddress::F64Source(mb.address()),
-                    $ComponentModel::F64Sink(_, mb) => $ComponentModelAddress::F64Sink(mb.address()),
-                    $ComponentModel::F64Combiner1(_, mb) => $ComponentModelAddress::F64Combiner1(mb.address()),
-                    $ComponentModel::F64Combiner2(_, mb) => $ComponentModelAddress::F64Combiner2(mb.address()),
-                    $ComponentModel::F64Combiner3(_, mb) => $ComponentModelAddress::F64Combiner3(mb.address()),
-                    $ComponentModel::F64Combiner4(_, mb) => $ComponentModelAddress::F64Combiner4(mb.address()),
-                    $ComponentModel::F64Combiner5(_, mb) => $ComponentModelAddress::F64Combiner5(mb.address()),
-                    $ComponentModel::F64Splitter1(_, mb) => $ComponentModelAddress::F64Splitter1(mb.address()),
-                    $ComponentModel::F64Splitter2(_, mb) => $ComponentModelAddress::F64Splitter2(mb.address()),
-                    $ComponentModel::F64Splitter3(_, mb) => $ComponentModelAddress::F64Splitter3(mb.address()),
-                    $ComponentModel::F64Splitter4(_, mb) => $ComponentModelAddress::F64Splitter4(mb.address()),
-                    $ComponentModel::F64Splitter5(_, mb) => $ComponentModelAddress::F64Splitter5(mb.address()),
-                    $ComponentModel::Vector3Stock(_, mb) => $ComponentModelAddress::Vector3Stock(mb.address()),
-                    $ComponentModel::Vector3Process(_, mb) => $ComponentModelAddress::Vector3Process(mb.address()),
-                    $ComponentModel::Vector3Source(_, mb) => $ComponentModelAddress::Vector3Source(mb.address()),
-                    $ComponentModel::Vector3Sink(_, mb) => $ComponentModelAddress::Vector3Sink(mb.address()),
-                    $ComponentModel::Vector3Combiner1(_, mb) => $ComponentModelAddress::Vector3Combiner1(mb.address()),
-                    $ComponentModel::Vector3Combiner2(_, mb) => $ComponentModelAddress::Vector3Combiner2(mb.address()),
-                    $ComponentModel::Vector3Combiner3(_, mb) => $ComponentModelAddress::Vector3Combiner3(mb.address()),
-                    $ComponentModel::Vector3Combiner4(_, mb) => $ComponentModelAddress::Vector3Combiner4(mb.address()),
-                    $ComponentModel::Vector3Combiner5(_, mb) => $ComponentModelAddress::Vector3Combiner5(mb.address()),
-                    $ComponentModel::Vector3Splitter1(_, mb) => $ComponentModelAddress::Vector3Splitter1(mb.address()),
-                    $ComponentModel::Vector3Splitter2(_, mb) => $ComponentModelAddress::Vector3Splitter2(mb.address()),
-                    $ComponentModel::Vector3Splitter3(_, mb) => $ComponentModelAddress::Vector3Splitter3(mb.address()),
-                    $ComponentModel::Vector3Splitter4(_, mb) => $ComponentModelAddress::Vector3Splitter4(mb.address()),
-                    $ComponentModel::Vector3Splitter5(_, mb) => $ComponentModelAddress::Vector3Splitter5(mb.address()),
-                    $ComponentModel::StringStock(_, mb) => $ComponentModelAddress::StringStock(mb.address()),
-                    $ComponentModel::StringProcess(_, mb) => $ComponentModelAddress::StringProcess(mb.address()),
-                    $ComponentModel::StringParallelProcess(_, mb) => $ComponentModelAddress::StringParallelProcess(mb.address()),
-                    $ComponentModel::StringSource(_, mb) => $ComponentModelAddress::StringSource(mb.address()),
-                    $ComponentModel::StringSink(_, mb) => $ComponentModelAddress::StringSink(mb.address()),
+                use $crate::get_address_arms;
 
-                    $ComponentModel::Vector3ContainerLoadProcess(_, mb) => $ComponentModelAddress::Vector3ContainerLoadProcess(mb.address()),
-                    $ComponentModel::Vector3ContainerUnloadProcess(_, mb) => $ComponentModelAddress::Vector3ContainerUnloadProcess(mb.address()),
-                    $ComponentModel::Vector3ContainerStock(_, mb) => $ComponentModelAddress::Vector3ContainerStock(mb.address()),
-                    $ComponentModel::Vector3ContainerProcess(_, mb) => $ComponentModelAddress::Vector3ContainerProcess(mb.address()),
-                    $ComponentModel::Vector3ContainerParallelProcess(_, mb) => $ComponentModelAddress::Vector3ContainerParallelProcess(mb.address()),
-
-                    $ComponentModel::BasicEnvironment(_, mb) => $ComponentModelAddress::BasicEnvironment(mb.address()),
-                    $(
-                        $(#[$components_var_meta])*
-                        $ComponentModel::$R(_, mb) => {
-                            $ComponentModelAddress::$R(mb.address())
-                        }
-                    ),*
-                    x => {
-                        panic!("Component type {} not implemented for address retrieval", x);
-                    }
-                }
+                get_address_arms!(self,
+                    F64Stock, F64Process, F64Source, F64Sink,
+                    Vector3Stock, Vector3Process, Vector3Source, Vector3Sink,
+                    Vector3Combiner1, Vector3Combiner2, Vector3Combiner3, Vector3Combiner4, Vector3Combiner5,
+                    Vector3Splitter1, Vector3Splitter2, Vector3Splitter3, Vector3Splitter4, Vector3Splitter5,
+                    StringStock, StringProcess, StringParallelProcess, StringSource, StringSink,
+                    Vector3ContainerStock, Vector3ContainerProcess, Vector3ContainerParallelProcess,
+                    Vector3ContainerSource, Vector3ContainerSink, Vector3ContainerLoadProcess, Vector3ContainerUnloadProcess,
+                    BasicEnvironment,
+                    $($R),*
+                )
             }
         }
 
@@ -1133,6 +991,8 @@ macro_rules! define_model_enums {
             Vector3ContainerStock($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<Vector3Container>>),
             Vector3ContainerProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
             Vector3ContainerParallelProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
+            Vector3ContainerSource($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<Vector3Container, Vector3Container, Vector3ContainerFactory>>),
+            Vector3ContainerSink($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>>),
 
             BasicEnvironment($crate::nexosim::Address<BasicEnvironment>),
             $(
@@ -1165,129 +1025,30 @@ macro_rules! define_model_enums {
         impl $ComponentLogger {
             pub fn connect_logger(a: &mut $ComponentLogger, b: &mut $ComponentModel, n: Option<usize>) -> Result<(), Box<dyn ::std::error::Error>> {
                 use $crate::core::CustomLoggerConnection;
-                match (a, b, n) {
-                    ($ComponentLogger::VectorStockLoggerF64(a), $ComponentModel::F64Stock(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::F64Process(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::F64Source(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::VectorProcessLoggerF64(a), $ComponentModel::F64Sink(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    // TODO: Add f64 combiners splitters
-                    ($ComponentLogger::Vector3StockLogger(a), $ComponentModel::Vector3Stock(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Process(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Source(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Sink(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner1(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner2(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner4(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Combiner5(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter1(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter2(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter3(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter4(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ProcessLogger(a), $ComponentModel::Vector3Splitter5(b, bmb), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
+                use $crate::connect_logger_arms;
 
-                    ($ComponentLogger::StringStockLogger(a), $ComponentModel::StringStock(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringProcess(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringParallelProcess(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringSource(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::StringProcessLogger(a), $ComponentModel::StringSink(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-
-                    ($ComponentLogger::Vector3ContainerStockLogger(a), $ComponentModel::Vector3ContainerStock(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerProcess(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerParallelProcess(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerLoadProcess(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    ($ComponentLogger::Vector3ContainerProcessLogger(a), $ComponentModel::Vector3ContainerUnloadProcess(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-
-                    ($ComponentLogger::BasicEnvironmentLogger(a), $ComponentModel::BasicEnvironment(b, bd), _) => {
-                        b.log_emitter.connect_sink(&a.buffer);
-                        Ok(())
-                    },
-                    (a,b,n) => <$ComponentLogger as CustomLoggerConnection>::connect_logger(a, b, n)
-                }
+                connect_logger_arms!(a, b, n,
+                    VectorStockLoggerF64 => [F64Stock],
+                    VectorProcessLoggerF64 => [F64Process, F64Source, F64Sink],
+                    
+                    Vector3StockLogger => [Vector3Stock],
+                    Vector3ProcessLogger => [
+                        Vector3Process, Vector3Source, Vector3Sink,
+                        Vector3Combiner1, Vector3Combiner2, Vector3Combiner3, Vector3Combiner4, Vector3Combiner5,
+                        Vector3Splitter1, Vector3Splitter2, Vector3Splitter3, Vector3Splitter4, Vector3Splitter5
+                    ],
+                    
+                    StringStockLogger => [StringStock],
+                    StringProcessLogger => [StringProcess, StringParallelProcess, StringSource, StringSink],
+                    
+                    Vector3ContainerStockLogger => [Vector3ContainerStock],
+                    Vector3ContainerProcessLogger => [
+                        Vector3ContainerProcess, Vector3ContainerParallelProcess, 
+                        Vector3ContainerLoadProcess, Vector3ContainerUnloadProcess
+                    ],
+                    
+                    BasicEnvironmentLogger => [BasicEnvironment],
+                )
             }
 
             pub fn write_csv(mut self, dir: &str) -> Result<(), Box<dyn Error>> {
