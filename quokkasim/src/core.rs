@@ -162,28 +162,7 @@ pub trait Stock<
     fn add_impl(&mut self, payload: &mut (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + ;
 
     fn post_add(&mut self, payload: &mut (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
-        async move {
-            // let mut source_event_id = payload.1.clone();
-            // let current_state = self.get_state();
-            // let previous_state: &Option<Self::StockState> = self.get_previous_state();
-            // match previous_state {
-            //     None => {},
-            //     Some(ps) => {
-            //         let ps = ps.clone();
-            //         source_event_id = self.log(cx.time(), source_event_id.clone(), "StockAdd").await;
-            //         if !ps.is_same_state(&current_state) {
-            //             source_event_id = self.log(cx.time(), source_event_id.clone(), "StateChange").await;
-            //             // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
-            //             cx.schedule_event(
-            //                 cx.time() + ::std::time::Duration::from_nanos(1),
-            //                 Self::emit_change,
-            //                 source_event_id,
-            //             ).unwrap();
-            //         } else {
-            //         }
-            //     }
-            // }
-        }
+        async move {}
     }
 
     fn emit_change(&mut self, payload: EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send;
@@ -205,27 +184,7 @@ pub trait Stock<
     fn remove_impl(&mut self, payload: &mut (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = SendType>;
 
     fn post_remove(&mut self, payload: &mut (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
-        async move {
-            // let mut event_id: EventId = payload.1.clone();
-            // let current_state = self.get_state();
-            // let previous_state: &Option<Self::StockState> = self.get_previous_state();
-            // match previous_state {
-            //     None => {},
-            //     Some(ps) => {
-            //         let ps = ps.clone();
-            //         if !ps.is_same_state(&current_state) {
-            //             event_id = self.log(cx.time(), event_id, ps).await;
-            //             // State change emission is scheduled 1ns in future to avoid infinite state change loops with processes
-            //             cx.schedule_event(
-            //                 cx.time() + ::std::time::Duration::from_nanos(1),
-            //                 Self::emit_change,
-            //                 event_id,
-            //             ).unwrap();
-            //         } else {
-            //         }
-            //     }
-            // }
-        }
+        async move {}
     }
 
     fn remove(&mut self, mut payload: (SendParameterType, EventId), cx: &mut Context<Self>) -> impl Future<Output = SendType> + where SendParameterType: 'static {
@@ -590,7 +549,9 @@ macro_rules! define_model_enums {
             F64ContainerParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>>),
             F64ContainerSource($crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>>),
             F64ContainerSink($crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>>),
-            
+            F64ContainerLoadProcess($crate::components::vector_container::ContainerLoadingProcess<F64Container, f64>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerLoadingProcess<F64Container, f64>>),
+            F64ContainerUnloadProcess($crate::components::vector_container::ContainerUnloadingProcess<F64Container, f64>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerUnloadingProcess<F64Container, f64>>),
+
             Vector3ContainerStock($crate::components::discrete::DiscreteStock<Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteStock<Vector3Container>>),
             Vector3ContainerProcess($crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
             Vector3ContainerParallelProcess($crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteParallelProcess<(), Option<Vector3Container>, Vector3Container, Vector3Container>>),
@@ -598,6 +559,7 @@ macro_rules! define_model_enums {
             Vector3ContainerSink($crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>, $crate::nexosim::Mailbox<$crate::components::discrete::DiscreteSink<(), Option<Vector3Container>, Vector3Container>>),
             Vector3ContainerLoadProcess($crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
             Vector3ContainerUnloadProcess($crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>, $crate::nexosim::Mailbox<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
+            
             BasicEnvironment(BasicEnvironment, $crate::nexosim::Mailbox<BasicEnvironment>),
             $(
                 $(#[$components_var_meta])*
@@ -966,6 +928,7 @@ macro_rules! define_model_enums {
             F64Splitter3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>>),
             F64Splitter4($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 4>>),
             F64Splitter5($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 5>>),
+            
             Vector3Stock($crate::nexosim::Address<$crate::components::vector::VectorStock<Vector3>>),
             Vector3Process($crate::nexosim::Address<$crate::components::vector::VectorProcess<f64, Vector3, Vector3, Vector3>>),
             Vector3Source($crate::nexosim::Address<$crate::components::vector::VectorSource<Vector3, Vector3>>),
@@ -980,11 +943,20 @@ macro_rules! define_model_enums {
             Vector3Splitter3($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 3>>),
             Vector3Splitter4($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 4>>),
             Vector3Splitter5($crate::nexosim::Address<$crate::components::vector::VectorSplitter<f64, Vector3, Vector3, Vector3, 5>>),
+            
             StringStock($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<String>>),
             StringProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<String>, String, String>>),
             StringParallelProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<String>, String, String>>),
             StringSource($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<String, String, StringItemFactory>>),
             StringSink($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<String>, String>>),
+
+            F64ContainerLoadProcess($crate::nexosim::Address<$crate::components::vector_container::ContainerLoadingProcess<F64Container, f64>>),
+            F64ContainerUnloadProcess($crate::nexosim::Address<$crate::components::vector_container::ContainerUnloadingProcess<F64Container, f64>>),
+            F64ContainerStock($crate::nexosim::Address<$crate::components::discrete::DiscreteStock<F64Container>>),
+            F64ContainerProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteProcess<(), Option<F64Container>, F64Container, F64Container>>),
+            F64ContainerParallelProcess($crate::nexosim::Address<$crate::components::discrete::DiscreteParallelProcess<(), Option<F64Container>, F64Container, F64Container>>),
+            F64ContainerSource($crate::nexosim::Address<$crate::components::discrete::DiscreteSource<F64Container, F64Container, F64ContainerFactory>>),
+            F64ContainerSink($crate::nexosim::Address<$crate::components::discrete::DiscreteSink<(), Option<F64Container>, F64Container>>),
 
             Vector3ContainerLoadProcess($crate::nexosim::Address<$crate::components::vector_container::ContainerLoadingProcess<Vector3Container, Vector3>>),
             Vector3ContainerUnloadProcess($crate::nexosim::Address<$crate::components::vector_container::ContainerUnloadingProcess<Vector3Container, Vector3>>),
@@ -1011,6 +983,9 @@ macro_rules! define_model_enums {
 
             StringStockLogger($crate::components::discrete::DiscreteStockLogger<String>),
             StringProcessLogger($crate::components::discrete::DiscreteProcessLogger<String>),
+
+            F64ContainerStockLogger($crate::components::discrete::DiscreteStockLogger<F64Container>),
+            F64ContainerProcessLogger($crate::components::discrete::DiscreteProcessLogger<F64Container>),
 
             Vector3ContainerStockLogger($crate::components::discrete::DiscreteStockLogger<Vector3Container>),
             Vector3ContainerProcessLogger($crate::components::discrete::DiscreteProcessLogger<Vector3Container>),
@@ -1041,6 +1016,12 @@ macro_rules! define_model_enums {
                     StringStockLogger => [StringStock],
                     StringProcessLogger => [StringProcess, StringParallelProcess, StringSource, StringSink],
                     
+                    F64ContainerStockLogger => [F64ContainerStock],
+                    F64ContainerProcessLogger => [
+                        F64ContainerProcess, F64ContainerParallelProcess, 
+                        F64ContainerLoadProcess, F64ContainerUnloadProcess
+                    ],
+
                     Vector3ContainerStockLogger => [Vector3ContainerStock],
                     Vector3ContainerProcessLogger => [
                         Vector3ContainerProcess, Vector3ContainerParallelProcess, 
