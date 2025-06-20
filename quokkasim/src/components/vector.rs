@@ -271,22 +271,33 @@ pub struct VectorProcess<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
 > {
+    // Descriptive fields
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+    
+    // Communication
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), VectorStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub push_downstream: Output<(SendType, EventId)>,
+    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
+
+    // States
     pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+    
+    // Parameters
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub delay_modes: DelayModes,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 impl<
     ReceiveParameterType: Clone + Send,
@@ -299,17 +310,21 @@ impl<
             element_name: String::new(),
             element_code: String::new(),
             element_type: String::new(),
+
+            req_upstream: Requestor::default(),
+            req_downstream: Requestor::default(),
+            req_environment: Requestor::default(),
+            withdraw_upstream: Requestor::default(),
+            push_downstream: Output::default(),
+            log_emitter: Output::default(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             delay_modes: DelayModes::default(),
 
-            req_upstream: Requestor::default(),
-            req_downstream: Requestor::default(),
-            withdraw_upstream: Requestor::default(),
-            push_downstream: Output::default(),
-            log_emitter: Output::default(),
-            
-            process_state: None,
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,

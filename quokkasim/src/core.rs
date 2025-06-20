@@ -594,7 +594,11 @@ macro_rules! define_model_enums {
                         a.push_downstream.connect($crate::components::vector::VectorStock::add, bd.address());
                         Ok(())
                     },
-
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Process(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorProcess::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    }
                     // F64Source
                     ($ComponentModel::F64Source(a, am), $ComponentModel::F64Stock(b, bm), _) => {
                         b.state_emitter.connect($crate::components::vector::VectorSource::update_state, am.address());
