@@ -152,8 +152,8 @@ pub struct ContainerLoadingProcess<
     pub processes_complete: VecDeque<ContainerType>,
 
     pub max_process_count: usize,
-    pub process_time_distr: Option<Distribution>,
-    pub process_quantity_distr: Option<Distribution>,
+    pub process_time_distr: Distribution,
+    pub process_quantity_distr: Distribution,
 
     pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
     time_to_next_event: Option<Duration>,
@@ -186,8 +186,8 @@ impl<
             processes_in_progress: Vec::new(),
             processes_complete: VecDeque::new(),
 
-            process_time_distr: None,
-            process_quantity_distr: None,
+            process_time_distr: Default::default(),
+            process_quantity_distr: Default::default(),
 
             log_emitter: Output::default(),
             time_to_next_event: None,
@@ -297,13 +297,9 @@ impl<
                                 *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::WithdrawRequest).await;
                                 let container = self.withdraw_us_containers.send(((), source_event_id.clone())).await.next().unwrap();
                                 if let Some(mut item) = container {
-                                    let quantity = self.process_quantity_distr.as_mut().unwrap_or_else(|| {
-                                        panic!("Process quantity distribution not set for process {}", self.element_name);
-                                    }).sample();
+                                    let quantity = self.process_quantity_distr.sample();
                                     let resource = self.withdraw_us_resource.send((quantity, source_event_id.clone())).await.next().unwrap();
-                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                        panic!("Process time distribution not set for process {}", self.element_name);
-                                    }).sample());
+                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.sample());
                                     item.add(resource);
                                     self.processes_in_progress.push((process_duration, item.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: item }).await;
@@ -411,7 +407,7 @@ pub struct ContainerUnloadingProcess<
     pub processes_complete: VecDeque<ContainerType>,
 
     pub max_process_count: usize,
-    pub process_time_distr: Option<Distribution>,
+    pub process_time_distr: Distribution,
 
     pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
     time_to_next_event: Option<Duration>,
@@ -445,7 +441,7 @@ impl<
             processes_in_progress: Vec::new(),
             processes_complete: VecDeque::new(),
 
-            process_time_distr: None,
+            process_time_distr: Default::default(),
 
             log_emitter: Output::default(),
             time_to_next_event: None,
@@ -562,9 +558,7 @@ impl<
                                 *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::WithdrawRequest).await;
                                 let container = self.withdraw_upstream.send(((), source_event_id.clone())).await.next().unwrap();
                                 if let Some(item) = container {
-                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                        panic!("Process time distribution not set for process {}", self.element_name);
-                                    }).sample());
+                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.sample());
                                     self.processes_in_progress.push((process_duration, item.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: item }).await;
                                 } else {
