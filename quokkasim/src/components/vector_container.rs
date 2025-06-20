@@ -270,7 +270,6 @@ impl<
     
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
-            // First resolve any completed processes
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
@@ -279,6 +278,7 @@ impl<
                 None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
             };
 
+            // First resolve any completed processes
             match &self.env_state {
                 BasicEnvironmentState::Normal => {
                     self.processes_in_progress.retain_mut(|(process_time_left, item)| {
@@ -290,28 +290,29 @@ impl<
                             true
                         }
                     });
+
+                    while let Some(item) = self.processes_complete.pop_front() {
+                        let ds_state = self.req_downstream.send(()).await.next();
+                        match &ds_state {
+                            Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
+                                self.push_downstream.send((item.clone(), source_event_id.clone())).await;
+                            },
+                            Some(DiscreteStockState::Full { .. }) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is full" }).await;
+                                break;
+                            },
+                            None => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
+                                break;
+                            }
+                        }
+                    }
                 },
                 BasicEnvironmentState::Stopped => {}
             }
 
-            while let Some(item) = self.processes_complete.pop_front() {
-                let ds_state = self.req_downstream.send(()).await.next();
-                match &ds_state {
-                    Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
-                        self.push_downstream.send((item.clone(), source_event_id.clone())).await;
-                    },
-                    Some(DiscreteStockState::Full { .. }) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is full" }).await;
-                        break;
-                    },
-                    None => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
-                        break;
-                    }
-                }
-            }
-
+            // Resolve new environment state
             match (&self.env_state, &new_env_state) {
                 (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
@@ -531,7 +532,6 @@ impl<
     
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
-            // First resolve any completed processes
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
@@ -539,6 +539,8 @@ impl<
                 Some(x) => x,
                 None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
             };
+
+            // First resolve any completed processes
 
             match &self.env_state {
                 BasicEnvironmentState::Normal => {
@@ -551,51 +553,52 @@ impl<
                             true
                         }
                     });
+
+                    while let Some(mut item) = self.processes_complete.pop_front() {
+                        let ds_containers_state = self.req_ds_containers.send(()).await.next();
+                        let ds_resource_state = self.req_ds_resource.send(()).await.next();
+                        match (&ds_containers_state, &ds_resource_state) {
+                            (Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }), Some(VectorStockState::Empty { .. } | VectorStockState::Normal { .. }) ) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
+                                
+                                let proportion = self.process_quantity_ratio_distr.sample();
+                                match item.take_resource() {
+                                    Some(mut resource) => {
+                                        if proportion >= 1. {
+                                            let moved_resource = item.remove_all();
+                                            self.push_ds_resource.send((moved_resource, source_event_id.clone())).await;
+                                        } else {
+                                            let quantity = resource.total() * proportion;
+                                            let moved_resource = resource.remove(quantity);
+                                            item.set_resource(Some(resource));
+                                            self.push_ds_resource.send((moved_resource, source_event_id.clone())).await;
+                                        }
+                                    },
+                                    None => {
+                                        // No resource to remove, just send the empty container
+                                    }
+                                }
+                                self.push_ds_containers.send((item, source_event_id.clone())).await;
+                            },
+                            (Some(DiscreteStockState::Full { .. }), _) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream container stock is full" }).await;
+                                break;
+                            },
+                            (_, Some(VectorStockState::Full { .. })) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream resource stock is full" }).await;
+                                break;
+                            },
+                            (_, _) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
+                                break;
+                            }
+                        }
+                    }
                 },
                 BasicEnvironmentState::Stopped => {}
             }
 
-            while let Some(mut item) = self.processes_complete.pop_front() {
-                let ds_containers_state = self.req_ds_containers.send(()).await.next();
-                let ds_resource_state = self.req_ds_resource.send(()).await.next();
-                match (&ds_containers_state, &ds_resource_state) {
-                    (Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }), Some(VectorStockState::Empty { .. } | VectorStockState::Normal { .. }) ) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
-                        
-                        let proportion = self.process_quantity_ratio_distr.sample();
-                        match item.take_resource() {
-                            Some(mut resource) => {
-                                if proportion >= 1. {
-                                    let moved_resource = item.remove_all();
-                                    self.push_ds_resource.send((moved_resource, source_event_id.clone())).await;
-                                } else {
-                                    let quantity = resource.total() * proportion;
-                                    let moved_resource = resource.remove(quantity);
-                                    item.set_resource(Some(resource));
-                                    self.push_ds_resource.send((moved_resource, source_event_id.clone())).await;
-                                }
-                            },
-                            None => {
-                                // No resource to remove, just send the empty container
-                            }
-                        }
-                        self.push_ds_containers.send((item, source_event_id.clone())).await;
-                    },
-                    (Some(DiscreteStockState::Full { .. }), _) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream container stock is full" }).await;
-                        break;
-                    },
-                    (_, Some(VectorStockState::Full { .. })) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream resource stock is full" }).await;
-                        break;
-                    },
-                    (_, _) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
-                        break;
-                    }
-                }
-            }
-
+            // Resolve new environment state
             match (&self.env_state, &new_env_state) {
                 (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
@@ -609,7 +612,6 @@ impl<
             }
 
             // Then check for any processes to start
-
             match &self.env_state {
                 BasicEnvironmentState::Stopped => {
                     self.time_to_next_event = None;
