@@ -46,7 +46,7 @@ fn main() {
             .with_name("Stock 1".into())
             .with_low_capacity(10.)
             .with_max_capacity(100.)
-            .with_initial_vector([ 99., 0., 0. ].into()),
+            .with_initial_resource([ 99., 0., 0. ].into()),
         Mailbox::new()
     );
     let mut process = ComponentModel::Vector3Process(
@@ -54,12 +54,12 @@ fn main() {
             .with_name("Process".into())
             .with_process_quantity_distr(Distribution::Constant(1.))
             .with_process_time_distr(Distribution::Constant(1.))
-            .with_delay(DelayModeChange::Add(DelayMode {
+            .with_delay_mode(DelayModeChange::Add(DelayMode {
                 name: "ShortDelay".into(), 
                 until_delay_distr: df.create(DistributionConfig::Uniform { min: 5., max: 10. }).unwrap(),
                 until_fix_distr: Distribution::Constant(1.),
             }))
-            .with_delay(DelayModeChange::Add(DelayMode {
+            .with_delay_mode(DelayModeChange::Add(DelayMode {
                 name: "LongDelay".into(), 
                 until_delay_distr: df.create(DistributionConfig::Uniform { min: 40., max: 60. }).unwrap(),
                 until_fix_distr: Distribution::Constant(5.),
@@ -71,7 +71,7 @@ fn main() {
             .with_name("Stock 2".into())
             .with_low_capacity(10.)
             .with_max_capacity(100.)
-            .with_initial_vector([0., 0., 0.].into()),
+            .with_initial_resource([0., 0., 0.].into()),
         Mailbox::new()
     );
 

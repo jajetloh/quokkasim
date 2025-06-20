@@ -35,6 +35,7 @@ impl StateEq for DiscreteStockState {
     }
 }
 
+#[derive(WithMethods)]
 pub struct DiscreteStock<T> where T: Clone + Default + Send + 'static {
     pub element_name: String,
     pub element_code: String,
@@ -69,6 +70,18 @@ impl<T: Clone + Default + Send + 'static> Default for DiscreteStock<T> {
 pub struct ItemDeque<T>(VecDeque<T>);
 impl<T> Deref for ItemDeque<T>    { type Target = VecDeque<T>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl<T> DerefMut for ItemDeque<T> { fn deref_mut(&mut self) -> &mut VecDeque<T> { &mut self.0 } }
+
+impl<T, const N: usize> From<[T; N]> for ItemDeque<T> {
+    fn from(arr: [T; N]) -> Self {
+        ItemDeque(VecDeque::from(arr))
+    }
+}
+
+impl<T> From<Vec<T>> for ItemDeque<T> {
+    fn from(vec: Vec<T>) -> Self {
+        ItemDeque(VecDeque::from(vec))
+    }
+}
 
 impl<T: Default> Default for ItemDeque<T> {
     fn default() -> Self {
@@ -227,39 +240,6 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
 
 impl<T: Clone + Default + Send> Model for DiscreteStock<T> {}
 
-impl<T: Clone + Default + Send> DiscreteStock<T> {
-    pub fn new() -> Self {
-        DiscreteStock::default()
-    }
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-    pub fn with_type(mut self, type_: String) -> Self {
-        self.element_type = type_;
-        self
-    }
-
-    pub fn with_initial_contents(mut self, contents: Vec<T>) -> Self {
-        self.resource = ItemDeque(contents.into_iter().collect());
-        self
-    }
-
-    pub fn with_low_capacity(mut self, low_capacity: u32) -> Self {
-        self.low_capacity = low_capacity;
-        self
-    }
-
-    pub fn with_max_capacity(mut self, max_capacity: u32) -> Self {
-        self.max_capacity = max_capacity;
-        self
-    }
-}
-
 pub struct DiscreteStockLogger<T> where T: Send {
     pub name: String,
     pub buffer: EventQueue<DiscreteStockLog<T>>,
@@ -324,6 +304,7 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
     }
 }
 
+#[derive(WithMethods)]
 pub struct DiscreteProcess<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
@@ -340,8 +321,8 @@ pub struct DiscreteProcess<
     pub push_downstream: Output<(SendType, EventId)>,
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub env_state: BasicEnvironmentState,
-    pub process_time_distr: Option<Distribution>,
-    pub process_quantity_distr: Option<Distribution>,
+    pub process_time_distr: Distribution,
+    pub process_quantity_distr: Distribution,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
@@ -361,8 +342,8 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
             push_downstream: Output::new(),
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
-            process_time_distr: None,
-            process_quantity_distr: None,
+            process_time_distr: Default::default(),
+            process_quantity_distr: Default::default(),
             log_emitter: Output::new(),
             time_to_next_event: None,
             scheduled_event: None,
@@ -371,35 +352,6 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
         }
     }
 }
-
-impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
-> DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
-    pub fn new() -> Self {
-        DiscreteProcess::default()
-    }
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-    pub fn with_type(mut self, type_: String) -> Self {
-        self.element_type = type_;
-        self
-    }
-
-    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
-        self.process_time_distr = Some(distr);
-        self
-    }
-}
-
 
 impl<
     ReceiveParameterType: Clone + Send + 'static,
@@ -474,9 +426,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                             let received = self.withdraw_upstream.send(((), source_event_id.clone())).await.next().unwrap();
                             match received {
                                 Some(received_resource) => {
-                                    let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                        panic!("Process time distribution not set for process {}", self.element_name);
-                                    }).sample();
+                                    let process_duration_secs = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration_secs), received_resource.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: received_resource }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
@@ -665,6 +615,8 @@ impl ItemFactory<String> for StringItemFactory {
     }
 }
 
+
+#[derive(WithMethods)]
 pub struct DiscreteSource<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
@@ -679,8 +631,8 @@ pub struct DiscreteSource<
     pub push_downstream: Output<(SendType, EventId)>,
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub env_state: BasicEnvironmentState,
-    pub process_time_distr: Option<Distribution>,
-    pub process_quantity_distr: Option<Distribution>,
+    pub process_time_distr: Distribution,
+    pub process_quantity_distr: Distribution,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
@@ -705,8 +657,8 @@ impl<
             push_downstream: Output::new(),
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
-            process_time_distr: None,
-            process_quantity_distr: None,
+            process_time_distr: Default::default(),
+            process_quantity_distr: Default::default(),
             log_emitter: Output::new(),
             time_to_next_event: None,
             scheduled_event: None,
@@ -716,37 +668,6 @@ impl<
         }
     }
 }
-
-impl<
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
-    FactoryType: ItemFactory<InternalResourceType> + Default,
-> DiscreteSource<InternalResourceType, SendType, FactoryType> {
-    pub fn new() -> Self {
-        DiscreteSource::default()
-    }
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-    pub fn with_type(mut self, type_: String) -> Self {
-        self.element_type = type_;
-        self
-    }
-    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
-        self.process_time_distr = Some(distr);
-        self
-    }
-    pub fn with_item_factory(mut self, item_factory: FactoryType) -> Self {
-        self.item_factory = item_factory;
-        self
-    }
-}
-
 
 impl<
     InternalResourceType: Clone + Send + 'static,
@@ -815,9 +736,7 @@ impl<
                     let ds_state = self.req_downstream.send(()).await.next();
                     match &ds_state {
                         Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
-                            let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                panic!("Process time distribution not set for source {}", self.element_name);
-                            }).sample();
+                            let process_duration_secs = self.process_time_distr.sample();
 
                             let next_item = self.item_factory.create_item();
 
@@ -897,6 +816,7 @@ impl<
 
 }
 
+#[derive(WithMethods)]
 pub struct DiscreteSink<
     RequestParameterType: Clone + Send + 'static,
     RequestType: Clone + Send + 'static,
@@ -910,8 +830,8 @@ pub struct DiscreteSink<
     pub withdraw_upstream: Requestor<(RequestParameterType, EventId), RequestType>,
     pub process_state: Option<(Duration, InternalResourceType)>,
     pub env_state: BasicEnvironmentState,
-    pub process_time_distr: Option<Distribution>,
-    pub process_quantity_distr: Option<Distribution>,
+    pub process_time_distr: Distribution,
+    pub process_quantity_distr: Distribution,
     pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
@@ -934,40 +854,14 @@ impl<
             withdraw_upstream: Requestor::new(),
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
-            process_time_distr: None,
-            process_quantity_distr: None,
+            process_time_distr: Default::default(),
+            process_quantity_distr: Default::default(),
             log_emitter: Output::new(),
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
-    }
-}
-
-impl<
-    RequestParameterType: Clone + Send + 'static,
-    RequestType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static
-> DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {
-    pub fn new() -> Self {
-        DiscreteSink::default()
-    }
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-    pub fn with_type(mut self, type_: String) -> Self {
-        self.element_type = type_;
-        self
-    }
-    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
-        self.process_time_distr = Some(distr);
-        self
     }
 }
 
@@ -1038,9 +932,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                             let moved = self.withdraw_upstream.send(((), source_event_id.clone())).await.next().unwrap();
                             match moved {
                                 Some(moved) => {
-                                    let process_duration_secs = self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                        panic!("Process time distribution not set for sink {}", self.element_name);
-                                    }).sample();
+                                    let process_duration_secs = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: moved }).await;
                                     self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
@@ -1122,6 +1014,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     }
 }
 
+#[derive(WithMethods)]
 pub struct DiscreteParallelProcess<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
@@ -1139,8 +1032,8 @@ pub struct DiscreteParallelProcess<
     pub processes_in_progress: Vec<(Duration, InternalResourceType)>,
     pub env_state: BasicEnvironmentState,
     pub processes_complete: VecDeque<SendType>,
-    pub process_time_distr: Option<Distribution>,
-    pub process_quantity_distr: Option<Distribution>,
+    pub process_time_distr: Distribution,
+    pub process_quantity_distr: Distribution,
     pub log_emitter: Output<DiscreteProcessLog<SendType>>,
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
@@ -1167,42 +1060,14 @@ impl<
             processes_in_progress: Vec::new(),
             env_state: BasicEnvironmentState::Normal,
             processes_complete: VecDeque::new(),
-            process_time_distr: None,
-            process_quantity_distr: None,
+            process_time_distr: Default::default(),
+            process_quantity_distr: Default::default(),
             log_emitter: Output::new(),
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
         }
-    }
-}
-
-impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static
-> DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
-    pub fn new() -> Self {
-        DiscreteParallelProcess::default()
-    }
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-    pub fn with_type(mut self, type_: String) -> Self {
-        self.element_type = type_;
-        self
-    }
-
-    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
-        self.process_time_distr = Some(distr);
-        self
     }
 }
 
@@ -1294,9 +1159,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                                 *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::WithdrawRequest).await;
                                 let item = self.withdraw_upstream.send(((), source_event_id.clone())).await.next().unwrap();
                                 if let Some(item) = item {
-                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.as_mut().unwrap_or_else(|| {
-                                        panic!("Process time distribution not set for process {}", self.element_name);
-                                    }).sample());
+                                    let process_duration = Duration::from_secs_f64(self.process_time_distr.sample());
 
                                     self.processes_in_progress.push((process_duration, item.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: item }).await;

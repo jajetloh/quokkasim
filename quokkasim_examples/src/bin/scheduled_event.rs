@@ -37,7 +37,7 @@ fn main() {
             .with_name("Stock 1".into())
             .with_low_capacity(50.)
             .with_max_capacity(101.)
-            .with_initial_vector(100.),
+            .with_initial_resource(100.),
         Mailbox::new()
     );
     let stock_1_addr = stock_1.get_address();
@@ -46,7 +46,7 @@ fn main() {
             .with_name("Stock 2".into())
             .with_low_capacity(50.)
             .with_max_capacity(101.)
-            .with_initial_vector(0.),
+            .with_initial_resource(0.),
         Mailbox::new()
     );
     let mut process = ComponentModel::F64Process(

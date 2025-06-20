@@ -38,11 +38,12 @@ impl StateEq for VectorStockState {
     }
 }
 
+#[derive(WithMethods)]
 pub struct VectorStock<T: Clone + Send + 'static> {
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
-    pub vector: T,
+    pub resource: T,
     pub log_emitter: Output<VectorStockLog<T>>,
     pub state_emitter: Output<EventId>,
     pub low_capacity: f64,
@@ -57,7 +58,7 @@ impl<T: Clone + Default + Send> Default for VectorStock<T> {
             element_name: String::new(),
             element_code: String::new(),
             element_type: String::new(),
-            vector: Default::default(),
+            resource: Default::default(),
             low_capacity: 0.0,
             max_capacity: 0.0,
             log_emitter: Output::default(),
@@ -77,7 +78,7 @@ where
     type LogDetailsType = VectorStockLogType<T>;
 
     fn get_state(&mut self) -> Self::StockState {
-        let occupied = self.vector.total();
+        let occupied = self.resource.total();
         let empty = self.max_capacity - occupied;
         if empty <= 0.0 {
             VectorStockState::Full { occupied, empty }
@@ -95,7 +96,7 @@ where
         self.prev_state = Some(self.get_state());
     }
     fn get_resource(&self) -> &T {
-        &self.vector
+        &self.resource
     }
 
     fn add_impl(
@@ -105,7 +106,7 @@ where
     ) -> impl Future<Output=()> {
         async move {
             self.prev_state = Some(self.get_state().clone());
-            self.vector.add(payload.0.clone());
+            self.resource.add(payload.0.clone());
             payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Add { quantity: payload.0.total(), vector: payload.0.clone() }).await;
         }
     }
@@ -130,7 +131,7 @@ where
     ) -> impl Future<Output=T> {
         async move {
             self.prev_state = Some(self.get_state());
-            let result = self.vector.remove(payload.0);
+            let result = self.resource.remove(payload.0);
             payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Remove { quantity: payload.0, vector: result.clone() }).await;
             result
         }
@@ -184,7 +185,7 @@ where
     T: ResourceTotal<f64>
 {
     pub fn get_state(&mut self) -> VectorStockState {
-        let occupied = self.vector.total();
+        let occupied = self.resource.total();
         let empty = self.max_capacity - occupied;
         if empty <= 0.0 {
             VectorStockState::Full { occupied, empty }
@@ -192,56 +193,6 @@ where
             VectorStockState::Empty { occupied, empty }
         } else {
             VectorStockState::Normal { occupied, empty }
-        }
-    }
-
-    pub fn with_name(self, name: String) -> Self {
-        Self {
-            element_name: name,
-            ..self
-        }
-    }
-
-    pub fn with_code(self, code: String) -> Self {
-        Self {
-            element_code: code,
-            ..self
-        }
-    }
-
-    pub fn with_type(self, element_type: String) -> Self {
-        Self {
-            element_type,
-            ..self
-        }
-    }
-
-    pub fn new() -> Self where T: Default {
-        Self::default()
-    }
-
-    pub fn with_low_capacity(self, low_capacity: f64) -> Self {
-        Self {
-            low_capacity,
-            ..self
-        }
-    }
-
-    pub fn with_low_capacity_inplace(&mut self, low_capacity: f64) {
-        self.low_capacity = low_capacity;
-    }
-
-    pub fn with_max_capacity(self, max_capacity: f64) -> Self {
-        Self {
-            max_capacity,
-            ..self
-        }
-    }
-
-    pub fn with_initial_vector(self, vector: T) -> Self {
-        Self {
-            vector,
-            ..self
         }
     }
 }
@@ -289,10 +240,6 @@ impl<T: Serialize> Serialize for VectorStockLog<T> {
         state.serialize_field("log_type", &log_type)?;
         state.serialize_field("total", &total)?;
         state.serialize_field("vector", &vector_str)?;
-        // state.serialize_field("log_type", &self.message)?;
-        // state.serialize_field("state", &self.state.get_name())?;
-        // let vector_json = serde_json::to_string(&self.vector).map_err(serde::ser::Error::custom)?;
-        // state.serialize_field("vector", &vector_json)?;
         state.end()
     }
 }
@@ -702,7 +649,8 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
  * Combiner
  */
 
- pub struct VectorCombiner<
+#[derive(WithMethods)]
+pub struct VectorCombiner<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static,
@@ -750,16 +698,6 @@ impl<
     const M: usize
 > Default for VectorCombiner<U, T, [T; M], T, M> {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<
-    T: Clone + Send + 'static,
-    U: Clone + Send,
-    const M: usize
-> VectorCombiner<U, T, [T; M], T, M> {
-    pub fn new() -> Self {
         VectorCombiner {
             element_name: String::new(),
             element_code: String::new(),
@@ -778,34 +716,6 @@ impl<
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
             split_ratios: [1./(M as f64); M],
-        }
-    }
-
-    pub fn with_name(self, name: String) -> Self {
-        Self {
-            element_name: name,
-            ..self
-        }
-    }
-
-    pub fn with_code(self, code: String) -> Self {
-        Self {
-            element_code: code,
-            ..self
-        }
-    }
-
-    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        Self {
-            process_quantity_distr,
-            ..self
-        }
-    }
-
-    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        Self {
-            process_time_distr,
-            ..self
         }
     }
 }
@@ -990,7 +900,7 @@ where
 /**
  * Splitter
  */
-
+#[derive(WithMethods)]
 pub struct VectorSplitter<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
@@ -1015,40 +925,6 @@ pub struct VectorSplitter<
     pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
     pub previous_check_time: MonotonicTime,
     pub split_ratios: [f64; N],
-}
-
-impl<T: Send + 'static + Clone + Default, const N: usize> VectorSplitter<f64, T, T, T, N> where Self: Default {
-    pub fn new() -> Self {
-        Default::default()
-    }
-    
-    pub fn with_name(self, name: String) -> Self {
-        Self {
-            element_name: name,
-            ..self
-        }
-    }
-
-    pub fn with_code(self, code: String) -> Self {
-        Self {
-            element_code: code,
-            ..self
-        }
-    }
-
-    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        Self {
-            process_quantity_distr,
-            ..self
-        }
-    }
-
-    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        Self {
-            process_time_distr,
-            ..self
-        }
-    }
 }
 
 impl<
@@ -1273,6 +1149,7 @@ where
 /**
  * Source
  */
+#[derive(WithMethods)]
 pub struct VectorSource<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
@@ -1325,47 +1202,6 @@ impl<
             let source_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
             self.update_state(source_event_id, ctx).await;
             self.into()
-        }
-    }
-}
-
-impl<InternalResourceType: Send + 'static + Clone + Default, SendType: Send + 'static + Clone + Default> VectorSource<InternalResourceType, SendType> {
-    pub fn new() -> Self {
-        Default::default()
-    }
-    
-    pub fn with_name(self, name: String) -> Self {
-        Self {
-            element_name: name,
-            ..self
-        }
-    }
-
-    pub fn with_code(self, code: String) -> Self {
-        Self {
-            element_code: code,
-            ..self
-        }
-    }
-
-    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        Self {
-            process_quantity_distr,
-            ..self
-        }
-    }
-
-    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        Self {
-            process_time_distr,
-            ..self
-        }
-    }
-
-    pub fn with_source_vector(self, source_vector: InternalResourceType) -> Self {
-        Self {
-            source_vector,
-            ..self
         }
     }
 }
@@ -1518,6 +1354,7 @@ where
  * Sink
  */
 
+#[derive(WithMethods)]
 pub struct VectorSink<
     ReceiveParameterType: Clone + Send + 'static,
     ReceiveType: Clone + Send + 'static,
@@ -1574,44 +1411,6 @@ impl<
             next_event_index: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
-        }
-    }
-}
-
-impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-> VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> where Self: Default {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn with_name(self, name: String) -> Self {
-        Self {
-            element_name: name,
-            ..self
-        }
-    }
-
-    pub fn with_code(self, code: String) -> Self {
-        Self {
-            element_code: code,
-            ..self
-        }
-    }
-
-    pub fn with_process_quantity_distr(self, process_quantity_distr: Distribution) -> Self {
-        Self {
-            process_quantity_distr,
-            ..self
-        }
-    }
-
-    pub fn with_process_time_distr(self, process_time_distr: Distribution) -> Self {
-        Self {
-            process_time_distr,
-            ..self
         }
     }
 }

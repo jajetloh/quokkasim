@@ -336,7 +336,7 @@ fn main() {
             .with_name("MyStock1".into())
             .with_code("SP1".into())
             .with_type("IronOreStock".into())
-            .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
+            .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
             .with_low_capacity(10.)
             .with_max_capacity(100.),
         Mailbox::new(),
@@ -358,7 +358,7 @@ fn main() {
             .with_name("MyStock2".into())
             .with_code("SP2".into())
             .with_type("IronOreStock".into())
-            .with_initial_vector(IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 })
+            .with_initial_resource(IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 })
             .with_low_capacity(10.)
             .with_max_capacity(100.),
         Mailbox::new(),

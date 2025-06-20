@@ -29,14 +29,25 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                     "element_type" => {
                         methods.push(generate_simple_with_method("with_type", field_name, field_type));
                     },
+                    "resource" => {
+                        methods.push(quote! {
+                            pub fn with_initial_resource(mut self, resource: #field_type) -> Self {
+                                self.resource = resource;
+                                self
+                            }
+                        })
+                    },
+                    "source_vector" => {
+                        methods.push(generate_with_and_inplace_method("source_vector", field_name, field_type));
+                    },
                     "delay_modes" => {
                         methods.push(quote! {
-                            pub fn with_delay(mut self, delay_mode_change: DelayModeChange) -> Self {
+                            pub fn with_delay_mode(mut self, delay_mode_change: DelayModeChange) -> Self {
                                 self.delay_modes.modify(delay_mode_change);
                                 self
                             }
                             
-                            pub fn with_delay_inplace(&mut self, delay_mode_change: DelayModeChange) {
+                            pub fn with_delay_mode_inplace(&mut self, delay_mode_change: DelayModeChange) {
                                 self.delay_modes.modify(delay_mode_change);
                             }
                         });
@@ -45,7 +56,17 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                         methods.push(generate_with_and_inplace_method("process_quantity_distr", field_name, field_type));
                     },
                     "process_time_distr" => {
-                        methods.push(generate_simple_with_method("with_process_time_distr", field_name, field_type));
+                        // methods.push(generate_simple_with_method("with_process_time_distr", field_name, field_type));
+                        methods.push(generate_with_and_inplace_method("process_time_distr", field_name, field_type));
+                    },
+                    "low_capacity" => {
+                        methods.push(generate_with_and_inplace_method("low_capacity", field_name, field_type));
+                    },
+                    "max_capacity" => {
+                        methods.push(generate_with_and_inplace_method("max_capacity", field_name, field_type));
+                    },
+                    "item_factory" => {
+                        methods.push(generate_with_and_inplace_method("item_factory", field_name, field_type));
                     },
                     _ => {
                         // // Generate a generic with_fieldname method for any other field

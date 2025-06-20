@@ -149,7 +149,7 @@ fn main() {
         .with_name("source_sp".into())
         .with_code("ST-SP1".into())
         .with_type("IronOreStock".into())
-        .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
+        .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
         .with_low_capacity(10.)
         .with_max_capacity(100.),
         Mailbox::new(),
@@ -159,11 +159,9 @@ fn main() {
         .with_name("trucks_ready_to_load".into())
         .with_code("ST-TR0".into())
         .with_type("TruckStock".into())
-        .with_initial_contents(vec![
-            Truck { ore: None, truck_id: "Truck_01".into() },
-            Truck { ore: None, truck_id: "Truck_02".into() },
-            Truck { ore: None, truck_id: "Truck_03".into() },
-        ])
+        .with_initial_resource(ItemDeque::from(
+            (0..3).into_iter().map(|i| Truck { ore: None, truck_id: format!("Truck_{:02}", i) }).collect::<Vec<Truck>>()
+        ))
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),
@@ -182,7 +180,6 @@ fn main() {
         .with_name("trucks_loaded".into())
         .with_code("ST-TR1".into())
         .with_type("TruckStock".into())
-        .with_initial_contents(Vec::new())
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),
@@ -200,7 +197,6 @@ fn main() {
         .with_name("trucks_ready_to_dump".into())
         .with_code("ST-TR2".into())
         .with_type("TruckStock".into())
-        .with_initial_contents(Vec::new())
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),
@@ -210,7 +206,7 @@ fn main() {
         .with_name("destination_sp".into())
         .with_code("ST-SP2".into())
         .with_type("IronOreStock".into())
-        .with_initial_vector(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
+        .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
         .with_low_capacity(10.)
         .with_max_capacity(999_999_999.),
         Mailbox::new(),
@@ -229,7 +225,6 @@ fn main() {
         .with_name("trucks_dumped".into())
         .with_code("ST-TR3".into())
         .with_type("TruckStock".into())
-        .with_initial_contents(Vec::new())
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),

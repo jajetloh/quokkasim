@@ -120,19 +120,19 @@ impl CustomLoggerConnection for ComponentLogger {
     type ComponentType = ComponentModel;
     fn connect_logger(a: &mut Self, b: &mut Self::ComponentType, n: Option<usize>) -> Result<(), Box<dyn Error>> {
         match (a, b, n) {
-            (ComponentLogger::CarProcessLogger(a), ComponentModel::CarArrivals(b, b_mbox), _) => {
+            (ComponentLogger::CarProcessLogger(a), ComponentModel::CarArrivals(b, _), _) => {
                 b.log_emitter.connect_sink(&a.buffer);
                 Ok(())
             },
-            (ComponentLogger::CarProcessLogger(a), ComponentModel::FuelStation(b, b_mbox), _) => {
+            (ComponentLogger::CarProcessLogger(a), ComponentModel::FuelStation(b, _), _) => {
                 b.log_emitter.connect_sink(&a.buffer);
                 Ok(())
             },
-            (ComponentLogger::CarProcessLogger(a), ComponentModel::CarDepartures(b, b_mbox), _) => {
+            (ComponentLogger::CarProcessLogger(a), ComponentModel::CarDepartures(b, _), _) => {
                 b.log_emitter.connect_sink(&a.buffer);
                 Ok(())
             },
-            (ComponentLogger::CarStockLogger(a), ComponentModel::CarQueue(b, b_mbox), _) => {
+            (ComponentLogger::CarStockLogger(a), ComponentModel::CarQueue(b, _), _) => {
                 b.log_emitter.connect_sink(&a.buffer);
                 Ok(())
             },
@@ -176,15 +176,14 @@ fn main() {
             .with_name("Cars Waiting".into())
             .with_code("Q1".into())
             .with_low_capacity(0)
-            .with_max_capacity(10)
-            .with_initial_contents(Vec::new()),
+            .with_max_capacity(10),
         Mailbox::new()
     );
 
     let mut fs = FuelStation::new();
     fs.element_name = "Fuel Station".into();
     fs.element_code = "FS".into();
-    fs.process_time_distr = Some(Distribution::Constant(5.0));
+    fs.process_time_distr = Distribution::Constant(5.0);
     let mut fuel_station = ComponentModel::FuelStation(
         fs,
         Mailbox::new()
@@ -195,8 +194,7 @@ fn main() {
             .with_name("Cars Waiting".into())
             .with_code("Q2".into())
             .with_low_capacity(0)
-            .with_max_capacity(10)
-            .with_initial_contents(Vec::new()),
+            .with_max_capacity(10),
         Mailbox::new()
     );
 

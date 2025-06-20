@@ -44,7 +44,7 @@ fn main() {
             .with_name("Stock 1".into())
             .with_low_capacity(50.)
             .with_max_capacity(101.)
-            .with_initial_vector([0., 0., 0.].into()),
+            .with_initial_resource([0., 0., 0.].into()),
         Mailbox::new()
     );
     let mut process = ComponentModel::Vector3Process(
@@ -59,7 +59,7 @@ fn main() {
             .with_name("Stock 2".into())
             .with_low_capacity(50.)
             .with_max_capacity(101.)
-            .with_initial_vector([0., 0., 0.].into()),
+            .with_initial_resource([0., 0., 0.].into()),
         Mailbox::new()
     );
 

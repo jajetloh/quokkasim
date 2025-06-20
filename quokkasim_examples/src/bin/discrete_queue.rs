@@ -41,7 +41,7 @@ fn main() {
         .with_name("Queue1".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
-        .with_initial_contents(Vec::new()),
+        .with_initial_resource(ItemDeque::default()),
         Mailbox::new()
     );
 
@@ -55,7 +55,7 @@ fn main() {
         .with_name("Queue2".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
-        .with_initial_contents(Vec::new()),
+        .with_initial_resource(ItemDeque::default()),
         Mailbox::new()
     );
 
@@ -69,7 +69,7 @@ fn main() {
         .with_name("Queue3".into())
         .with_low_capacity(0)
         .with_max_capacity(10)
-        .with_initial_contents(Vec::new()),
+        .with_initial_resource(ItemDeque::default()),
         Mailbox::new()
     );
 
