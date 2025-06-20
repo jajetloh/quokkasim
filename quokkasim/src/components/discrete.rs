@@ -37,28 +37,41 @@ impl StateEq for DiscreteStockState {
 
 #[derive(WithMethods)]
 pub struct DiscreteStock<T> where T: Clone + Default + Send + 'static {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
-    pub resource: ItemDeque<T>,
+    
+    // Ports
     pub log_emitter: Output<DiscreteStockLog<T>>,
     pub state_emitter: Output<EventId>,
+
+    // configuration
     pub low_capacity: u32,
     pub max_capacity: u32,
-    pub prev_state: Option<DiscreteStockState>,
+    
+    // Runtime state
+    pub resource: ItemDeque<T>,
+
+    // Internals
+    prev_state: Option<DiscreteStockState>,
     next_event_index: u64,
 }
 impl<T: Clone + Default + Send + 'static> Default for DiscreteStock<T> {
     fn default() -> Self {
         DiscreteStock {
-            element_name: "DiscreteStock".to_string(),
-            element_code: "DiscreteStock".to_string(),
-            element_type: "DiscreteStock".to_string(),
-            resource: ItemDeque::default(),
+            element_name: "DiscreteStock".into(),
+            element_code: "".into(),
+            element_type: "DiscreteStock".into(),
+
             log_emitter: Output::new(),
             state_emitter: Output::new(),
+
             low_capacity: 0,
             max_capacity: 1,
+
+            resource: ItemDeque::default(),
+
             prev_state: None,
             next_event_index: 0,
         }
@@ -311,40 +324,53 @@ pub struct DiscreteProcess<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub push_downstream: Output<(SendType, EventId)>,
-    pub process_state: Option<(Duration, InternalResourceType)>,
-    pub env_state: BasicEnvironmentState,
+    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
+
+    // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
-    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
+
+    // Runtime state
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Default for DiscreteProcess<U, V, W, X> {
     fn default() -> Self {
         DiscreteProcess {
             element_name: "DiscreteProcess".to_string(),
-            element_code: "DiscreteProcess".to_string(),
+            element_code: "".to_string(),
             element_type: "DiscreteProcess".to_string(),
+
             req_upstream: Requestor::new(),
             req_environment: Requestor::new(),
             req_downstream: Requestor::new(),
             withdraw_upstream: Requestor::new(),
             push_downstream: Output::new(),
-            process_state: None,
-            env_state: BasicEnvironmentState::Normal,
+            log_emitter: Output::new(),
+
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
-            log_emitter: Output::new(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
@@ -622,23 +648,32 @@ pub struct DiscreteSource<
     SendType: Clone + Send + 'static,
     FactoryType: ItemFactory<InternalResourceType>,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub push_downstream: Output<(SendType, EventId)>,
-    pub process_state: Option<(Duration, InternalResourceType)>,
-    pub env_state: BasicEnvironmentState,
+    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
+    
+    // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
-    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
+    pub item_factory: FactoryType,
+    
+    // Runtime state
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub previous_check_time: MonotonicTime,
-    pub item_factory: FactoryType,
 }
 
 impl<
@@ -649,22 +684,26 @@ impl<
     fn default() -> Self {
         DiscreteSource {
             element_name: "DiscreteSource".to_string(),
-            element_code: "DiscreteSource".to_string(),
+            element_code: "".to_string(),
             element_type: "DiscreteSource".to_string(),
+
             req_upstream: Requestor::new(),
             req_environment: Requestor::new(),
             req_downstream: Requestor::new(),
             push_downstream: Output::new(),
-            process_state: None,
-            env_state: BasicEnvironmentState::Normal,
+            log_emitter: Output::new(),
+
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
-            log_emitter: Output::new(),
+            item_factory: FactoryType::default(),
+            
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,            
+            
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
-            item_factory: FactoryType::default(),
         }
     }
 }
@@ -822,17 +861,26 @@ pub struct DiscreteSink<
     RequestType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(RequestParameterType, EventId), RequestType>,
-    pub process_state: Option<(Duration, InternalResourceType)>,
-    pub env_state: BasicEnvironmentState,
+    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
+
+    // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
-    pub log_emitter: Output<DiscreteProcessLog<InternalResourceType>>,
+    
+    // Runtime state
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+    
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
@@ -847,7 +895,7 @@ impl<
     fn default() -> Self {
         DiscreteSink {
             element_name: "DiscreteSink".to_string(),
-            element_code: "DiscreteSink".to_string(),
+            element_code: "".to_string(),
             element_type: "DiscreteSink".to_string(),
             req_upstream: Requestor::new(),
             req_environment: Requestor::new(),
@@ -1021,20 +1069,29 @@ pub struct DiscreteParallelProcess<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub push_downstream: Output<(SendType, EventId)>,
+    pub log_emitter: Output<DiscreteProcessLog<SendType>>,
+
+    // Configuration
+    pub process_time_distr: Distribution,
+    pub process_quantity_distr: Distribution,
+
+    // Runtime state
     pub processes_in_progress: Vec<(Duration, InternalResourceType)>,
     pub env_state: BasicEnvironmentState,
     pub processes_complete: VecDeque<SendType>,
-    pub process_time_distr: Distribution,
-    pub process_quantity_distr: Distribution,
-    pub log_emitter: Output<DiscreteProcessLog<SendType>>,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
@@ -1050,19 +1107,23 @@ impl<
     fn default() -> Self {
         DiscreteParallelProcess {
             element_name: "DiscreteParallelProcess".to_string(),
-            element_code: "DiscreteParallelProcess".to_string(),
+            element_code: "".to_string(),
             element_type: "DiscreteParallelProcess".to_string(),
+            
             req_upstream: Requestor::new(),
             req_environment: Requestor::new(),
             req_downstream: Requestor::new(),
             withdraw_upstream: Requestor::new(),
             push_downstream: Output::new(),
+            log_emitter: Output::new(),
+            
+            process_time_distr: Default::default(),
+            process_quantity_distr: Default::default(),
+            
             processes_in_progress: Vec::new(),
             env_state: BasicEnvironmentState::Normal,
             processes_complete: VecDeque::new(),
-            process_time_distr: Default::default(),
-            process_quantity_distr: Default::default(),
-            log_emitter: Output::new(),
+            
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,

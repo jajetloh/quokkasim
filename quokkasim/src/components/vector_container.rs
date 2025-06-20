@@ -172,32 +172,37 @@ pub struct ContainerLoadingProcess<
     ContainerType: Clone + Send + 'static,
     ResourceType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_us_containers: Requestor<(), DiscreteStockState>,
     pub req_us_resource: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), DiscreteStockState>,
-
     pub req_environment: Requestor<(), BasicEnvironmentState>,
-    pub env_state: BasicEnvironmentState,
-
     pub withdraw_us_containers: Requestor<((), EventId), Option<ContainerType>>,
     pub withdraw_us_resource: Requestor<(f64, EventId), ResourceType>,
     pub push_downstream: Output<(ContainerType, EventId)>,
+    pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
 
-    processes_in_progress: Vec<(Duration, ContainerType)>,
-    pub processes_complete: VecDeque<ContainerType>,
-
+    // Configuration
     pub max_process_count: usize,
     pub process_time_distr: Distribution,
     pub process_capacity_ratio_distr: Distribution,
 
-    pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
+    // Runtime State
+    pub env_state: BasicEnvironmentState,
+    processes_in_progress: Vec<(Duration, ContainerType)>,
+    /// Proportion of the container capacity that is loaded
+    pub processes_complete: VecDeque<ContainerType>, 
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -209,27 +214,24 @@ impl<
             element_name: "ContainerLoadingProcess".to_string(),
             element_code: "CLP".to_string(),
             element_type: "ContainerLoadingProcess".to_string(),
+            
             req_us_containers: Requestor::default(),
             req_us_resource: Requestor::default(),
             req_downstream: Requestor::default(),
-
             req_environment: Requestor::default(),
-            env_state: BasicEnvironmentState::Normal,
-
             withdraw_us_containers: Requestor::default(),
             withdraw_us_resource: Requestor::default(),
             push_downstream: Output::default(),
+            log_emitter: Output::default(),
 
             max_process_count: 1,
-            processes_in_progress: Vec::new(),
-            processes_complete: VecDeque::new(),
-
             process_time_distr: Default::default(),
-
-            // Proportion of the container capacity that is loaded
             process_capacity_ratio_distr: Distribution::Constant(1.),
 
-            log_emitter: Output::default(),
+            processes_in_progress: Vec::new(),
+            processes_complete: VecDeque::new(),
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
@@ -431,31 +433,37 @@ pub struct ContainerUnloadingProcess<
     ContainerType: Clone + Send + 'static,
     ResourceType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), DiscreteStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
-    pub env_state: BasicEnvironmentState,
     pub req_ds_containers: Requestor<(), DiscreteStockState>,
     pub req_ds_resource: Requestor<(), VectorStockState>,
-
     pub withdraw_upstream: Requestor<((), EventId), Option<ContainerType>>,
     pub push_ds_containers: Output<(ContainerType, EventId)>,
     pub push_ds_resource: Output<(ResourceType, EventId)>,
-
-    processes_in_progress: Vec<(Duration, ContainerType)>,
-    pub processes_complete: VecDeque<ContainerType>,
-
+    pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
+    
+    // Configuration
     pub max_process_count: usize,
     pub process_time_distr: Distribution,
+    /// Proportion of the held amount to be unloaded
     pub process_quantity_ratio_distr: Distribution,
 
-    pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
+    // Runtime State
+    processes_in_progress: Vec<(Duration, ContainerType)>,
+    pub processes_complete: VecDeque<ContainerType>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -471,23 +479,20 @@ impl<
             req_upstream: Requestor::default(),
             req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
-
-            env_state: BasicEnvironmentState::Normal,
-
             req_ds_containers: Requestor::default(),
             req_ds_resource: Requestor::default(),
             push_ds_containers: Output::default(),
             push_ds_resource: Output::default(),
+            log_emitter: Output::default(),
 
             max_process_count: 1,
-            processes_in_progress: Vec::new(),
-            processes_complete: VecDeque::new(),
-
             process_time_distr: Default::default(),
-            // Proportion of the held amount to be unloaded
             process_quantity_ratio_distr: Distribution::Constant(1.),
 
-            log_emitter: Output::default(),
+            processes_in_progress: Vec::new(),
+            processes_complete: VecDeque::new(),
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
