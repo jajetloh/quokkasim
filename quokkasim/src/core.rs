@@ -37,6 +37,13 @@ impl ResourceRemoveAll<f64> for f64 {
     }
 }
 
+pub trait ResourceContainer<T, U> {
+    fn set_resource(&mut self, resource: Option<T>);
+    fn get_resource(&self) -> Option<T>;
+    fn take_resource(&mut self) -> Option<T>;
+    fn get_capacity(&self) -> U;
+}
+
 #[derive(Debug, Clone)]
 pub struct Vector3 {
     pub values: [f64; 3],

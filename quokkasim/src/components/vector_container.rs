@@ -31,6 +31,25 @@ impl ResourceRemoveAll<f64> for F64Container {
     }
 }
 
+impl ResourceContainer<f64, f64> for F64Container {
+
+    fn set_resource(&mut self, resource: Option<f64>) {
+        self.resource = resource;
+    }
+
+    fn get_resource(&self) -> Option<f64> {
+        self.resource
+    }
+
+    fn take_resource(&mut self) -> Option<f64> {
+        self.resource.take()
+    }
+
+    fn get_capacity(&self) -> f64 {
+        self.capacity
+    }
+}
+
 
 pub struct F64ContainerFactory {
     pub prefix: String,
@@ -81,6 +100,25 @@ impl ResourceAdd<Vector3> for Vector3Container {
         } else {
             self.resource = Some(arg);
         }
+    }
+}
+
+impl ResourceContainer<Vector3, f64> for Vector3Container {
+
+    fn set_resource(&mut self, resource: Option<Vector3>) {
+        self.resource = resource;
+    }
+    
+    fn get_resource(&self) -> Option<Vector3> {
+        self.resource.clone()
+    }
+
+    fn take_resource(&mut self) -> Option<Vector3> {
+        self.resource.take()
+    }
+
+    fn get_capacity(&self) -> f64 {
+        self.capacity
     }
 }
 
@@ -153,7 +191,7 @@ pub struct ContainerLoadingProcess<
 
     pub max_process_count: usize,
     pub process_time_distr: Distribution,
-    pub process_quantity_distr: Distribution,
+    pub process_capacity_ratio_distr: Distribution,
 
     pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
     time_to_next_event: Option<Duration>,
@@ -187,7 +225,9 @@ impl<
             processes_complete: VecDeque::new(),
 
             process_time_distr: Default::default(),
-            process_quantity_distr: Default::default(),
+
+            // Proportion of the container capacity that is loaded
+            process_capacity_ratio_distr: Distribution::Constant(1.),
 
             log_emitter: Output::default(),
             time_to_next_event: None,
@@ -199,8 +239,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceAdd<ResourceType> + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Send + ResourceAdd<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Send + ResourceTotal<f64> + 'static,
 > Model for ContainerLoadingProcess<ContainerType, ResourceType> {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -211,8 +251,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceAdd<ResourceType> + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Send + ResourceAdd<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Send + ResourceTotal<f64> + 'static,
 > Process for ContainerLoadingProcess<ContainerType, ResourceType> {
     type LogDetailsType = DiscreteProcessLogType<ContainerType>;
     
@@ -297,7 +337,8 @@ impl<
                                 *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::WithdrawRequest).await;
                                 let container = self.withdraw_us_containers.send(((), source_event_id.clone())).await.next().unwrap();
                                 if let Some(mut item) = container {
-                                    let quantity = self.process_quantity_distr.sample();
+                                    let proportion = self.process_capacity_ratio_distr.sample();
+                                    let quantity = (item.get_capacity() - item.get_resource().map_or(0., |x| x.total())) * proportion;
                                     let resource = self.withdraw_us_resource.send((quantity, source_event_id.clone())).await.next().unwrap();
                                     let process_duration = Duration::from_secs_f64(self.process_time_distr.sample());
                                     item.add(resource);
@@ -408,6 +449,7 @@ pub struct ContainerUnloadingProcess<
 
     pub max_process_count: usize,
     pub process_time_distr: Distribution,
+    pub process_quantity_ratio_distr: Distribution,
 
     pub log_emitter: Output<DiscreteProcessLog<ContainerType>>,
     time_to_next_event: Option<Duration>,
@@ -442,6 +484,8 @@ impl<
             processes_complete: VecDeque::new(),
 
             process_time_distr: Default::default(),
+            // Proportion of the held amount to be unloaded
+            process_quantity_ratio_distr: Distribution::Constant(1.),
 
             log_emitter: Output::default(),
             time_to_next_event: None,
@@ -453,8 +497,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Send + ResourceTotal<f64> + ResourceRemove<f64, ResourceType> + 'static,
 > Model for ContainerUnloadingProcess<ContainerType, ResourceType> {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -465,8 +509,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Send + ResourceTotal<f64> + ResourceRemove<f64, ResourceType> + 'static,
 > Process for ContainerUnloadingProcess<ContainerType, ResourceType> {
     type LogDetailsType = DiscreteProcessLogType<ContainerType>;
     
@@ -512,9 +556,25 @@ impl<
                 match (&ds_containers_state, &ds_resource_state) {
                     (Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }), Some(VectorStockState::Empty { .. } | VectorStockState::Normal { .. }) ) => {
                         *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
-                        let resource = item.remove_all();
+                        
+                        let proportion = self.process_quantity_ratio_distr.sample();
+                        match item.take_resource() {
+                            Some(mut resource) => {
+                                if proportion >= 1. {
+                                    let moved_resource = item.remove_all();
+                                    self.push_ds_resource.send((moved_resource, source_event_id.clone())).await;
+                                } else {
+                                    let quantity = resource.total() * proportion;
+                                    let moved_resource = resource.remove(quantity);
+                                    item.set_resource(Some(resource));
+                                    self.push_ds_resource.send((moved_resource, source_event_id.clone())).await;
+                                }
+                            },
+                            None => {
+                                // No resource to remove, just send the empty container
+                            }
+                        }
                         self.push_ds_containers.send((item, source_event_id.clone())).await;
-                        self.push_ds_resource.send((resource, source_event_id.clone())).await;
                     },
                     (Some(DiscreteStockState::Full { .. }), _) => {
                         *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream container stock is full" }).await;

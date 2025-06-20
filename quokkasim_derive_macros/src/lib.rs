@@ -56,8 +56,13 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                         methods.push(generate_with_and_inplace_method("process_quantity_distr", field_name, field_type));
                     },
                     "process_time_distr" => {
-                        // methods.push(generate_simple_with_method("with_process_time_distr", field_name, field_type));
                         methods.push(generate_with_and_inplace_method("process_time_distr", field_name, field_type));
+                    },
+                    "process_quantity_ratio_distr" => {
+                        methods.push(generate_with_and_inplace_method("process_quantity_ratio_distr", field_name, field_type));
+                    },
+                    "process_capacity_ratio_distr" => {
+                        methods.push(generate_with_and_inplace_method("process_capacity_ratio_distr", field_name, field_type));
                     },
                     "low_capacity" => {
                         methods.push(generate_with_and_inplace_method("low_capacity", field_name, field_type));
