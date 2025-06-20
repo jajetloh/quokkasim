@@ -40,24 +40,33 @@ impl StateEq for VectorStockState {
 
 #[derive(WithMethods)]
 pub struct VectorStock<T: Clone + Send + 'static> {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
-    pub resource: T,
+
+    // Ports
     pub log_emitter: Output<VectorStockLog<T>>,
     pub state_emitter: Output<EventId>,
+
+    // Configuration
     pub low_capacity: f64,
     pub max_capacity: f64,
-    pub prev_state: Option<VectorStockState>,
+
+    // Runtime State
+    pub resource: T,
+
+    // Internals
+    prev_state: Option<VectorStockState>,
     next_event_id: u64,
 }
 
 impl<T: Clone + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
-            element_name: String::new(),
-            element_code: String::new(),
-            element_type: String::new(),
+            element_name: "VectorStock".into(),
+            element_code: "".into(),
+            element_type: "VectorStock".into(),
             resource: Default::default(),
             low_capacity: 0.0,
             max_capacity: 0.0,
@@ -271,12 +280,12 @@ pub struct VectorProcess<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
 > {
-    // Descriptive fields
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
     
-    // Communication
+    // Ports
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), VectorStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
@@ -284,15 +293,15 @@ pub struct VectorProcess<
     pub push_downstream: Output<(SendType, EventId)>,
     pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
 
-    // States
-    pub process_state: Option<(Duration, InternalResourceType)>,
-    pub env_state: BasicEnvironmentState,
-    
-    // Parameters
+    // Configuration
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
     pub delay_modes: DelayModes,
 
+    // Runtime State
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+    
     // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
@@ -307,9 +316,9 @@ impl<
 > Default for VectorProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     fn default() -> Self {
         VectorProcess {
-            element_name: String::new(),
-            element_code: String::new(),
-            element_type: String::new(),
+            element_name: "VectorProcess".into(),
+            element_code: "".into(),
+            element_type: "VectorProcess".into(),
 
             req_upstream: Requestor::default(),
             req_downstream: Requestor::default(),
@@ -672,23 +681,34 @@ pub struct VectorCombiner<
     SendType: Clone + Send + 'static,
     const M: usize
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+    
+    // Ports
     pub req_upstreams: [Requestor<(), VectorStockState>; M],
     pub req_downstream: Requestor<(), VectorStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstreams: [Requestor<(ReceiveParameterType, EventId), ReceiveType>; M],
     pub push_downstream: Output<(SendType, EventId)>,
-    pub process_state: Option<(Duration, InternalResourceType)>,
-    pub delay_modes: DelayModes,
+    pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
+
+    // Configuration
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
+    pub delay_modes: DelayModes,
+    pub split_ratios: [f64; M],
+
+    // Runtime State
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
-    pub previous_check_time: MonotonicTime,
-    pub split_ratios: [f64; M],
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -714,23 +734,29 @@ impl<
 > Default for VectorCombiner<U, T, [T; M], T, M> {
     fn default() -> Self {
         VectorCombiner {
-            element_name: String::new(),
-            element_code: String::new(),
-            element_type: String::new(),
+            element_name: "VectorCombiner".into(),
+            element_code: "".into(),
+            element_type: "VectorCombiner".into(),
+
             req_upstreams: std::array::from_fn(|_| Requestor::default()),
             req_downstream: Requestor::default(),
+            req_environment: Requestor::default(),
             withdraw_upstreams: std::array::from_fn(|_| Requestor::default()),
             push_downstream: Output::default(),
-            process_state: None,
+            log_emitter: Output::default(),
+                   
             delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
+            split_ratios: [1./(M as f64); M],
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
-            log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
-            split_ratios: [1./(M as f64); M],
         }
     }
 }
@@ -923,23 +949,34 @@ pub struct VectorSplitter<
     SendType: Clone + Send + 'static,
     const N: usize
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstreams: [Requestor<(), VectorStockState>; N],
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
     pub push_downstreams: [Output<(SendType, EventId)>; N],
-    pub process_state: Option<(Duration, InternalResourceType)>,
-    pub delay_modes: DelayModes,
+    pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
+    
+    // Configuration
+    pub split_ratios: [f64; N],
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
+    pub delay_modes: DelayModes,
+
+    // Runtime State
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub log_emitter: Output<VectorProcessLog<ReceiveType>>,
-    pub previous_check_time: MonotonicTime,
-    pub split_ratios: [f64; N],
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -951,23 +988,29 @@ impl<
 > Default for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> {
     fn default() -> Self {
         VectorSplitter {
-            element_name: String::new(),
-            element_code: String::new(),
-            element_type: String::new(),
+            element_name: "VectorSplitter".into(),
+            element_code: "".into(),
+            element_type: "VectorSplitter".into(),
+
             req_upstream: Requestor::default(),
             req_downstreams: std::array::from_fn(|_| Requestor::default()),
+            req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             push_downstreams: std::array::from_fn(|_| Output::default()),
-            process_state: None,
-            delay_modes: DelayModes::default(),
+            log_emitter: Output::default(),
+
+            split_ratios: [1./(N as f64); N],
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
+            delay_modes: DelayModes::default(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
-            log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
-            split_ratios: [1./(N as f64); N],
         }
     }
 }
@@ -1169,40 +1212,57 @@ pub struct VectorSource<
     InternalResourceType: Clone + Send + 'static,
     SendType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_downstream: Requestor<(), VectorStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub push_downstream: Output<(SendType, EventId)>,
-    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
+
+    // Configuration
+    pub source_vector: InternalResourceType,
     pub delay_modes: DelayModes,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub source_vector: InternalResourceType,
+
+    // Runtime State
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Default for VectorSource<InternalResourceType, SendType> {
     fn default() -> Self {
         VectorSource {
-            element_name: String::new(),
-            element_code: String::new(),
-            element_type: String::new(),
+            element_name: "VectorSource".into(),
+            element_code: "".into(),
+            element_type: "VectorSource".into(),
+
             req_downstream: Requestor::default(),
+            req_environment: Requestor::default(),
             push_downstream: Output::default(),
-            process_state: None,
+            log_emitter: Output::default(),
+            
             delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
             source_vector: InternalResourceType::default(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
-            log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -1375,20 +1435,31 @@ pub struct VectorSink<
     ReceiveType: Clone + Send + 'static,
     InternalResourceType: Clone + Send + 'static,
 > {
+    // Identification
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
+    // Ports
     pub req_upstream: Requestor<(), VectorStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(ReceiveParameterType, EventId), ReceiveType>,
-    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
+    
+    // Configuration
     pub delay_modes: DelayModes,
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
+
+    // Runtime State
+    pub process_state: Option<(Duration, InternalResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
     time_to_next_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub log_emitter: Output<VectorProcessLog<InternalResourceType>>,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -1412,19 +1483,25 @@ impl<
 > Default for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> {
     fn default() -> Self {
         VectorSink {
-            element_name: String::new(),
-            element_code: String::new(),
-            element_type: String::new(),
+            element_name: "VectorSink".into(),
+            element_code: "".into(),
+            element_type: "VectorSink".into(),
+            
             req_upstream: Requestor::default(),
+            req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
-            process_state: None,
+            log_emitter: Output::default(),
+
             delay_modes: DelayModes::default(),
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
             time_to_next_event: None,
             scheduled_event: None,
             next_event_index: 0,
-            log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }

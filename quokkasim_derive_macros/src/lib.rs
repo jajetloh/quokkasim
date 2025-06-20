@@ -52,6 +52,9 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                             }
                         });
                     },
+                    "split_ratios" => {
+                        methods.push(generate_with_and_inplace_method("split_ratios", field_name, field_type));
+                    }
                     "process_quantity_distr" => {
                         methods.push(generate_with_and_inplace_method("process_quantity_distr", field_name, field_type));
                     },
