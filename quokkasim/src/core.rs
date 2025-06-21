@@ -215,6 +215,7 @@ pub trait Stock<
     fn log(&mut self, now: MonotonicTime, source_event: EventId, details: Self::LogDetailsType) -> impl Future<Output = EventId> + Send;
 }
 
+#[derive(WithMethods)]
 pub struct BasicEnvironment {
     pub element_name: String,
     pub element_code: String,
@@ -235,12 +236,6 @@ impl Model for BasicEnvironment {
 
 impl Default for BasicEnvironment {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl BasicEnvironment {
-    pub fn new() -> Self {
         BasicEnvironment {
             element_name: String::new(),
             element_code: String::new(),
@@ -250,17 +245,9 @@ impl BasicEnvironment {
             emit_change: Output::default(),
         }
     }
+}
 
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-
+impl BasicEnvironment {
     pub fn with_state(mut self, state: BasicEnvironmentState) -> Self {
         self.state = state;
         self

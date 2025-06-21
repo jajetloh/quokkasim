@@ -164,8 +164,8 @@ fn main() {
     };
     let mut car_arrivals = ComponentModel::CarArrivals(
         DiscreteSource::new()
-            .with_name("Car Arrivals".into())
-            .with_code("IN".into())
+            .with_name("Car Arrivals")
+            .with_code("IN") 
             .with_process_time_distr(Distribution::Constant(1.0))
             .with_item_factory(car_arrival_generator),
         Mailbox::new()
@@ -173,8 +173,8 @@ fn main() {
 
     let mut cars_waiting = ComponentModel::CarQueue(
         DiscreteStock::new()
-            .with_name("Cars Waiting".into())
-            .with_code("Q1".into())
+            .with_name("Cars Waiting")
+            .with_code("Q1") 
             .with_low_capacity(0)
             .with_max_capacity(10),
         Mailbox::new()
@@ -191,8 +191,8 @@ fn main() {
 
     let mut cars_leaving = ComponentModel::CarQueue(
         DiscreteStock::new()
-            .with_name("Cars Waiting".into())
-            .with_code("Q2".into())
+            .with_name("Cars Waiting")
+            .with_code("Q2") 
             .with_low_capacity(0)
             .with_max_capacity(10),
         Mailbox::new()
@@ -200,8 +200,8 @@ fn main() {
 
     let mut cars_departing = ComponentModel::CarDepartures(
         DiscreteSink::new()
-            .with_name("Car Departures".into())
-            .with_code("OUT".into())
+            .with_name("Car Departures")
+            .with_code("OUT") 
             .with_process_time_distr(Distribution::Constant(1.0)),
         Mailbox::new()
     );

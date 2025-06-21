@@ -34,7 +34,7 @@ fn main() {
 
     let mut stock_1 = ComponentModel::F64Stock(
         VectorStock::new()
-            .with_name("Stock 1".into())
+            .with_name("Stock 1")
             .with_low_capacity(50.)
             .with_max_capacity(101.)
             .with_initial_resource(100.),
@@ -43,7 +43,7 @@ fn main() {
     let stock_1_addr = stock_1.get_address();
     let mut stock_2 = ComponentModel::F64Stock(
         VectorStock::new()
-            .with_name("Stock 2".into())
+            .with_name("Stock 2")
             .with_low_capacity(50.)
             .with_max_capacity(101.)
             .with_initial_resource(0.),
@@ -51,7 +51,7 @@ fn main() {
     );
     let mut process = ComponentModel::F64Process(
         VectorProcess::new()
-            .with_name("Process".into())
+            .with_name("Process")
             .with_process_quantity_distr(Distribution::Constant(1.))
             .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()

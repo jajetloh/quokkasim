@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Type, TypeSlice};
 
 #[proc_macro_derive(WithMethods)]
 pub fn derive_with_methods(input: TokenStream) -> TokenStream {
@@ -21,13 +21,28 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                 
                 match field_name_str.as_str() {
                     "element_name" => {
-                        methods.push(generate_simple_with_method("with_name", field_name, field_type));
-                    },
+                        methods.push(quote! {
+                            pub fn with_name(mut self, element_name: &str) -> Self {
+                                self.element_name = element_name.to_string();
+                                self
+                            }
+                        });
+                    }
                     "element_code" => {
-                        methods.push(generate_simple_with_method("with_code", field_name, field_type));
+                        methods.push(quote! {
+                            pub fn with_code(mut self, element_code: &str) -> Self {
+                                self.element_code = element_code.to_string();
+                                self
+                            }
+                        });
                     },
                     "element_type" => {
-                        methods.push(generate_simple_with_method("with_type", field_name, field_type));
+                        methods.push(quote! {
+                            pub fn with_type(mut self, element_type: &str) -> Self {
+                                self.element_type = element_type.to_string();
+                                self
+                            }
+                        });
                     },
                     "resource" => {
                         methods.push(quote! {

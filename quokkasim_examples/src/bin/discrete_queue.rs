@@ -35,10 +35,10 @@ fn main() {
         next_seed: 0,
     };
 
-    let mut source = ComponentModel::StringSource(DiscreteSource::new().with_name("Source".into()).with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
+    let mut source = ComponentModel::StringSource(DiscreteSource::new().with_name("Source").with_process_time_distr(Distribution::Constant(3.)), Mailbox::new());
 
     let mut queue_1 = ComponentModel::StringStock(DiscreteStock::new()
-        .with_name("Queue1".into())
+        .with_name("Queue1")
         .with_low_capacity(0)
         .with_max_capacity(10)
         .with_initial_resource(ItemDeque::default()),
@@ -46,13 +46,13 @@ fn main() {
     );
 
     let mut process_1 = ComponentModel::StringProcess(DiscreteProcess::new()
-        .with_name("Process1".into())
+        .with_name("Process1")
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
 
     let mut queue_2 = ComponentModel::StringStock(DiscreteStock::new()
-        .with_name("Queue2".into())
+        .with_name("Queue2")
         .with_low_capacity(0)
         .with_max_capacity(10)
         .with_initial_resource(ItemDeque::default()),
@@ -60,13 +60,13 @@ fn main() {
     );
 
     let mut process_par = ComponentModel::StringProcess(DiscreteProcess::new()
-        .with_name("Process2".into())
+        .with_name("Process2")
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 1., max: 10., mode: 6. }).unwrap()),
         Mailbox::new()
     );
 
     let mut queue_3 = ComponentModel::StringStock(DiscreteStock::new()
-        .with_name("Queue3".into())
+        .with_name("Queue3")
         .with_low_capacity(0)
         .with_max_capacity(10)
         .with_initial_resource(ItemDeque::default()),
@@ -74,7 +74,7 @@ fn main() {
     );
 
     let mut sink = ComponentModel::StringSink(DiscreteSink::new()
-        .with_name("Sink".into())
+        .with_name("Sink")
         .with_process_time_distr(Distribution::Constant(1.)),
         Mailbox::new()
     );

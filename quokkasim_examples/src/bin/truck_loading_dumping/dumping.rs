@@ -8,40 +8,38 @@ use crate::iron_ore::IronOre;
 use crate::loggers::{TruckingProcessLog, TruckingProcessLogType};
 use crate::truck::Truck;
 
+#[derive(WithMethods)]
 pub struct DumpingProcess {
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
+
     pub req_upstream_trucks: Requestor<(), DiscreteStockState>,
     pub req_downstream_trucks: Requestor<(), DiscreteStockState>,
     pub req_downstream_ore: Requestor<(), VectorStockState>,
-
     pub withdraw_upstream_trucks: Requestor<((), EventId), Option<Truck>>,
     pub push_downstream_trucks: Output<(Truck, EventId)>,
     pub push_downstream_ore: Output<(IronOre, EventId)>,
+    pub log_emitter: Output<TruckingProcessLog>,
+
+    pub process_quantity_distr: Distribution,
+    pub process_time_distr: Distribution,
 
     pub process_state: Option<(Duration, Truck)>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub process_quantity_distr: Distribution,
-    pub process_time_distr: Distribution,
-    pub time_to_next_event: Option<Duration>,
+
+    time_to_next_event: Option<Duration>,
     next_event_index: u64,
-    pub log_emitter: Output<TruckingProcessLog>,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl Default for DumpingProcess {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DumpingProcess {
-    pub fn new() -> Self {
         DumpingProcess {
             element_name: String::new(),
             element_code: String::new(),
             element_type: String::new(),
+
             req_upstream_trucks: Requestor::default(),
             req_downstream_ore: Requestor::default(),
             req_downstream_trucks: Requestor::default(),
@@ -57,31 +55,6 @@ impl DumpingProcess {
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
-    }
-
-    pub fn with_name(mut self, name: String) -> Self {
-        self.element_name = name;
-        self
-    }
-
-    pub fn with_code(mut self, code: String) -> Self {
-        self.element_code = code;
-        self
-    }
-
-    pub fn with_type(mut self, element_type: String) -> Self {
-        self.element_type = element_type;
-        self
-    }
-
-    pub fn with_process_quantity_distr(mut self, distr: Distribution) -> Self {
-        self.process_quantity_distr = distr;
-        self
-    }
-
-    pub fn with_process_time_distr(mut self, distr: Distribution) -> Self {
-        self.process_time_distr = distr;
-        self
     }
 }
 

@@ -146,9 +146,9 @@ fn main() {
     let mut df = DistributionFactory::new(base_seed);
 
     let mut source_sp = ComponentModel::IronOreStock(VectorStock::new()
-        .with_name("source_sp".into())
-        .with_code("ST-SP1".into())
-        .with_type("IronOreStock".into())
+        .with_name("source_sp")
+        .with_code("ST-SP1")
+        .with_type("IronOreStock")
         .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
         .with_low_capacity(10.)
         .with_max_capacity(100.),
@@ -156,9 +156,9 @@ fn main() {
     );
 
     let mut trucks_ready_to_load = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
-        .with_name("trucks_ready_to_load".into())
-        .with_code("ST-TR0".into())
-        .with_type("TruckStock".into())
+        .with_name("trucks_ready_to_load")
+        .with_code("ST-TR0")
+        .with_type("TruckStock")
         .with_initial_resource(ItemDeque::from(
             (0..3).into_iter().map(|i| Truck { ore: None, truck_id: format!("Truck_{:02}", i) }).collect::<Vec<Truck>>()
         ))
@@ -168,44 +168,44 @@ fn main() {
     );
 
     let mut loading_process = ComponentModel::LoadingProcess(LoadingProcess::new()
-        .with_name("loading_process".into())
-        .with_code("PR-LOADING".into())
-        .with_type("LoadingProcess".into())
+        .with_name("loading_process")
+        .with_code("PR-LOADING")
+        .with_type("LoadingProcess")
         .with_process_quantity_distr(df.create(DistributionConfig::Constant(5.)).unwrap())
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap()),
         Mailbox::new(),
     );
 
     let mut trucks_loaded = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
-        .with_name("trucks_loaded".into())
-        .with_code("ST-TR1".into())
-        .with_type("TruckStock".into())
+        .with_name("trucks_loaded")
+        .with_code("ST-TR1")
+        .with_type("TruckStock")
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),
     );
 
     let mut loaded_truck_movements = ComponentModel::DiscreteParallelProcessTruck(DiscreteParallelProcess::new()
-        .with_name("loaded_truck_movements".into())
-        .with_code("PR-LOADMOV".into())
-        .with_type("LoadedTruckMovements".into())
+        .with_name("loaded_truck_movements")
+        .with_code("PR-LOADMOV")
+        .with_type("LoadedTruckMovements")
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 120. }).unwrap()),
         Mailbox::new(),
     );
 
     let mut trucks_ready_to_dump = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
-        .with_name("trucks_ready_to_dump".into())
-        .with_code("ST-TR2".into())
-        .with_type("TruckStock".into())
+        .with_name("trucks_ready_to_dump")
+        .with_code("ST-TR2")
+        .with_type("TruckStock")
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),
     );
 
     let mut destination_sp = ComponentModel::IronOreStock(VectorStock::new()
-        .with_name("destination_sp".into())
-        .with_code("ST-SP2".into())
-        .with_type("IronOreStock".into())
+        .with_name("destination_sp")
+        .with_code("ST-SP2")
+        .with_type("IronOreStock")
         .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
         .with_low_capacity(10.)
         .with_max_capacity(999_999_999.),
@@ -213,27 +213,27 @@ fn main() {
     );
 
     let mut dumping_process = ComponentModel::DumpingProcess(DumpingProcess::new()
-        .with_name("dumping_process".into())
-        .with_code("PR-DUMPING".into())
-        .with_type("DumpingProcess".into())
+        .with_name("dumping_process")
+        .with_code("PR-DUMPING")
+        .with_type("DumpingProcess")
         .with_process_quantity_distr(df.create(DistributionConfig::Constant(5.)).unwrap())
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 10. }).unwrap()),
         Mailbox::new(),
     );
 
     let mut trucks_dumped = ComponentModel::DiscreteStockTruck(DiscreteStock::new()
-        .with_name("trucks_dumped".into())
-        .with_code("ST-TR3".into())
-        .with_type("TruckStock".into())
+        .with_name("trucks_dumped")
+        .with_code("ST-TR3")
+        .with_type("TruckStock")
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new(),
     );
 
     let mut dumped_truck_movements = ComponentModel::DiscreteParallelProcessTruck(DiscreteParallelProcess::new()
-        .with_name("dumped_truck_movements".into())
-        .with_code("PR-DUMPMOV".into())
-        .with_type("DumpedTruckMovements".into())
+        .with_name("dumped_truck_movements")
+        .with_code("PR-DUMPMOV")
+        .with_type("DumpedTruckMovements")
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 120. }).unwrap()),
         Mailbox::new(),
     );

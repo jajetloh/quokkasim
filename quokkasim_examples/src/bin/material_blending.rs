@@ -41,8 +41,8 @@ fn main() {
 
     let mut stockpile_1 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Stockpile 1".into())
-            .with_code("SP1".into())
+            .with_name("Stockpile 1")
+            .with_code("SP1") 
             .with_low_capacity(100.)
             .with_max_capacity(10_000.)
             .with_initial_resource([8000., 2000., 0.].into()),
@@ -51,8 +51,8 @@ fn main() {
 
     let mut stockpile_2 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Stockpile 2".into())
-            .with_code("SP2".into())
+            .with_name("Stockpile 2")
+            .with_code("SP2") 
             .with_low_capacity(100.)
             .with_max_capacity(10_000.)
             .with_initial_resource([0., 6000., 2000.].into()),
@@ -61,8 +61,8 @@ fn main() {
 
     let mut stockpile_3 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Stockpile 3".into())
-            .with_code("SP3".into())
+            .with_name("Stockpile 3")
+            .with_code("SP3") 
             .with_low_capacity(100.)
             .with_max_capacity(10_000.)
             .with_initial_resource([5000., 5000., 0.].into()),
@@ -71,8 +71,8 @@ fn main() {
 
     let mut reclaimer_1 = ComponentModel::Vector3Combiner2(
         VectorCombiner::new()
-            .with_name("Reclaimer 1".into())
-            .with_code("RC1".into())
+            .with_name("Reclaimer 1")
+            .with_code("RC1") 
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
@@ -80,8 +80,8 @@ fn main() {
 
     let mut output_stockpile_1 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Output Stockpile 1".into())
-            .with_code("OSP1".into())
+            .with_name("Output Stockpile 1")
+            .with_code("OSP1") 
             .with_low_capacity(100.)
             .with_max_capacity(15_000.)
             .with_initial_resource([0., 0., 0.].into()),
@@ -90,8 +90,8 @@ fn main() {
 
     let mut output_stockpile_2 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Output Stockpile 2".into())
-            .with_code("OSP2".into())
+            .with_name("Output Stockpile 2")
+            .with_code("OSP2") 
             .with_low_capacity(100.)
             .with_max_capacity(15_000.)
             .with_initial_resource([0., 0., 0.].into()),
@@ -100,8 +100,8 @@ fn main() {
 
     let mut reclaimer_2 = ComponentModel::Vector3Combiner2(
         VectorCombiner::new()
-            .with_name("Reclaimer 2".into())
-            .with_code("RC2".into())
+            .with_name("Reclaimer 2")
+            .with_code("RC2") 
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(30.)),
         Mailbox::new()
@@ -109,8 +109,8 @@ fn main() {
 
     let mut reclaimer_3 = ComponentModel::Vector3Combiner1(
         VectorCombiner::new() 
-            .with_name("Reclaimer 3".into())
-            .with_code("RC3".into())
+            .with_name("Reclaimer 3")
+            .with_code("RC3") 
             .with_process_quantity_distr(Distribution::Constant(100.))
             .with_process_time_distr(Distribution::Constant(60.)),
         Mailbox::new()
@@ -118,8 +118,8 @@ fn main() {
 
     let mut stacker = ComponentModel::Vector3Splitter2(
         VectorSplitter::new()
-            .with_name("Stacker".into())
-            .with_code("STK".into())
+            .with_name("Stacker")
+            .with_code("STK") 
             .with_process_quantity_distr(Distribution::Constant(600.))
             .with_process_time_distr(Distribution::Constant(360.)),
         Mailbox::new()

@@ -140,60 +140,60 @@ fn main() {
     };
 
     let mut source = ComponentModel::ProtoCarSource(DiscreteSource::new()
-        .with_name("Source".into())
-        .with_code("SRC".into())
+        .with_name("Source")
+        .with_code("SRC") 
         .with_process_time_distr(Distribution::Constant(15. * 60.)),
         Mailbox::new()
     );
 
     let mut queue_1 = ComponentModel::ProtoCarStock(DiscreteStock::new()
-        .with_name("Queue1".into())
-        .with_code("Q1".into())
+        .with_name("Queue1")
+        .with_code("Q1") 
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new()
     );
 
     let mut process_1 = ComponentModel::ProtoCarProcess(DiscreteProcess::new()
-        .with_name("Process1".into())
-        .with_code("P1".into())
+        .with_name("Process1")
+        .with_code("P1") 
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 10. * 60., max: 25. * 60., mode: 13. * 60. }).unwrap()),
         Mailbox::new()
     );
 
     let mut queue_2 = ComponentModel::ProtoCarStock(DiscreteStock::new()
-        .with_name("Queue2".into())
-        .with_code("Q2".into())
+        .with_name("Queue2")
+        .with_code("Q2") 
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new()
     );
 
     let mut process_par = ComponentModel::ProtoCarParallelProcess(DiscreteParallelProcess::new()
-        .with_name("Process2".into())
-        .with_code("P2".into())
+        .with_name("Process2")
+        .with_code("P2") 
         .with_process_time_distr(df.create(DistributionConfig::Triangular { min: 10. * 60., max: 25. * 60., mode: 13. * 60. }).unwrap()),
         Mailbox::new()
     );
 
     let mut queue_3 = ComponentModel::ProtoCarStock(DiscreteStock::new()
-        .with_name("Queue3".into())
-        .with_code("Q3".into())
+        .with_name("Queue3")
+        .with_code("Q3") 
         .with_low_capacity(0)
         .with_max_capacity(10),
         Mailbox::new()
     );
 
     let mut sink = ComponentModel::ProtoCarSink(DiscreteSink::new()
-        .with_name("Sink".into())
-        .with_code("SNK".into())
+        .with_name("Sink")
+        .with_code("SNK") 
         .with_process_time_distr(Distribution::Constant(15. * 60.)),
         Mailbox::new()
     );
 
     let mut env_controller = ComponentModel::BasicEnvironment(BasicEnvironment::new()
-        .with_name("EnvironmentController".into())
-        .with_code("ENV".into()),
+        .with_name("EnvironmentController")
+        .with_code("ENV") ,
         Mailbox::new()
     );
     let env_addr = env_controller.get_address();

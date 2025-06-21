@@ -32,7 +32,7 @@ fn main() {
 
     // let mut source = ComponentModel::Vector3Source(
     //     VectorSource::new()
-    //         .with_name("Source".into())
+    //         .with_name("Source")
     //         .with_process_quantity_distr(Distribution::Constant(1.))
     //         .with_process_time_distr(Distribution::Constant(1.))
     //         .with_source_vector([1., 4., 5.].into()),
@@ -43,7 +43,7 @@ fn main() {
 
     let mut stock_1 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Stock 1".into())
+            .with_name("Stock 1")
             .with_low_capacity(10.)
             .with_max_capacity(100.)
             .with_initial_resource([ 99., 0., 0. ].into()),
@@ -51,7 +51,7 @@ fn main() {
     );
     let mut process = ComponentModel::Vector3Process(
         VectorProcess::new()
-            .with_name("Process".into())
+            .with_name("Process")
             .with_process_quantity_distr(Distribution::Constant(1.))
             .with_process_time_distr(Distribution::Constant(1.))
             .with_delay_mode(DelayModeChange::Add(DelayMode {
@@ -68,7 +68,7 @@ fn main() {
     );
     let mut stock_2 = ComponentModel::Vector3Stock(
         VectorStock::new()
-            .with_name("Stock 2".into())
+            .with_name("Stock 2")
             .with_low_capacity(10.)
             .with_max_capacity(100.)
             .with_initial_resource([0., 0., 0.].into()),
@@ -77,7 +77,7 @@ fn main() {
 
     // let mut sink = ComponentModel::Vector3Sink(
     //     VectorSink::new()
-    //         .with_name("Sink".into())
+    //         .with_name("Sink")
     //         .with_process_quantity_distr(Distribution::Constant(1.))
     //         .with_process_time_distr(Distribution::Constant(2.)),
     //     Mailbox::new()

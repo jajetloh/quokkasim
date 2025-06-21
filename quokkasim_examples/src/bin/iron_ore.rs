@@ -333,9 +333,9 @@ fn main() {
 
     let mut stock1 = ComponentModel::IronOreStock(
         VectorStock::new()
-            .with_name("MyStock1".into())
-            .with_code("SP1".into())
-            .with_type("IronOreStock".into())
+            .with_name("MyStock1")
+            .with_code("SP1") 
+            .with_name("IronOreStock")
             .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
             .with_low_capacity(10.)
             .with_max_capacity(100.),
@@ -344,9 +344,9 @@ fn main() {
 
     let mut process1 = ComponentModel::IronOreProcess(
         VectorProcess::new()
-            .with_name("MyProcess1".into())
-            .with_code("P1".into())
-            .with_type("IronOreProcess".into())
+            .with_name("MyProcess1")
+            .with_code("P1") 
+            .with_name("IronOreProcess")
             .with_process_quantity_distr(df.create(DistributionConfig::Uniform { min: 2., max: 8. }).unwrap())
             .with_process_time_distr(Distribution::Constant(10.)),
         Mailbox::new(),
@@ -355,9 +355,9 @@ fn main() {
 
     let mut stock2 = ComponentModel::IronOreStock(
         VectorStock::new()
-            .with_name("MyStock2".into())
-            .with_code("SP2".into())
-            .with_type("IronOreStock".into())
+            .with_name("MyStock2")
+            .with_code("SP2") 
+            .with_name("IronOreStock")
             .with_initial_resource(IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 })
             .with_low_capacity(10.)
             .with_max_capacity(100.),
