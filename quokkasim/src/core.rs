@@ -884,6 +884,184 @@ macro_rules! define_model_enums {
                         a.push_ds_resource.connect($crate::components::vector::VectorStock::add, bm.address());
                         Ok(())
                     },
+                    /**
+                     * Environments
+                     */
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Process(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorProcess::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Source(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSource::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Sink(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSink::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Combiner1(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Combiner2(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Combiner3(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Combiner4(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Combiner5(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Splitter1(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Splitter2(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Splitter3(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Splitter4(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::F64Splitter5(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Process(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorProcess::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Source(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSource::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Sink(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSink::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Combiner1(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Combiner2(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Combiner3(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Combiner4(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Combiner5(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Splitter1(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Splitter2(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Splitter3(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Splitter4(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3Splitter5(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::StringProcess(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteProcess::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::StringSource(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteSource::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::StringSink(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteSink::<(), Option<String>, String>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::StringParallelProcess(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteParallelProcess::<(), Option<String>, String, String>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3ContainerProcess(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteProcess::<(), Option<Vector3Container>, Vector3Container, Vector3Container>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3ContainerSource(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteSource::<Vector3Container, Vector3Container, Vector3ContainerFactory>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3ContainerSink(b, bm), _) => {
+                        a.emit_change.connect($crate::components::discrete::DiscreteSink::<(), Option<Vector3Container>, Vector3Container>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3ContainerLoadProcess(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector_container::ContainerLoadingProcess::<Vector3Container, Vector3>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::BasicEnvironment(a, am), $ComponentModel::Vector3ContainerUnloadProcess(b, bm), _) => {
+                        a.emit_change.connect($crate::components::vector_container::ContainerUnloadingProcess::<Vector3Container, Vector3>::update_state, bm.address());
+                        b.req_environment.connect($crate::core::BasicEnvironment::get_state_async, am.address());
+                        Ok(())
+                    },
                     (a,b,n) => {
                         <$ComponentModel as CustomComponentConnection>::connect_components(a, b, n)
                     }
