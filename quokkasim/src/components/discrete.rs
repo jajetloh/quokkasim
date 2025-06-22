@@ -434,7 +434,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                     self.env_state = BasicEnvironmentState::Stopped;
                 },
                 (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
+                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
                     self.env_state = BasicEnvironmentState::Normal;
                 }
                 _ => {
@@ -488,7 +488,6 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                 },
                 (Some((time, resource)), _) => {
                     self.time_to_next_process_event = Some(*time);
-                    *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
         }
@@ -547,7 +546,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
 #[derive(Debug, Clone)]
 pub enum DiscreteProcessLogType<T> {
     ProcessStart { resource: T },
-    ProcessContinue { resource: T },
+    ProcessContinue { reason: &'static str },
     ProcessFinish { resource: T },
     ProcessNonStart { reason: &'static str },
     ProcessStopped { reason: &'static str },
@@ -577,7 +576,7 @@ impl<T: Serialize> Serialize for DiscreteProcessLog<T> {
         state.serialize_field("element_type", &self.element_type)?;
         let (event_type, item, reason): (String, Option<String>, Option<&str>) = match &self.event {
             DiscreteProcessLogType::ProcessStart { resource } => ("ProcessStart".into(), Some(serde_json::to_string(resource).unwrap()), None),
-            DiscreteProcessLogType::ProcessContinue { resource } => ("ProcessContinue".into(), Some(serde_json::to_string(resource).unwrap()), None),
+            DiscreteProcessLogType::ProcessContinue { reason } => ("ProcessContinue".into(), None, Some(reason)),
             DiscreteProcessLogType::ProcessFinish { resource } => ("ProcessFinish".into(), Some(serde_json::to_string(resource).unwrap()), None),
             DiscreteProcessLogType::ProcessNonStart { reason } => ("ProcessNonStart".into(), None, Some(reason)),
             DiscreteProcessLogType::ProcessStopped { reason } => ("ProcessStopped".into(), None, Some(reason)),
@@ -802,7 +801,6 @@ impl<
                 },
                 (Some((time, resource)), _) => {
                     self.time_to_next_process_event = Some(*time);
-                    *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
         }
@@ -1016,7 +1014,6 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                 },
                 (Some((time, resource)), _) => {
                     self.time_to_next_process_event = Some(*time);
-                    *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
         }
