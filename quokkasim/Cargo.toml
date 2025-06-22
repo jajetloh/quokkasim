@@ -5,7 +5,6 @@ version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/jajetloh/quokkasim"
 documentation = "https://jajetloh.github.io/quokkasim-book/"
-license = "MIT"
 license-file = "LICENCE"
 authors = ["Ja-Jet Loh and other QuokkaSim contributors"]
 categories = ["simulation", "asynchronous", "science"]
