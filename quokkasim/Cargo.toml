@@ -1,12 +1,13 @@
 [package]
 name = "quokkasim"
-description = "A Rust-based Discrete Event Simulation (DES) framework, which simplifies simulation for beginners, and provides excellent utilities for experience modellers."
-version = "0.1.0"
+description = "A Rust-based Discrete Event Simulation (DES) framework, which simplifies simulation for beginners, and provides excellent utilities for experienced modellers."
+version = "0.2.0"
 edition = "2024"
+readme = "../README.md"
 repository = "https://github.com/jajetloh/quokkasim"
 documentation = "https://jajetloh.github.io/quokkasim-book/"
 license-file = "LICENCE"
-authors = ["Ja-Jet Loh and other QuokkaSim contributors"]
+authors = ["Ja-Jet Loh"]
 categories = ["simulation", "asynchronous", "science"]
 keywords = ["discrete-event", "logistics", "digital-twin", "framework", "stochastic"]
 
