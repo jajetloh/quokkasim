@@ -340,6 +340,7 @@ pub struct DiscreteProcess<
     // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
+    pub delay_modes: DelayModes,
 
     // Runtime state
     pub process_state: Option<(Duration, InternalResourceType)>,
@@ -368,6 +369,7 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
+            delay_modes: Default::default(),
 
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
@@ -412,37 +414,67 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
-            let new_env_state = match self.req_environment.send(()).await.next() {
-                Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
-            };
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
-                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                } else {
-                    self.process_state = Some((process_time_left, resource));
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
+                let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
+
+                // Decrement process time counter (if not delayed or env blocked)
+                if !(is_in_delay || is_env_blocked) {
+                    if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
+                            self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
+                        }
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if !is_env_blocked && (is_in_delay || is_in_process) {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
 
-            match (&self.env_state, &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Stopped;
-                },
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Normal;
-                }
-                _ => {
+            // Update cached environment state
+            {
+                let new_env_state = match self.req_environment.send(()).await.next() {
+                    Some(x) => x,
+                    None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
+                };
+                match (&self.env_state, &new_env_state) {
+                    (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Stopped;
+                    },
+                    (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Normal;
+                    }
+                    _ => {}
                 }
             }
-            
-            match (&self.process_state, &self.env_state) {
-                (None, BasicEnvironmentState::Normal) => {
+
+            // Update internal state
+            let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
+            let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     let ds_state = self.req_downstream.send(()).await.next();
                     match (&us_state, &ds_state) {
@@ -483,12 +515,19 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                         }
                     }
                 },
-                (_, BasicEnvironmentState::Stopped) => {
-                    self.time_to_next_process_event = None;
-                },
-                (Some((time, resource)), _) => {
+                (Some((time, _)), false) => {
                     self.time_to_next_process_event = Some(*time);
                 }
+                (_, true) => {
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                },
+            }
+            
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay || !is_env_stopped {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
@@ -551,6 +590,8 @@ pub enum DiscreteProcessLogType<T> {
     ProcessNonStart { reason: &'static str },
     ProcessStopped { reason: &'static str },
     WithdrawRequest,
+    DelayStart { delay_name: String },
+    DelayEnd { delay_name: String },
 }
 
 
@@ -581,6 +622,8 @@ impl<T: Serialize> Serialize for DiscreteProcessLog<T> {
             DiscreteProcessLogType::ProcessNonStart { reason } => ("ProcessNonStart".into(), None, Some(reason)),
             DiscreteProcessLogType::ProcessStopped { reason } => ("ProcessStopped".into(), None, Some(reason)),
             DiscreteProcessLogType::WithdrawRequest => ("WithdrawRequest".into(), None, None),
+            DiscreteProcessLogType::DelayStart { delay_name } => ("DelayStart".into(), Some(delay_name.clone()), None),
+            DiscreteProcessLogType::DelayEnd { delay_name } => ("DelayEnd".into(), Some(delay_name.clone()), None),
         };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("item", &item)?;
@@ -664,6 +707,7 @@ pub struct DiscreteSource<
     // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
+    pub delay_modes: DelayModes,
     pub item_factory: FactoryType,
     
     // Runtime state
@@ -697,6 +741,7 @@ impl<
 
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
+            delay_modes: DelayModes::default(),
             item_factory: FactoryType::default(),
             
             process_state: None,
@@ -744,37 +789,67 @@ impl<
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
-            let new_env_state = match self.req_environment.send(()).await.next() {
-                Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
-            };
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
-                    self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-                } else {
-                    self.process_state = Some((process_time_left, resource));
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
+                let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
+
+                // Decrement process time counter (if not delayed or env blocked)
+                if !(is_in_delay || is_env_blocked) {
+                    if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
+                            self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
+                        }
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if !is_env_blocked && (is_in_delay || is_in_process) {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
 
-            match (&self.env_state, &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Stopped;
-                },
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Normal;
-                }
-                _ => {
+            // Update cached environment state
+            {
+                let new_env_state = match self.req_environment.send(()).await.next() {
+                    Some(x) => x,
+                    None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
+                };
+                match (&self.env_state, &new_env_state) {
+                    (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Stopped;
+                    },
+                    (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Normal;
+                    }
+                    _ => {}
                 }
             }
-
-            match (&self.process_state, &new_env_state) {
-                (None, BasicEnvironmentState::Normal) => {
+            
+            // Update internal state
+            let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
+            let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let ds_state = self.req_downstream.send(()).await.next();
                     match &ds_state {
                         Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
@@ -796,12 +871,19 @@ impl<
                         }
                     }
                 },
-                (_, BasicEnvironmentState::Stopped) => {
-                    self.time_to_next_process_event = None;
-                },
-                (Some((time, resource)), _) => {
+                (Some((time, _)), _) => {
                     self.time_to_next_process_event = Some(*time);
+                },
+                (_, true) => {
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
                 }
+            }
+            
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay || !is_env_stopped {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
@@ -877,6 +959,7 @@ pub struct DiscreteSink<
     // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
+    pub delay_modes: DelayModes,
     
     // Runtime state
     pub process_state: Option<(Duration, InternalResourceType)>,
@@ -908,6 +991,7 @@ impl<
 
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
+            delay_modes: Default::default(),
             
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
@@ -951,36 +1035,67 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             let time = cx.time();
-            let new_env_state = match self.req_environment.send(()).await.next() {
-                Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
-            };
+            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
 
-            if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
-                let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-                process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                if process_time_left.is_zero() {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
-                } else {
-                    self.process_state = Some((process_time_left, resource));
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.process_state.is_some() && !is_in_delay;
+                let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
+
+                // Decrement process time counter (if not delayed or env blocked)
+                if !(is_in_delay || is_env_blocked) {
+                    if let (Some((mut process_time_left, resource)), BasicEnvironmentState::Normal) = (self.process_state.take(), &self.env_state) {
+                        let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        if process_time_left.is_zero() {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: resource.clone() }).await;
+                        } else {
+                            self.process_state = Some((process_time_left, resource));
+                        }
+                    }
+                }
+
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if !is_env_blocked && (is_in_delay || is_in_process) {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
+                    }
                 }
             }
 
-            match (&self.env_state, &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Stopped;
-                },
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Normal;
-                }
-                _ => {
+            // Update cached environment state
+            {
+                let new_env_state = match self.req_environment.send(()).await.next() {
+                    Some(x) => x,
+                    None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
+                };
+                match (&self.env_state, &new_env_state) {
+                    (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Stopped;
+                    },
+                    (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Normal;
+                    }
+                    _ => {}
                 }
             }
 
-            match (&self.process_state, &new_env_state) {
-                (None, BasicEnvironmentState::Normal) => {
+            // Update internal state
+            let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
+            let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
+            match (&self.process_state, has_active_delay) {
+                (None, false) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     match &us_state {
                         Some(DiscreteStockState::Normal { .. } | DiscreteStockState::Full { .. }) => {
@@ -1009,12 +1124,13 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                         }
                     }
                 },
-                (_, BasicEnvironmentState::Stopped) => {
+                (Some((time, _)), _) => {
+                    self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+                },
+                (_, true) => {
                     self.time_to_next_process_event = None;
                 },
-                (Some((time, resource)), _) => {
-                    self.time_to_next_process_event = Some(*time);
-                }
+
             }
         }
     }
@@ -1092,6 +1208,7 @@ pub struct DiscreteParallelProcess<
     // Configuration
     pub process_time_distr: Distribution,
     pub process_quantity_distr: Distribution,
+    pub delay_modes: DelayModes,
 
     // Runtime state
     pub processes_in_progress: Vec<(Duration, InternalResourceType)>,
@@ -1127,7 +1244,8 @@ impl<
             
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
-            
+            delay_modes: Default::default(),
+
             processes_in_progress: Vec::new(),
             env_state: BasicEnvironmentState::Normal,
             processes_complete: VecDeque::new(),
@@ -1165,58 +1283,88 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
 
             let time = cx.time();
             let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-            let new_env_state = match self.req_environment.send(()).await.next() {
-                Some(x) => x,
-                None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
-            };
 
-            match &self.env_state {
-                BasicEnvironmentState::Normal => {
-                    self.processes_in_progress.retain_mut(|(process_time_left, item)| {
-                        *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-                        if process_time_left.is_zero() {
-                            self.processes_complete.push_back(item.clone());
-                            false
-                        } else {
-                            true
+            // Update duration counters based on time since last check
+            {
+                let is_in_delay = self.delay_modes.active_delay().is_some();
+                let is_in_process = self.processes_in_progress.len().gt(&0) && !is_in_delay;
+                let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
+
+                // Decrement process time counter (if not delayed or env blocked)
+                if !(is_in_delay || is_env_blocked) {
+
+                    match &self.env_state {
+                        BasicEnvironmentState::Normal => {
+                            self.processes_in_progress.retain_mut(|(process_time_left, item)| {
+                                *process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                                if process_time_left.is_zero() {
+                                    self.processes_complete.push_back(item.clone());
+                                    false
+                                } else {
+                                    true
+                                }
+                            });
+                        },
+                        BasicEnvironmentState::Stopped => {}
+                    }
+
+                    while let Some(item) = self.processes_complete.pop_front() {
+                        let ds_state = self.req_downstream.send(()).await.next();
+                        match &ds_state {
+                            Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
+                                self.push_downstream.send((item.clone(), source_event_id.clone())).await;
+                            },
+                            Some(DiscreteStockState::Full { .. }) => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is full" }).await;
+                                break;
+                            },
+                            None => {
+                                *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
+                                break;
+                            }
                         }
-                    });
-                },
-                BasicEnvironmentState::Stopped => {}
-            }
-
-            while let Some(item) = self.processes_complete.pop_front() {
-                let ds_state = self.req_downstream.send(()).await.next();
-                match &ds_state {
-                    Some(DiscreteStockState::Empty { .. } | DiscreteStockState::Normal { .. }) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessFinish { resource: item.clone() }).await;
-                        self.push_downstream.send((item.clone(), source_event_id.clone())).await;
-                    },
-                    Some(DiscreteStockState::Full { .. }) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is full" }).await;
-                        break;
-                    },
-                    None => {
-                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
-                        break;
+                    }
+                }
+                
+                // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+                // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+                // when a process is active
+                if !is_env_blocked && (is_in_delay || is_in_process) {
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    if delay_transition.has_changed() {
+                        if let Some(delay_name) = &delay_transition.from {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                        }
+                        if let Some(delay_name) = &delay_transition.to {
+                            *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                        }
                     }
                 }
             }
 
-            match (&self.env_state, &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Stopped;
-                },
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Resumed by environment" }).await;
-                    self.env_state = BasicEnvironmentState::Normal;
+            // Update cached environment state
+            {
+                let new_env_state = match self.req_environment.send(()).await.next() {
+                    Some(x) => x,
+                    None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
+                };
+                match (&self.env_state, &new_env_state) {
+                    (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Stopped;
+                    },
+                    (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                        *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
+                        self.env_state = BasicEnvironmentState::Normal;
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
 
-            // Then check for any processes to start
-
+            // Update internal state
+            let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
+            let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
             match &self.env_state {
                 BasicEnvironmentState::Stopped => {
                     self.time_to_next_process_event = None;
@@ -1257,6 +1405,13 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                         Some(min_time)
                     };
                 }
+            }
+            
+            // Set time of next delay
+            if self.processes_in_progress.len().gt(&0) || has_active_delay || !is_env_stopped {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
