@@ -27,7 +27,8 @@ pub struct LoadingProcess {
 
     pub process_state: Option<(Duration, Truck, IronOre)>,
 
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -48,7 +49,8 @@ impl Default for LoadingProcess {
             process_state: None,
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+         time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             log_emitter: Output::default(),
@@ -106,7 +108,7 @@ impl LoadingProcess {
             // Check if we need to start a new loading process
             match self.process_state {
                 Some((time_left, _, _)) => {
-                    self.time_to_next_event = Some(time_left);
+                    self.time_to_next_process_event = Some(time_left);
                 }
                 None => {
                     // Check if we have trucks and ore available
@@ -134,7 +136,7 @@ impl LoadingProcess {
                                     let process_duration = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration), Truck { ore: None, truck_id: truck_id.clone() }, ore.clone()));
 
-                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration));
+                                    self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration));
                                 },
                                 Some(Truck { ore: Some(_), .. }) => {
                                     // Truck already has ore - how did we get here?
@@ -143,24 +145,24 @@ impl LoadingProcess {
                                 None => {
                                     // No truck available upstream
                                     source_event_id = self.log(time, source_event_id, TruckingProcessLogType::LoadingFailure { reason: "No truck available upstream" }).await;
-                                    self.time_to_next_event = None;
+                                    self.time_to_next_process_event = None;
                                 }
                             }
                         }
                         (_, Some(VectorStockState::Empty { .. }) | None, _) => {
                             // No ore available upstream
                             source_event_id = self.log(time, source_event_id, TruckingProcessLogType::LoadingFailure { reason: "No ore available upstream" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (Some(DiscreteStockState::Empty { .. }) | None, _, _) => {
                             // Downstream truck stock is full
                             source_event_id = self.log(time, source_event_id, TruckingProcessLogType::LoadingFailure { reason: "Upstream truck stock is empty or not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, _, Some(DiscreteStockState::Full { .. }) | None) => {
                             // Downstream truck stock is full
                             source_event_id = self.log(time, source_event_id, TruckingProcessLogType::LoadingFailure { reason: "Downstream truck stock is full or not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                     }
                 }
@@ -168,7 +170,7 @@ impl LoadingProcess {
 
             // Post-update logic
             
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 Some(time_until_next) if time_until_next > Duration::ZERO => {
                     let next_time = time + time_until_next;
 

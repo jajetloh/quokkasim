@@ -34,7 +34,7 @@ fn main() {
         VectorStock::new()
             .with_name("Stock1")
             .with_code("S1")
-            .with_initial_resource(1000.)
+            .with_initial_resource(100.)
             .with_low_capacity(10.)
             .with_max_capacity(1000.),
         Mailbox::new()
@@ -45,7 +45,8 @@ fn main() {
             .with_name("Splitter")
             .with_code("P1")
             .with_process_quantity_distr(Distribution::Constant(10.))
-            .with_process_time_distr(Distribution::Constant(10.)),
+            .with_process_time_distr(Distribution::Constant(10.))
+            .with_delay_mode(DelayModeChange::Add(DelayMode { name: "SplitterDelay".into(), until_delay_distr: Distribution::Constant(7.), until_fix_distr: Distribution::Constant(2.) })),
         Mailbox::new()
     );
 
@@ -54,7 +55,7 @@ fn main() {
             .with_name("Stock2")
             .with_code("S2")
             .with_low_capacity(10.)
-            .with_max_capacity(400.),
+            .with_max_capacity(1000.),
         Mailbox::new()
     );
 
@@ -87,7 +88,7 @@ fn main() {
 
     let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
 
-    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(3600)).unwrap();
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(30)).unwrap();
 
     let output_dir = "outputs/delay_testing";
     create_dir_all(output_dir).unwrap();

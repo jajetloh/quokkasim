@@ -305,7 +305,8 @@ pub struct VectorProcess<
     pub env_state: BasicEnvironmentState,
     
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -336,7 +337,8 @@ impl<
             process_time_distr: Distribution::default(),
             delay_modes: DelayModes::default(),
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -384,6 +386,7 @@ where
                 let is_in_delay = self.delay_modes.active_delay().is_some();
                 let is_in_process = self.process_state.is_some() && !is_in_delay;
 
+                // Decrement process time counter (if not in a delay)
                 if !is_in_delay {
                     if let Some((mut process_time_left, resource)) = self.process_state.take() {
                         process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
@@ -429,39 +432,47 @@ where
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(VectorStockState::Empty {..} ), _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (None, _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, None) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, Some(VectorStockState::Full {..} )) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                     }
                 },
                 (Some((time, _)), false) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
+                    self.time_to_next_process_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
+            }
+            
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            match self.time_to_next_event {
+            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -707,7 +718,8 @@ pub struct VectorCombiner<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -755,7 +767,8 @@ impl<
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -789,6 +802,7 @@ where
                 let is_in_delay = self.delay_modes.active_delay().is_some();
                 let is_in_process = self.process_state.is_some() && !is_in_delay;
 
+                // Decrement process time counter (if not in a delay)
                 if !is_in_delay {
                     if let Some((mut process_time_left, resources)) = self.process_state.take() {
                         
@@ -859,39 +873,47 @@ where
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::CombineStart { quantity: process_quantity, vectors: withdrawn.into() }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(false), _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "At least one upstream is empty" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (None, _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "No upstreams are connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, None) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, Some(VectorStockState::Full {..} )) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                     }
                 },
                 (Some((time, _)), false) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
+                    self.time_to_next_process_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
+            }
+             
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            match self.time_to_next_event {
+            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -975,7 +997,8 @@ pub struct VectorSplitter<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -1009,7 +1032,8 @@ impl<
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -1059,6 +1083,7 @@ where
                 let is_in_delay = self.delay_modes.active_delay().is_some();
                 let is_in_process = self.process_state.is_some() && !is_in_delay;
 
+                // Decrement process time counter (if not in a delay)
                 if !is_in_delay {
                     if let Some((mut process_time_left, resource)) = self.process_state.take() {
                         process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
@@ -1125,39 +1150,47 @@ where
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::SplitStart { quantity: process_quantity, vector: withdrawn }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (_, Some(false)) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "At least one downstream is full" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, None) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "No downstreams are connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (None, _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (Some(VectorStockState::Empty {..} ), _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                     }
                 },
                 (Some((time, _)), false) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
+                    self.time_to_next_process_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
+            }
+
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            match self.time_to_next_event {
+            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -1236,7 +1269,8 @@ pub struct VectorSource<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -1262,7 +1296,8 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -1309,6 +1344,7 @@ where
                 let is_in_delay = self.delay_modes.active_delay().is_some();
                 let is_in_process = self.process_state.is_some() && !is_in_delay;
 
+                // Decrement process time counter (if not in a delay)
                 if !is_in_delay {
                     if let Some((mut process_time_left, resource)) = self.process_state.take() {
                         let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
@@ -1346,7 +1382,7 @@ where
                     match ds_state {
                         Some(VectorStockState::Full {..}) => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         Some(VectorStockState::Normal {..}) | Some(VectorStockState::Empty {..}) => {
                             let process_quantity = self.process_quantity_distr.sample();
@@ -1359,27 +1395,35 @@ where
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), created.clone()));
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: created }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         None => {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                     }
                 },
                 (Some((time, _)), false) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
+                    self.time_to_next_process_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
+            }
+            
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
-            match self.time_to_next_event {
+            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -1458,7 +1502,8 @@ pub struct VectorSink<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -1501,7 +1546,8 @@ impl<
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -1536,6 +1582,7 @@ where
                 let is_in_delay = self.delay_modes.active_delay().is_some();
                 let is_in_process = self.process_state.is_some() && !is_in_delay;
 
+                // Decrement process time counter (if not in a delay)
                 if !is_in_delay {
                     if let Some((mut process_time_left, resource)) = self.process_state.take() {
                         let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
@@ -1577,33 +1624,41 @@ where
                             let process_duration_secs = self.process_time_distr.sample();
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), withdrawn.clone()));
                             self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: withdrawn }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         Some(VectorStockState::Empty {..}) => {
                         }
                         None => {
                             self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         _ => {
                             self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 },
                 (Some((time, _)), false) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
+                    self.time_to_next_process_event = Some(self.delay_modes.active_delay().unwrap().1.clone())
                 }
+            }
+
+            // Set time of next delay
+            if self.process_state.is_some() || has_active_delay {
+                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+            } else {
+                self.time_to_next_delay_event = None;
             }
         }
     }
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            match self.time_to_next_event {
+            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {

@@ -195,6 +195,15 @@ pub enum DelayState {
     TimeUntilFix(Duration),
 }
 
+impl DelayState {
+    pub fn as_duration(&self) -> Duration {
+        match self {
+            DelayState::TimeUntilDelay(duration) => *duration,
+            DelayState::TimeUntilFix(duration) => *duration,
+        }
+    }
+}
+
 pub struct DelayStateTransition {
     pub from: Option<String>,
     pub to: Option<String>,

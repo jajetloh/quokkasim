@@ -74,3 +74,4 @@ e.g. Using the Manufacturing example:
 - The ``quokkasim`` directory contains the main QuokkaSim crate code.
 - The ``quokkasim_examples`` directory contains uses of QuokkaSim code, which can be run to test functionality and copied to quickly spin up new models.
     - To try an example model, use ``cargo run --bin [EXAMPLE_NAME e.g. discrete_queue]``
+- The ``quokkasim_derive_macros`` directory contains Derive macros that are highly recommended for convenience when developing with QuokkaSim.

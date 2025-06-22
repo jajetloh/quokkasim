@@ -28,7 +28,8 @@ pub struct DumpingProcess {
     pub process_state: Option<(Duration, Truck)>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
 
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+time_to_next_delay_event: Option<Duration>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
 }
@@ -50,7 +51,8 @@ impl Default for DumpingProcess {
             scheduled_event: None,
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+         time_to_next_delay_event: None,
             next_event_index: 0,
             log_emitter: Output::default(),
             previous_check_time: MonotonicTime::EPOCH,
@@ -107,7 +109,7 @@ impl DumpingProcess {
             // Check if we can start a new dumping event
             match self.process_state {
                 Some((time_left, _)) => {
-                    self.time_to_next_event = Some(time_left);
+                    self.time_to_next_process_event = Some(time_left);
                 }
                 None => {
                     let us_trucks_state = self.req_upstream_trucks.send(()).await.next();
@@ -135,25 +137,25 @@ impl DumpingProcess {
                                     self.process_state = Some((Duration::from_secs_f64(process_duration), truck.clone()));
 
                                     source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingStart { truck_id: truck.truck_id, quantity: ore.total(), ore: ore.clone() }).await;
-                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration));
+                                    self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration));
                                 }
                                 None => {
                                     source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "No truck available upstream" }).await;
-                                    self.time_to_next_event = None;
+                                    self.time_to_next_process_event = None;
                                 }
                             }
                         }
                         (Some(DiscreteStockState::Empty { .. }) | None, _, _) => {
                             source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "Upstream truck stock is empty or not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, Some(VectorStockState::Full { .. }) | None, _) => {
                             source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "No ore can be received downstream" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, _, Some(DiscreteStockState::Full { .. }) | None) => {
                             source_event_id = self.log(time, source_event_id, TruckingProcessLogType::DumpingFailure { reason: "Downstream truck stock is full or not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                     }
                 }
@@ -161,7 +163,7 @@ impl DumpingProcess {
 
             // Post-update logic
 
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {

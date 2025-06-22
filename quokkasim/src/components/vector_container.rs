@@ -199,7 +199,8 @@ pub struct ContainerLoadingProcess<
     pub processes_complete: VecDeque<ContainerType>, 
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -232,7 +233,8 @@ impl<
             processes_complete: VecDeque::new(),
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -329,7 +331,7 @@ impl<
 
             match &self.env_state {
                 BasicEnvironmentState::Stopped => {
-                    self.time_to_next_event = None;
+                    self.time_to_next_process_event = None;
                 },
                 BasicEnvironmentState::Normal => {
                     loop {
@@ -367,7 +369,7 @@ impl<
                         }
                     }
                     
-                    self.time_to_next_event = if self.processes_in_progress.is_empty() {
+                    self.time_to_next_process_event = if self.processes_in_progress.is_empty() {
                         None
                     } else {
                         // Find the minimum time to next event
@@ -381,7 +383,7 @@ impl<
     
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -461,7 +463,8 @@ pub struct ContainerUnloadingProcess<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -494,7 +497,8 @@ impl<
             processes_complete: VecDeque::new(),
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -614,7 +618,7 @@ impl<
             // Then check for any processes to start
             match &self.env_state {
                 BasicEnvironmentState::Stopped => {
-                    self.time_to_next_event = None;
+                    self.time_to_next_process_event = None;
                 },
                 BasicEnvironmentState::Normal => {
                     loop {
@@ -648,7 +652,7 @@ impl<
                         }
                     }
                     
-                    self.time_to_next_event = if self.processes_in_progress.is_empty() {
+                    self.time_to_next_process_event = if self.processes_in_progress.is_empty() {
                         None
                     } else {
                         // Find the minimum time to next event
@@ -662,7 +666,7 @@ impl<
     
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {

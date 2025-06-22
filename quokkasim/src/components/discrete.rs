@@ -346,7 +346,8 @@ pub struct DiscreteProcess<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
@@ -371,7 +372,8 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
             process_state: None,
             env_state: BasicEnvironmentState::Normal,
 
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -455,37 +457,37 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                                     let process_duration_secs = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration_secs), received_resource.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: received_resource }).await;
-                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                                    self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                                 },
                                 None => {
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream did not provide resource" }).await;
-                                    self.time_to_next_event = None;
+                                    self.time_to_next_process_event = None;
                                 }
                             }
                         },
                         (Some(DiscreteStockState::Empty { .. }), _ ) => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is empty" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (None, _) => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, Some(DiscreteStockState::Full { .. })) => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is full" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         (_, None) => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 },
                 (_, BasicEnvironmentState::Stopped) => {
-                    self.time_to_next_event = None;
+                    self.time_to_next_process_event = None;
                 },
                 (Some((time, resource)), _) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                     *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
@@ -494,7 +496,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -670,7 +672,8 @@ pub struct DiscreteSource<
     pub env_state: BasicEnvironmentState,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
     pub previous_check_time: MonotonicTime,
@@ -700,7 +703,8 @@ impl<
             process_state: None,
             env_state: BasicEnvironmentState::Normal,            
             
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -781,23 +785,23 @@ impl<
 
                             self.process_state = Some((Duration::from_secs_f64(process_duration_secs), next_item.clone()));
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: next_item.clone() }).await;
-                            self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         Some(DiscreteStockState::Full { .. }) => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is full" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         },
                         None => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Downstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 },
                 (_, BasicEnvironmentState::Stopped) => {
-                    self.time_to_next_event = None;
+                    self.time_to_next_process_event = None;
                 },
                 (Some((time, resource)), _) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                     *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
@@ -806,7 +810,7 @@ impl<
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -881,10 +885,11 @@ pub struct DiscreteSink<
     pub env_state: BasicEnvironmentState,
     
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -897,15 +902,20 @@ impl<
             element_name: "DiscreteSink".to_string(),
             element_code: "".to_string(),
             element_type: "DiscreteSink".to_string(),
+            
             req_upstream: Requestor::new(),
             req_environment: Requestor::new(),
             withdraw_upstream: Requestor::new(),
-            process_state: None,
-            env_state: BasicEnvironmentState::Normal,
+            log_emitter: Output::new(),
+
             process_time_distr: Default::default(),
             process_quantity_distr: Default::default(),
-            log_emitter: Output::new(),
-            time_to_next_event: None,
+            
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -983,29 +993,29 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                                     let process_duration_secs = self.process_time_distr.sample();
                                     self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessStart { resource: moved }).await;
-                                    self.time_to_next_event = Some(Duration::from_secs_f64(process_duration_secs));
+                                    self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                                 },
                                 None => {
                                     *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream did not provide resource" }).await;
-                                    self.time_to_next_event = None;
+                                    self.time_to_next_process_event = None;
                                 }
                             }
                         },
                         Some(DiscreteStockState::Empty { .. }) => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is empty" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         }
                         None => {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::ProcessNonStart { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_event = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 },
                 (_, BasicEnvironmentState::Stopped) => {
-                    self.time_to_next_event = None;
+                    self.time_to_next_process_event = None;
                 },
                 (Some((time, resource)), _) => {
-                    self.time_to_next_event = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                     *source_event_id = self.log(cx.time(), source_event_id.clone(), DiscreteProcessLogType::ProcessContinue { resource: resource.clone() }).await;
                 }
             }
@@ -1014,7 +1024,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
@@ -1092,10 +1102,11 @@ pub struct DiscreteParallelProcess<
     pub processes_complete: VecDeque<SendType>,
 
     // Internals
-    time_to_next_event: Option<Duration>,
+    time_to_next_process_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     scheduled_event: Option<(MonotonicTime, ActionKey)>,
     next_event_index: u64,
-    pub previous_check_time: MonotonicTime,
+    previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -1124,7 +1135,8 @@ impl<
             env_state: BasicEnvironmentState::Normal,
             processes_complete: VecDeque::new(),
             
-            time_to_next_event: None,
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -1210,7 +1222,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
 
             match &self.env_state {
                 BasicEnvironmentState::Stopped => {
-                    self.time_to_next_event = None;
+                    self.time_to_next_process_event = None;
                 },
                 BasicEnvironmentState::Normal => {
                     loop {
@@ -1240,7 +1252,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                         }
                     }
                     
-                    self.time_to_next_event = if self.processes_in_progress.is_empty() {
+                    self.time_to_next_process_event = if self.processes_in_progress.is_empty() {
                         None
                     } else {
                         // Find the minimum time to next event
@@ -1264,7 +1276,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            match self.time_to_next_event {
+            match self.time_to_next_process_event {
                 None => {},
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
