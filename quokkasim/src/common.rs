@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, fmt::{Display, Formatter, Result as FmtResult}, time::Duration};
+use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}, time::Duration};
 use indexmap::IndexMap;
 use rand::{rngs::SmallRng, SeedableRng};
 use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
@@ -264,7 +264,7 @@ impl DelayModes {
         // If in a delay, decrement the time remaining. If time left is zero, return the delay's name
         let active_delay = if let Some((delay_name, delay_dur_remaining)) = self.active_delay_mut() {
             *delay_dur_remaining = delay_dur_remaining.saturating_sub(time_elapsed);
-            Some((delay_name.clone(), delay_dur_remaining.clone()))
+            Some((delay_name.clone(), *delay_dur_remaining))
         } else {
             None
         };
@@ -282,11 +282,8 @@ impl DelayModes {
         } else {
             // If not in delay, decrement all times until delay
             self.state.iter_mut().for_each(|(name, state)| {
-                match state {
-                    DelayState::TimeUntilDelay(duration) => {
-                        *duration = duration.saturating_sub(time_elapsed);
-                    },
-                    _ => {}
+                if let DelayState::TimeUntilDelay(duration) = state {
+                    *duration = duration.saturating_sub(time_elapsed);
                 }
             });
         }
@@ -318,14 +315,14 @@ impl DelayModes {
 
     pub fn get_next_event(&self) -> Option<(String, DelayState)> {
         if let Some((delay_name, time_until_fix)) = self.active_delay() {
-            return Some((delay_name.clone(), DelayState::TimeUntilFix(time_until_fix.clone())));
+            return Some((delay_name.clone(), DelayState::TimeUntilFix(*time_until_fix)));
         }
         let to_next_delay = self.state.iter().filter_map(|(name, state)| {
             match state {
                 DelayState::TimeUntilDelay(duration) => Some((name, duration)),
                 _ => None,
             }
-        }).min_by_key(|(_, duration)| *duration).map(|(name, duration)| (name.clone(), DelayState::TimeUntilDelay(duration.clone())));
+        }).min_by_key(|(_, duration)| *duration).map(|(name, duration)| (name.clone(), DelayState::TimeUntilDelay(*duration)));
         to_next_delay
     }
 

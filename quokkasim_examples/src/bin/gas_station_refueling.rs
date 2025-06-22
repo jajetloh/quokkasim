@@ -40,7 +40,7 @@ impl DerefMut for FuelStation { fn deref_mut(&mut self) -> &mut Self::Target { &
 impl Model for FuelStation {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            self.0.update_state(EventId::from_init(), &mut Self::as_inner_context(cx)).await;
+            self.0.update_state(EventId::from_init(), Self::as_inner_context(cx)).await;
             self.into()
         }
     }

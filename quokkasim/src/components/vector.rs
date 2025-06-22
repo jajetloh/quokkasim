@@ -2,7 +2,7 @@ use futures::{future::join_all};
 use nexosim::{model::Model, ports::{EventQueue, Output, Requestor}};
 use serde::{ser::SerializeStruct, Serialize};
 use tai_time::MonotonicTime;
-use std::{collections::HashMap, fmt::Debug, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 use crate::prelude::*;
 
@@ -404,7 +404,7 @@ where
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -477,7 +477,7 @@ where
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
             
@@ -864,7 +864,7 @@ where
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -955,7 +955,7 @@ where
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
              
@@ -1169,7 +1169,7 @@ where
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -1253,7 +1253,7 @@ where
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
 
@@ -1442,7 +1442,7 @@ where
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if is_in_delay || is_in_process {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -1507,7 +1507,7 @@ where
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
             
@@ -1700,7 +1700,7 @@ where
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -1763,7 +1763,7 @@ where
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
 

@@ -439,7 +439,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -519,7 +519,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T>
                     self.time_to_next_process_event = Some(*time);
                 }
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 },
             }
             
@@ -814,7 +814,7 @@ impl<
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -875,7 +875,7 @@ impl<
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| delay_state.clone());
+                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
             
@@ -1060,7 +1060,7 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -1331,7 +1331,7 @@ impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;

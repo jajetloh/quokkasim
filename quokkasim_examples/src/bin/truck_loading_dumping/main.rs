@@ -160,7 +160,7 @@ fn main() {
         .with_code("ST-TR0")
         .with_type("TruckStock")
         .with_initial_resource(ItemDeque::from(
-            (0..3).into_iter().map(|i| Truck { ore: None, truck_id: format!("Truck_{:02}", i) }).collect::<Vec<Truck>>()
+            (0..3).map(|i| Truck { ore: None, truck_id: format!("Truck_{:02}", i) }).collect::<Vec<Truck>>()
         ))
         .with_low_capacity(0)
         .with_max_capacity(10),

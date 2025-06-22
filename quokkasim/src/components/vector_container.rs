@@ -23,11 +23,7 @@ impl ResourceAdd<f64> for F64Container {
 
 impl ResourceRemoveAll<f64> for F64Container {
     fn remove_all(&mut self) -> f64 {
-        if let Some(resource) = self.resource.take() {
-            resource
-        } else {
-            0.0
-        }
+        self.resource.take().unwrap_or(0.0)
     }
 }
 
@@ -63,11 +59,7 @@ impl ItemFactory<F64Container> for F64ContainerFactory {
     fn create_item(&mut self) -> F64Container {
         let id = format!("{}{:0width$}", self.prefix, self.next_index, width = self.num_digits);
         self.next_index += 1;
-        let resource = if let Some(distr) = &mut self.create_quantity_distr {
-            Some(distr.sample())
-        } else {
-            None
-        };
+        let resource = self.create_quantity_distr.as_mut().map(|distr| distr.sample());
         F64Container {
             id,
             resource,
@@ -85,11 +77,7 @@ pub struct Vector3Container {
 
 impl ResourceRemoveAll<Vector3> for Vector3Container {
     fn remove_all(&mut self) -> Vector3 {
-        if let Some(resource) = self.resource.take() {
-            resource
-        } else {
-            Vector3::default()
-        }
+        self.resource.take().unwrap_or_default()
     }
 }
 
@@ -319,7 +307,7 @@ impl<
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
@@ -629,7 +617,7 @@ impl<
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check.clone());
+                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
                             *source_event_id = self.log(time, source_event_id.clone(), DiscreteProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
