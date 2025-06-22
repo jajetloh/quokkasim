@@ -21,9 +21,9 @@ impl Logger for TruckingProcessLogger {
         self.buffer
     }
 
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         TruckingProcessLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }

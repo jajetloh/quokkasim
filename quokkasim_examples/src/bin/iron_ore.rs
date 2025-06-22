@@ -234,9 +234,9 @@ impl Logger for IronOreProcessLogger {
         self.buffer
     }
 
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         IronOreProcessLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }
@@ -258,9 +258,9 @@ impl Logger for IronOreStockLogger {
         self.buffer
     }
 
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         IronOreStockLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }

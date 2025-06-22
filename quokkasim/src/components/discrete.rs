@@ -266,9 +266,9 @@ impl<T> Logger for DiscreteStockLogger<T> where T: Serialize + Send + 'static {
     fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         DiscreteStockLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }
@@ -645,9 +645,9 @@ impl<T> Logger for DiscreteProcessLogger<T> where T: Serialize, T: Send + 'stati
     fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         DiscreteProcessLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }

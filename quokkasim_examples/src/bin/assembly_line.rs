@@ -210,9 +210,9 @@ fn main() {
     connect_components!(&mut env_controller, &mut process_par).unwrap();
     connect_components!(&mut env_controller, &mut sink).unwrap();
 
-    let mut queue_logger = ComponentLogger::ProtoCarStockLogger(DiscreteStockLogger::new("StockLogger".into()));
-    let mut process_logger = ComponentLogger::ProtoCarProcessLogger(DiscreteProcessLogger::new("ProcessLogger".into()));
-    let mut env_logger = ComponentLogger::BasicEnvironmentLogger(BasicEnvironmentLogger::new("EnvControllerLogger".into()));
+    let mut queue_logger = ComponentLogger::ProtoCarStockLogger(DiscreteStockLogger::new("StockLogger"));
+    let mut process_logger = ComponentLogger::ProtoCarProcessLogger(DiscreteProcessLogger::new("ProcessLogger"));
+    let mut env_logger = ComponentLogger::BasicEnvironmentLogger(BasicEnvironmentLogger::new("EnvControllerLogger"));
 
     connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
     connect_logger!(&mut queue_logger, &mut queue_2).unwrap();

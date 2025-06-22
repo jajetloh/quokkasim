@@ -332,9 +332,9 @@ pub struct BasicEnvironmentLogger {
 impl Logger for BasicEnvironmentLogger {
     type RecordType = BasicEnvironmentLog;
 
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         BasicEnvironmentLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }
@@ -399,7 +399,7 @@ pub trait Logger {
         writer.flush()?;
         Ok(()) 
     }
-    fn new(name: String) -> Self;
+    fn new(name: &str) -> Self;
 }
 
 pub trait CustomComponentConnection {

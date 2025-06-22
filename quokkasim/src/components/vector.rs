@@ -263,9 +263,9 @@ impl<T: Serialize + ResourceTotal<f64> + Send + 'static> Logger for VectorStockL
     fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         VectorStockLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }
@@ -554,9 +554,9 @@ impl<T> Logger for VectorProcessLogger<T> where VectorProcessLog<T>: Serialize, 
     fn get_buffer(self) -> EventQueue<Self::RecordType> {
         self.buffer
     }
-    fn new(name: String) -> Self {
+    fn new(name: &str) -> Self {
         VectorProcessLogger {
-            name,
+            name: name.into(),
             buffer: EventQueue::new(),
         }
     }
