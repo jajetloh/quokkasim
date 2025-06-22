@@ -1,7 +1,13 @@
 [package]
 name = "quokkasim_derive_macros"
-version = "0.1.0"
+description = "Derive macros for the QuokkaSim simulation framework."
+version = "0.2.0"
 edition = "2021"
+readme = "../README.md"
+repository = "https://github.com/jajetloh/quokkasim"
+documentation = "https://jajetloh.github.io/quokkasim-book/"
+license-file = "LICENCE"
+authors = ["Ja-Jet Loh"]
 
 [lib]
 proc-macro = true
