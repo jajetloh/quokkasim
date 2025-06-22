@@ -724,7 +724,7 @@ dependencies = [
  "indexmap",
  "nexosim",
  "paste",
- "quokkasim_derive_macros",
+ "quokkasim_derive_macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand",
  "rand_distr",
  "serde",
@@ -737,6 +737,17 @@ dependencies = [
 [[package]]
 name = "quokkasim_derive_macros"
 version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "quokkasim_derive_macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "048676dffd73a57cf38af05e1f09b8a8cc9a47f6be34d902c2579792d223e147"
 dependencies = [
  "proc-macro2",
  "quote",
