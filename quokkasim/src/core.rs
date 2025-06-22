@@ -172,7 +172,7 @@ pub trait Stock<
         async move {}
     }
 
-    fn emit_change(&mut self, payload: EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send;
+    fn emit_change(&mut self, payload: (Self::StockState, EventId), cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send;
 
     fn add(&mut self, mut payload: (ReceiveType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + where ReceiveType: 'static {
         async move {
@@ -506,11 +506,11 @@ macro_rules! define_model_enums {
             F64Process($crate::components::vector::VectorProcess<f64, f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorProcess<f64, f64, f64, f64>>),
             F64Source($crate::components::vector::VectorSource<f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSource<f64, f64>>),
             F64Sink($crate::components::vector::VectorSink<f64, f64, f64>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSink<f64, f64, f64>>),
-            F64Combiner1($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 1], 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>>),
-            F64Combiner2($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 2], 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>>),
-            F64Combiner3($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 3], 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>>),
-            F64Combiner4($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 4], 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>>),
-            F64Combiner5($crate::components::vector::VectorCombiner<f64, f64, f64, [f64; 5], 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>>),
+            F64Combiner1($crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 1], f64, 1>>),
+            F64Combiner2($crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 2], f64, 2>>),
+            F64Combiner3($crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 3], f64, 3>>),
+            F64Combiner4($crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 4], f64, 4>>),
+            F64Combiner5($crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>, $crate::nexosim::Mailbox<$crate::components::vector::VectorCombiner<f64, f64, [f64; 5], f64, 5>>),
             F64Splitter1($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 1>>),
             F64Splitter2($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 2>>),
             F64Splitter3($crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>, $crate::nexosim::Mailbox<$crate::components::vector::VectorSplitter<f64, f64, f64, f64, 3>>),
@@ -596,6 +596,128 @@ macro_rules! define_model_enums {
                     // F64Sink
                     ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Sink(b, bm), _) => {
                         a.state_emitter.connect($crate::components::vector::VectorSink::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+
+                    // F64Combiner1
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Combiner1(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Combiner1(a, am), $ComponentModel::F64Stock(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Combiner2(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Combiner2(a, am), $ComponentModel::F64Stock(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Combiner3(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Combiner3(a, am), $ComponentModel::F64Stock(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Combiner4(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Combiner4(a, am), $ComponentModel::F64Stock(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Combiner5(b, bm), Some(n)) => {
+                        a.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, bm.address());
+                        b.req_upstreams[n].connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstreams[n].connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Combiner5(a, am), $ComponentModel::F64Stock(b, bm), _) => {
+                        b.state_emitter.connect($crate::components::vector::VectorCombiner::update_state, am.address());
+                        a.req_downstream.connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstream.connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Splitter1(a, am), $ComponentModel::F64Stock(b, bm), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, am.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Splitter1(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Splitter2(a, am), $ComponentModel::F64Stock(b, bm), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, am.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Splitter2(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Splitter3(a, am), $ComponentModel::F64Stock(b, bm), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, am.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Splitter3(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Splitter4(a, am), $ComponentModel::F64Stock(b, bm), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, am.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Splitter4(b, bm), _) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
+                        b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
+                        b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Splitter5(a, am), $ComponentModel::F64Stock(b, bm), Some(n)) => {
+                        b.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, am.address());
+                        a.req_downstreams[n].connect($crate::components::vector::VectorStock::get_state_async, bm.address());
+                        a.push_downstreams[n].connect($crate::components::vector::VectorStock::add, bm.address());
+                        Ok(())
+                    },
+                    ($ComponentModel::F64Stock(a, am), $ComponentModel::F64Splitter5(b, bm), n) => {
+                        a.state_emitter.connect($crate::components::vector::VectorSplitter::update_state, bm.address());
                         b.req_upstream.connect($crate::components::vector::VectorStock::get_state_async, am.address());
                         b.withdraw_upstream.connect($crate::components::vector::VectorStock::remove, am.address());
                         Ok(())
@@ -1059,6 +1181,8 @@ macro_rules! define_model_enums {
                 use $crate::register_component_arms;
                 register_component_arms!(component, sim_init,
                     F64Process, F64Stock, F64Source, F64Sink,
+                    F64Combiner1, F64Combiner2, F64Combiner3, F64Combiner4, F64Combiner5,
+                    F64Splitter1, F64Splitter2, F64Splitter3, F64Splitter4, F64Splitter5,
                     Vector3Stock, Vector3Process, Vector3Source, Vector3Sink,
                     Vector3Combiner1, Vector3Combiner2, Vector3Combiner3, Vector3Combiner4, Vector3Combiner5,
                     Vector3Splitter1, Vector3Splitter2, Vector3Splitter3, Vector3Splitter4, Vector3Splitter5,
@@ -1075,7 +1199,9 @@ macro_rules! define_model_enums {
                 use $crate::get_address_arms;
 
                 get_address_arms!(self,
-                    F64Stock, F64Process, F64Source, F64Sink,
+                    F64Process, F64Stock, F64Source, F64Sink,
+                    F64Combiner1, F64Combiner2, F64Combiner3, F64Combiner4, F64Combiner5,
+                    F64Splitter1, F64Splitter2, F64Splitter3, F64Splitter4, F64Splitter5,
                     Vector3Stock, Vector3Process, Vector3Source, Vector3Sink,
                     Vector3Combiner1, Vector3Combiner2, Vector3Combiner3, Vector3Combiner4, Vector3Combiner5,
                     Vector3Splitter1, Vector3Splitter2, Vector3Splitter3, Vector3Splitter4, Vector3Splitter5,
@@ -1180,7 +1306,10 @@ macro_rules! define_model_enums {
 
                 connect_logger_arms!(a, b, n,
                     VectorStockLoggerF64 => [F64Stock],
-                    VectorProcessLoggerF64 => [F64Process, F64Source, F64Sink],
+                    VectorProcessLoggerF64 => [F64Process, F64Source, F64Sink,
+                        F64Combiner1, F64Combiner2, F64Combiner3, F64Combiner4, F64Combiner5,
+                        F64Splitter1, F64Splitter2, F64Splitter3, F64Splitter4, F64Splitter5
+                    ],
                     
                     Vector3StockLogger => [Vector3Stock],
                     Vector3ProcessLogger => [
@@ -1252,7 +1381,7 @@ macro_rules! define_model_enums {
                 match (self, addr) {
                     ($ScheduledEventConfig::SetLowCapacity(low_capacity), $ComponentModelAddress::F64Stock(addr)) => {
                         scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::with_low_capacity_inplace, low_capacity.clone(), addr.clone())?;
-                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::emit_change, source_event_id, addr.clone())?;
+                        scheduler.schedule_event(time, $crate::components::vector::VectorStock::<f64>::add, (0., source_event_id), addr.clone())?; // To trigger state change checks etc.
                         Ok(())
                     },
                     ($ScheduledEventConfig::SetProcessQuantity(distr), $ComponentModelAddress::F64Process(addr)) => {

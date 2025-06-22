@@ -39,7 +39,7 @@ impl StateEq for VectorStockState {
 }
 
 #[derive(WithMethods)]
-pub struct VectorStock<T: Clone + Send + 'static> {
+pub struct VectorStock<T: ResourceTotal<f64> + Clone + Send + 'static> {
     // Identification
     pub element_name: String,
     pub element_code: String,
@@ -61,7 +61,7 @@ pub struct VectorStock<T: Clone + Send + 'static> {
     next_event_id: u64,
 }
 
-impl<T: Clone + Default + Send> Default for VectorStock<T> {
+impl<T: ResourceTotal<f64> + Clone + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
             element_name: "VectorStock".into(),
@@ -116,7 +116,7 @@ where
         async move {
             self.prev_state = Some(self.get_state().clone());
             self.resource.add(payload.0.clone());
-            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Add { quantity: payload.0.total(), vector: payload.0.clone() }).await;
+            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Add { balance: self.resource.total(), vector: payload.0.clone() }).await;
         }
     }
 
@@ -127,7 +127,7 @@ where
             if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state) {
                 // Send 1ns in future to avoid infinite loops with processes
                 let next_time = cx.time() + Duration::from_nanos(1);
-                cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
+                cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
             }
             self.prev_state = Some(current_state);
         }
@@ -141,7 +141,7 @@ where
         async move {
             self.prev_state = Some(self.get_state());
             let result = self.resource.remove(payload.0);
-            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Remove { quantity: payload.0, vector: result.clone() }).await;
+            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Remove { balance: self.resource.total(), vector: result.clone() }).await;
             result
         }
     }
@@ -155,7 +155,7 @@ where
                 Some(prev_state) => {
                     if !prev_state.is_same_state(&current_state) {
                         let next_time = cx.time() + Duration::from_nanos(1);
-                        cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
+                        cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
                     }
                 }
             }
@@ -163,9 +163,9 @@ where
         }
     }
 
-    fn emit_change(&mut self, source_event_id: EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
+    fn emit_change(&mut self, payload: (Self::StockState, EventId), cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
         async move {
-            let nm = self.log(cx.time(), source_event_id, VectorStockLogType::EmitChange).await;
+            let nm = self.log(cx.time(), payload.1, VectorStockLogType::StateChange { new_state: payload.0 }).await;
             self.state_emitter.send(nm).await;
         }
     }
@@ -206,15 +206,15 @@ where
     }
 }
 
-impl<T: Clone + Send> Model for VectorStock<T> {}
+impl<T: ResourceTotal<f64> + Clone + Send> Model for VectorStock<T> {}
 
-pub struct VectorStockLogger<T> where T: Send {
+pub struct VectorStockLogger<T: ResourceTotal<f64> + Send> {
     pub name: String,
     pub buffer: EventQueue<VectorStockLog<T>>,
 }
 
 #[derive(Clone)]
-pub struct VectorStockLog<T> {
+pub struct VectorStockLog<T: ResourceTotal<f64>> {
     pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
@@ -224,13 +224,13 @@ pub struct VectorStockLog<T> {
 }
 
 #[derive(Clone)]
-pub enum VectorStockLogType<T> {
-    Add { quantity: f64, vector: T },
-    Remove { quantity: f64, vector: T },
-    EmitChange,
+pub enum VectorStockLogType<T: ResourceTotal<f64>> {
+    Add { balance: f64, vector: T },
+    Remove { balance: f64, vector: T },
+    StateChange { new_state: VectorStockState },
 }
 
-impl<T: Serialize> Serialize for VectorStockLog<T> {
+impl<T: Serialize + ResourceTotal<f64>> Serialize for VectorStockLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -241,19 +241,21 @@ impl<T: Serialize> Serialize for VectorStockLog<T> {
         state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let (log_type, total, vector_str): (&str, Option<f64>, Option<String>) = match &self.details {
-            VectorStockLogType::Add { quantity, vector } => ("add", Some(*quantity), Some(serde_json::to_string(vector).map_err(serde::ser::Error::custom)?)),
-            VectorStockLogType::Remove { quantity, vector } => ("remove", Some(*quantity), Some(serde_json::to_string(vector).map_err(serde::ser::Error::custom)?)),
-            VectorStockLogType::EmitChange => ("emit_change", None, None),
+        let (log_type, balance, vector_total, vector_str, new_state_str): (&str, Option<f64>, Option<f64>, Option<String>, Option<String>) = match &self.details {
+            VectorStockLogType::Add { balance, vector } => ("add", Some(*balance), Some(vector.total()), Some(serde_json::to_string(vector).map_err(serde::ser::Error::custom)?), None),
+            VectorStockLogType::Remove { balance, vector } => ("remove", Some(*balance), Some(vector.total()), Some(serde_json::to_string(vector).map_err(serde::ser::Error::custom)?), None),
+            VectorStockLogType::StateChange { new_state } => ("emit_change", None, None, None, Some(new_state.get_name())),
         };
         state.serialize_field("log_type", &log_type)?;
-        state.serialize_field("total", &total)?;
+        state.serialize_field("balance", &balance)?;
+        state.serialize_field("vector_total", &vector_total)?;
         state.serialize_field("vector", &vector_str)?;
+        state.serialize_field("new_state", &new_state_str)?;
         state.end()
     }
 }
 
-impl<T: Serialize + Send + 'static> Logger for VectorStockLogger<T> {
+impl<T: Serialize + ResourceTotal<f64> + Send + 'static> Logger for VectorStockLogger<T> {
     type RecordType = VectorStockLog<T>;
     fn get_name(&self) -> &String {
         &self.name

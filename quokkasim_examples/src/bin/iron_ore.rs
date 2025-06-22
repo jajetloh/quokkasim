@@ -174,22 +174,24 @@ impl Serialize for IronOreStockLog {
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
 
-        let (log_type, total, fe, other_elements, fe_pc, magnetite, hematite, limonite) = match &self.details {
-            VectorStockLogType::Add { quantity, vector } => {
-                ("Add", Some(vector.total()), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite))
+        let (log_type, new_state, balance, vector_total, fe, other_elements, fe_pc, magnetite, hematite, limonite) = match &self.details {
+            VectorStockLogType::Add { balance, vector } => {
+                ("Add", None, Some(balance), Some(vector.total()), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite))
             },
-            VectorStockLogType::Remove { quantity, vector } => {
-                ("Remove", Some(vector.total()), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite))
+            VectorStockLogType::Remove { balance, vector } => {
+                ("Remove", None, Some(balance), Some(vector.total()), Some(vector.fe), Some(vector.other_elements), Some(vector.fe / vector.total()), Some(vector.magnetite), Some(vector.hematite), Some(vector.limonite))
             },
-            VectorStockLogType::EmitChange => {
-                ("StateChange", None, None, None, None, None, None, None)
+            VectorStockLogType::StateChange { new_state }=> {
+                ("StateChange", Some(new_state.get_name()), None, None, None, None, None, None, None, None)
             },
             _ => {
                 unimplemented!()
             }
         };
         state.serialize_field("log_type", &log_type)?;
-        state.serialize_field("total", &total)?;
+        state.serialize_field("new_state", &new_state)?;
+        state.serialize_field("balance", &balance)?;
+        state.serialize_field("vector_total", &vector_total)?;
         state.serialize_field("fe", &fe)?;
         state.serialize_field("other_elements", &other_elements)?;
         state.serialize_field("fe_%", &fe_pc)?;
@@ -335,7 +337,7 @@ fn main() {
         VectorStock::new()
             .with_name("MyStock1")
             .with_code("SP1") 
-            .with_name("IronOreStock")
+            .with_type("IronOreStock")
             .with_initial_resource(IronOre { fe: 60., other_elements: 40., magnetite: 10., hematite: 5., limonite: 15. })
             .with_low_capacity(10.)
             .with_max_capacity(100.),
@@ -351,13 +353,12 @@ fn main() {
             .with_process_time_distr(Distribution::Constant(10.)),
         Mailbox::new(),
     );
-    let process1_addr = process1.get_address();
 
     let mut stock2 = ComponentModel::IronOreStock(
         VectorStock::new()
             .with_name("MyStock2")
             .with_code("SP2") 
-            .with_name("IronOreStock")
+            .with_type("IronOreStock")
             .with_initial_resource(IronOre { fe: 3., other_elements: 2., magnetite: 0.5, hematite: 0.25, limonite: 0.75 })
             .with_low_capacity(10.)
             .with_max_capacity(100.),

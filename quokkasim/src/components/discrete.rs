@@ -191,7 +191,7 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
             if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state) {
                 // Send 1ns in future to avoid infinite loops with processes
                 let next_time = cx.time() + Duration::from_nanos(1);
-                cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
+                cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
             }
             self.prev_state = Some(current_state);
         }
@@ -216,7 +216,7 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
                 Some(prev_state) => {
                     if !prev_state.is_same_state(&current_state) {
                         let next_time = cx.time() + Duration::from_nanos(1);
-                        cx.schedule_event(next_time, Self::emit_change, payload.1.clone()).unwrap();
+                        cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
                     }
                 }
             }
@@ -224,10 +224,10 @@ impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for Discre
         }
     }
 
-    fn emit_change(&mut self, source_event_id: EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
+    fn emit_change(&mut self, source_event_id: (Self::StockState, EventId), cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> {
         async move {
             let state = self.get_state().clone();
-            let nm = self.log(cx.time(), source_event_id, DiscreteStockLogType::<T>::StateChange(state)).await;
+            let nm = self.log(cx.time(), source_event_id.1, DiscreteStockLogType::<T>::StateChange(state)).await;
             self.state_emitter.send(nm).await;
         }
     }

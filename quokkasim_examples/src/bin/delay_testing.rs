@@ -30,36 +30,67 @@ impl CustomLoggerConnection for ComponentLogger {
 
 fn main() {
 
-    // let mut stock1 = ComponentModel::F64Stock(
-    //     VectorStock::new()
-    //         .with_name("Stock1"), ())
+    let mut stock1 = ComponentModel::F64Stock(
+        VectorStock::new()
+            .with_name("Stock1")
+            .with_code("S1")
+            .with_initial_resource(1000.)
+            .with_low_capacity(10.)
+            .with_max_capacity(1000.),
+        Mailbox::new()
+    );
 
-    // let mut queue_logger = ComponentLogger::StringStockLogger(DiscreteStockLogger::new("QueueLogger".into()));
-    // let mut process_logger = ComponentLogger::StringProcessLogger(DiscreteProcessLogger::new("ProcessLogger".into()));
+    let mut splitter = ComponentModel::F64Splitter2(                
+        VectorSplitter::new()
+            .with_name("Splitter")
+            .with_code("P1")
+            .with_process_quantity_distr(Distribution::Constant(10.))
+            .with_process_time_distr(Distribution::Constant(10.)),
+        Mailbox::new()
+    );
 
-    // connect_logger!(&mut queue_logger, &mut queue_1).unwrap();
-    // connect_logger!(&mut queue_logger, &mut queue_2).unwrap();
-    // connect_logger!(&mut queue_logger, &mut queue_3).unwrap();
-    // connect_logger!(&mut process_logger, &mut source).unwrap();
-    // connect_logger!(&mut process_logger, &mut process_1).unwrap();
-    // connect_logger!(&mut process_logger, &mut process_par).unwrap();
-    // connect_logger!(&mut process_logger, &mut sink).unwrap();
+    let mut stock2 = ComponentModel::F64Stock(
+        VectorStock::new()
+            .with_name("Stock2")
+            .with_code("S2")
+            .with_low_capacity(10.)
+            .with_max_capacity(400.),
+        Mailbox::new()
+    );
 
-    // let mut sim_builder = SimInit::new();
-    // sim_builder = register_component!(sim_builder, source);
-    // sim_builder = register_component!(sim_builder, queue_1);
-    // sim_builder = register_component!(sim_builder, process_1);
-    // sim_builder = register_component!(sim_builder, queue_2);
-    // sim_builder = register_component!(sim_builder, process_par);
-    // sim_builder = register_component!(sim_builder, queue_3);
-    // sim_builder = register_component!(sim_builder, sink);
+    let mut stock3 = ComponentModel::F64Stock(
+        VectorStock::new()
+            .with_name("Stock3")
+            .with_code("S3")
+            .with_low_capacity(10.)
+            .with_max_capacity(1000.),
+        Mailbox::new()
+    );
 
-    // let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+    connect_components!(&mut stock1, &mut splitter).unwrap();
+    connect_components!(&mut splitter, &mut stock2, 0).unwrap();
+    connect_components!(&mut splitter, &mut stock3, 1).unwrap();
 
-    // simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(200)).unwrap();
+    let mut stock_logger = ComponentLogger::VectorStockLoggerF64(VectorStockLogger::new("StockLogger".into()));
+    let mut process_logger = ComponentLogger::VectorProcessLoggerF64(VectorProcessLogger::new("ProcessLogger".into()));
 
-    // let output_dir = "outputs/discrete_queue";
-    // create_dir_all(output_dir).unwrap();
-    // queue_logger.write_csv(output_dir).unwrap();
-    // process_logger.write_csv(output_dir).unwrap();
+    connect_logger!(&mut stock_logger, &mut stock1).unwrap();
+    connect_logger!(&mut stock_logger, &mut stock2).unwrap();
+    connect_logger!(&mut stock_logger, &mut stock3).unwrap();
+    connect_logger!(&mut process_logger, &mut splitter).unwrap();
+    
+    let mut sim_builder = SimInit::new();
+    sim_builder = register_component!(sim_builder, stock1);
+    sim_builder = register_component!(sim_builder, stock2);
+    sim_builder = register_component!(sim_builder, stock3);
+    sim_builder = register_component!(sim_builder, splitter);
+
+    let mut simu = sim_builder.init(MonotonicTime::EPOCH).unwrap().0;
+
+    simu.step_until(MonotonicTime::EPOCH + Duration::from_secs(3600)).unwrap();
+
+    let output_dir = "outputs/delay_testing";
+    create_dir_all(output_dir).unwrap();
+    stock_logger.write_csv(output_dir).unwrap();
+    process_logger.write_csv(output_dir).unwrap();
 }
