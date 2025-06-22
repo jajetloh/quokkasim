@@ -20,8 +20,18 @@ strum = "0.27.1"
 strum_macros = "0.27.1"
 
 [[test]]
-name = "material_blending"
-path = "src/bin/material_blending.rs"
+name = "truck_loading_dumping"
+path = "src/bin/truck_loading_dumping/main.rs"
+harness = false
+
+[[test]]
+name = "assembly_line"
+path = "src/bin/assembly_line.rs"
+harness = false
+
+[[test]]
+name = "delay_testing"
+path = "src/bin/delay_testing.rs"
 harness = false
 
 [[test]]
@@ -30,8 +40,18 @@ path = "src/bin/discrete_queue.rs"
 harness = false
 
 [[test]]
+name = "gas_station_refueling"
+path = "src/bin/gas_station_refueling.rs"
+harness = false
+
+[[test]]
 name = "iron_ore"
 path = "src/bin/iron_ore.rs"
+harness = false
+
+[[test]]
+name = "material_blending"
+path = "src/bin/material_blending.rs"
 harness = false
 
 [[test]]
@@ -45,6 +65,6 @@ path = "src/bin/source_sink.rs"
 harness = false
 
 [[test]]
-name = "truck_loading_dumping"
-path = "src/bin/truck_loading_dumping/main.rs"
+name = "transport"
+path = "src/bin/transport.rs"
 harness = false
