@@ -5,4 +5,5 @@ pub use crate::components::{
 };
 pub use crate::core::*;
 pub use crate::common::*;
+pub use crate::delays::*;
 pub use quokkasim_derive_macros::WithMethods;

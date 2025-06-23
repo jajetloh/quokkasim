@@ -4,6 +4,7 @@ pub mod prelude;
 pub mod common;
 pub mod core;
 pub mod components;
+pub mod delays;
 pub use strum;
 pub use strum_macros;
 pub mod nexosim {
