@@ -39,7 +39,7 @@ impl StateEq for VectorStockState {
 }
 
 #[derive(WithMethods)]
-pub struct VectorStock<T: ResourceTotal<f64> + Clone + Send + 'static> {
+pub struct VectorStock<T: ResourceTotal<f64> + Clone + Debug + Send + 'static> {
     // Identification
     pub element_name: String,
     pub element_code: String,
@@ -61,7 +61,7 @@ pub struct VectorStock<T: ResourceTotal<f64> + Clone + Send + 'static> {
     next_event_id: u64,
 }
 
-impl<T: ResourceTotal<f64> + Clone + Default + Send> Default for VectorStock<T> {
+impl<T: ResourceTotal<f64> + Clone + Debug + Default + Send> Default for VectorStock<T> {
     fn default() -> Self {
         VectorStock {
             element_name: "VectorStock".into(),
@@ -78,7 +78,7 @@ impl<T: ResourceTotal<f64> + Clone + Default + Send> Default for VectorStock<T> 
     }
 }
 
-impl<T: Clone + Send> Stock<T, T, f64, T> for VectorStock<T>
+impl<T: Clone + Send + Debug> Stock<T, T, f64, T> for VectorStock<T>
 where
     T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>
 {
@@ -188,7 +188,7 @@ where
     }
 }
 
-impl<T: Clone + Send> VectorStock<T>
+impl<T: Clone + Send + Debug> VectorStock<T>
 where
     Self: Default,
     T: ResourceTotal<f64>
@@ -206,7 +206,7 @@ where
     }
 }
 
-impl<T: ResourceTotal<f64> + Clone + Send> Model for VectorStock<T> {}
+impl<T: ResourceTotal<f64> + Clone + Send + Debug> Model for VectorStock<T> {}
 
 pub struct VectorStockLogger<T: ResourceTotal<f64> + Send> {
     pub name: String,
@@ -277,10 +277,10 @@ impl<T: Serialize + ResourceTotal<f64> + Send + 'static> Logger for VectorStockL
 
 #[derive(WithMethods)]
 pub struct VectorProcess<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -312,10 +312,10 @@ pub struct VectorProcess<
     previous_check_time: MonotonicTime,
 }
 impl<
-    ReceiveParameterType: Clone + Send,
-    ReceiveType: Clone + Send,
-    InternalResourceType: Clone + Send,
-    SendType: Clone + Send
+    ReceiveParameterType: Clone + Send + Debug,
+    ReceiveType: Clone + Send + Debug,
+    InternalResourceType: Clone + Send + Debug,
+    SendType: Clone + Send + Debug,
 > Default for VectorProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     fn default() -> Self {
         VectorProcess {
@@ -347,10 +347,10 @@ impl<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send,
-    ReceiveType: Clone + Send,
-    InternalResourceType: Clone + Send,
-    SendType: Clone + Send
+    ReceiveParameterType: Clone + Send + Debug,
+    ReceiveType: Clone + Send + Debug,
+    InternalResourceType: Clone + Send + Debug,
+    SendType: Clone + Send + Debug,
 > Model for VectorProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -361,7 +361,7 @@ impl<
     }
 }
 
-impl<T: Clone + Send> Process for VectorProcess<f64, T, T, T>
+impl<T: Clone + Send + Debug> Process for VectorProcess<f64, T, T, T>
 where
     T: ResourceAdd<T> + ResourceRemove<f64, T> + ResourceTotal<f64>,
 {
@@ -725,10 +725,10 @@ impl<T> Serialize for VectorProcessLog<T> where T: Serialize + Send {
 
 #[derive(WithMethods)]
 pub struct VectorCombiner<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     const M: usize
 > {
     // Identification
@@ -763,10 +763,10 @@ pub struct VectorCombiner<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     const M: usize
 > Model for VectorCombiner<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, M> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
@@ -779,8 +779,8 @@ impl<
 }
 
 impl<
-    T: Clone + Send + 'static,
-    U: Clone + Send,
+    T: Clone + Debug + Send + 'static,
+    U: Clone + Send + Debug,
     const M: usize
 > Default for VectorCombiner<U, T, [T; M], T, M> {
     fn default() -> Self {
@@ -813,7 +813,7 @@ impl<
     }
 }
 
-impl<T: Send + 'static + Clone + Default, const M: usize> Process for VectorCombiner<f64, T, [T; M], T, M>
+impl<T: Send + 'static + Clone + Debug + Default, const M: usize> Process for VectorCombiner<f64, T, [T; M], T, M>
 where
     T: ResourceAdd<T> + ResourceTotal<f64>,
 {
@@ -1025,10 +1025,10 @@ where
  */
 #[derive(WithMethods)]
 pub struct VectorSplitter<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     const N: usize
 > {
     // Identification
@@ -1063,10 +1063,10 @@ pub struct VectorSplitter<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     const N: usize
 > Default for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> {
     fn default() -> Self {
@@ -1100,10 +1100,10 @@ impl<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     const N: usize
 > Model for VectorSplitter<ReceiveParameterType, ReceiveType, InternalResourceType, SendType, N> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
@@ -1115,7 +1115,7 @@ impl<
     }
 }
 
-impl<T: Send + 'static + Clone + Default, const N: usize> Process for VectorSplitter<f64, T, T, T, N>
+impl<T: Clone + Debug + Send + 'static, const N: usize> Process for VectorSplitter<f64, T, T, T, N>
 where
     T: ResourceRemove<f64, T> + ResourceTotal<f64>,
 {
@@ -1323,8 +1323,8 @@ where
  */
 #[derive(WithMethods)]
 pub struct VectorSource<
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -1355,7 +1355,7 @@ pub struct VectorSource<
     previous_check_time: MonotonicTime,
 }
 
-impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Default for VectorSource<InternalResourceType, SendType> {
+impl<InternalResourceType: Clone + Debug + Default + Send, SendType: Clone + Debug + Send> Default for VectorSource<InternalResourceType, SendType> {
     fn default() -> Self {
         VectorSource {
             element_name: "VectorSource".into(),
@@ -1385,8 +1385,8 @@ impl<InternalResourceType: Clone + Default + Send, SendType: Clone + Send> Defau
 }
 
 impl<
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static
 > Model for VectorSource<InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -1397,7 +1397,7 @@ impl<
     }
 }
 
-impl<T: Clone + Send + 'static> Process for VectorSource<T, T>
+impl<T: Clone + Debug + Send + 'static> Process for VectorSource<T, T>
 where
     T: ResourceTotal<f64> + ResourceMultiply<f64>
 {
@@ -1577,9 +1577,9 @@ where
 
 #[derive(WithMethods)]
 pub struct VectorSink<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -1610,9 +1610,9 @@ pub struct VectorSink<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
 > Model for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -1624,9 +1624,9 @@ impl<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + Default + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
 > Default for VectorSink<ReceiveParameterType, ReceiveType, InternalResourceType> {
     fn default() -> Self {
         VectorSink {
@@ -1655,7 +1655,7 @@ impl<
     }
 }
 
-impl<T: Send + 'static + Clone + Default> Process for VectorSink<f64, T, T>
+impl<T: Clone + Default + Send + 'static + Debug> Process for VectorSink<f64, T, T>
 where
     T: ResourceTotal<f64>,
 {
@@ -1748,13 +1748,11 @@ where
                             self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         Some(VectorStockState::Empty {..}) => {
+                            self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            self.time_to_next_process_event = None;
                         }
                         None => {
                             self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_process_event = None;
-                        },
-                        _ => {
-                            self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
                             self.time_to_next_process_event = None;
                         }
                     }
@@ -1763,7 +1761,8 @@ where
                     self.time_to_next_process_event = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
+                    self.time_to_next_process_event = None;
+                    self.time_to_next_delay_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
 
@@ -1778,7 +1777,14 @@ where
 
     fn post_update_state(&mut self, source_event_id: &mut EventId, cx: &mut nexosim::model::Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            let time_to_next_event = match (self.time_to_next_process_event, self.time_to_next_delay_event, self.delay_modes.active_delay()) {
+                (Some(process_time), Some(delay_time), Some(_)) => Some(process_time.min(delay_time)),
+                (Some(process_time), None, _) => Some(process_time),
+                (None, Some(delay_time), Some(_)) => Some(delay_time),
+                (None, Some(_), None) => None, // Time to next delay only decrements if a process is active
+                _ => None,
+            };
+            // let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
             match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {

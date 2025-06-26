@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{collections::VecDeque, time::Duration, fmt::Debug};
 
 use serde::{ser::SerializeStruct, Serialize};
 
@@ -157,8 +157,8 @@ impl ItemFactory<Vector3Container> for Vector3ContainerFactory {
 
 #[derive(WithMethods)]
 pub struct ContainerLoadingProcess<
-    ContainerType: Clone + Send + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Debug + Send + 'static,
+    ResourceType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -196,8 +196,8 @@ pub struct ContainerLoadingProcess<
 }
 
 impl<
-    ContainerType: Clone + Send + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Debug + Send + 'static,
+    ResourceType: Clone + Debug + Send + 'static,
 > Default for ContainerLoadingProcess<ContainerType, ResourceType> {
     fn default() -> Self {
         Self {
@@ -233,8 +233,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceAdd<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
-    ResourceType: Clone + Send + ResourceTotal<f64> + 'static,
+    ContainerType: Clone + Debug + Send + ResourceAdd<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Debug + Send + ResourceTotal<f64> + 'static,
 > Model for ContainerLoadingProcess<ContainerType, ResourceType> {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -245,8 +245,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceAdd<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
-    ResourceType: Clone + Send + ResourceTotal<f64> + 'static,
+    ContainerType: Clone + Debug + Send + ResourceAdd<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Debug + Send + ResourceTotal<f64> + 'static,
 > Process for ContainerLoadingProcess<ContainerType, ResourceType> {
     type LogDetailsType = DiscreteProcessLogType<ContainerType>;
     
@@ -444,8 +444,8 @@ impl<
 
 #[derive(WithMethods)]
 pub struct ContainerUnloadingProcess<
-    ContainerType: Clone + Send + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Debug + Send + 'static,
+    ResourceType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -483,8 +483,8 @@ pub struct ContainerUnloadingProcess<
 }
 
 impl<
-    ContainerType: Clone + Send + 'static,
-    ResourceType: Clone + Send + 'static,
+    ContainerType: Clone + Debug + Send + 'static,
+    ResourceType: Clone + Debug + Send + 'static,
 > Default for ContainerUnloadingProcess<ContainerType, ResourceType> {
     fn default() -> Self {
         Self {
@@ -520,8 +520,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
-    ResourceType: Clone + Send + ResourceTotal<f64> + ResourceRemove<f64, ResourceType> + 'static,
+    ContainerType: Clone + Debug + Send + ResourceRemoveAll<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Debug + Send + ResourceTotal<f64> + ResourceRemove<f64, ResourceType> + 'static,
 > Model for ContainerUnloadingProcess<ContainerType, ResourceType> {
     fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -532,8 +532,8 @@ impl<
 }
 
 impl<
-    ContainerType: Clone + Send + ResourceRemoveAll<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
-    ResourceType: Clone + Send + ResourceTotal<f64> + ResourceRemove<f64, ResourceType> + 'static,
+    ContainerType: Clone + Debug + Send + ResourceRemoveAll<ResourceType> + ResourceContainer<ResourceType, f64> + 'static,
+    ResourceType: Clone + Debug + Send + ResourceTotal<f64> + ResourceRemove<f64, ResourceType> + 'static,
 > Process for ContainerUnloadingProcess<ContainerType, ResourceType> {
     type LogDetailsType = DiscreteProcessLogType<ContainerType>;
     

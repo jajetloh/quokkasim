@@ -155,7 +155,7 @@ where
     }
 }
 
-impl<T: Clone + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for DiscreteStock<T> {
+impl<T: Clone + Debug + Default + Send> Stock<ItemDeque<T>, T, (), Option<T>> for DiscreteStock<T> {
     type StockState = DiscreteStockState;
     type LogDetailsType = DiscreteStockLogType<T>;
     fn get_state(&mut self) -> Self::StockState {
@@ -319,10 +319,10 @@ impl<T: Serialize> Serialize for DiscreteStockLog<T> {
 
 #[derive(WithMethods)]
 pub struct DiscreteProcess<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -353,7 +353,7 @@ pub struct DiscreteProcess<
     next_event_index: u64,
     previous_check_time: MonotonicTime,
 }
-impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'static, X: Clone + Send + 'static> Default for DiscreteProcess<U, V, W, X> {
+impl<U: Clone + Debug + Send + 'static, V: Clone + Debug + Send + 'static, W: Clone + Debug + Send + 'static, X: Clone + Debug + Send + 'static> Default for DiscreteProcess<U, V, W, X> {
     fn default() -> Self {
         DiscreteProcess {
             element_name: "DiscreteProcess".to_string(),
@@ -384,10 +384,10 @@ impl<U: Clone + Send + 'static, V: Clone + Send + 'static, W: Clone + Send + 'st
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
 > Model for DiscreteProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -398,7 +398,7 @@ impl<
     } 
 }
 
-impl<T: Clone + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
+impl<T: Clone + Debug + Send + 'static> Process for DiscreteProcess<(), Option<T>, T, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
@@ -688,8 +688,8 @@ impl ItemFactory<String> for StringItemFactory {
 
 #[derive(WithMethods)]
 pub struct DiscreteSource<
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     FactoryType: ItemFactory<InternalResourceType>,
 > {
     // Identification
@@ -723,8 +723,8 @@ pub struct DiscreteSource<
 }
 
 impl<
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     FactoryType: ItemFactory<InternalResourceType> + Default,
 > Default for DiscreteSource<InternalResourceType, SendType, FactoryType> {
     fn default() -> Self {
@@ -757,8 +757,8 @@ impl<
 }
 
 impl<
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
     FactoryType: ItemFactory<InternalResourceType> + Send + 'static,
 > Model for DiscreteSource<InternalResourceType, SendType, FactoryType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
@@ -771,7 +771,7 @@ impl<
 }
 
 impl<
-    T: Clone + Send + 'static,
+    T: Clone + Debug + Send + 'static,
     FactoryType: ItemFactory<T> + Send + 'static,
 > Process for DiscreteSource<T, T, FactoryType> {
     type LogDetailsType = DiscreteProcessLogType<T>;
@@ -941,9 +941,9 @@ impl<
 
 #[derive(WithMethods)]
 pub struct DiscreteSink<
-    RequestParameterType: Clone + Send + 'static,
-    RequestType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
+    RequestParameterType: Clone + Debug + Send + 'static,
+    RequestType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -974,9 +974,9 @@ pub struct DiscreteSink<
 }
 
 impl<
-    RequestParameterType: Clone + Send + 'static,
-    RequestType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static
+    RequestParameterType: Clone + Debug + Send + 'static,
+    RequestType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static
 > Default for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> {
     fn default() -> Self {
         DiscreteSink {
@@ -1006,9 +1006,9 @@ impl<
 }
 
 impl<
-    RequestParameterType: Clone + Send + 'static,
-    RequestType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static
+    RequestParameterType: Clone + Debug + Send + 'static,
+    RequestType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static
 > Model for DiscreteSink<RequestParameterType, RequestType, InternalResourceType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
         async move {
@@ -1019,7 +1019,7 @@ impl<
     }
 }
 
-impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
+impl<T: Clone + Debug + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
     type LogDetailsType = DiscreteProcessLogType<T>;
     
     fn pre_update_state(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
@@ -1187,10 +1187,10 @@ impl<T: Clone + Send + 'static> Process for DiscreteSink<(), Option<T>, T> {
 
 #[derive(WithMethods)]
 pub struct DiscreteParallelProcess<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -1224,10 +1224,10 @@ pub struct DiscreteParallelProcess<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static
 > Default for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> {
     fn default() -> Self {
         DiscreteParallelProcess {
@@ -1260,10 +1260,10 @@ impl<
 }
 
 impl<
-    ReceiveParameterType: Clone + Send + 'static,
-    ReceiveType: Clone + Send + 'static,
-    InternalResourceType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static
+    ReceiveParameterType: Clone + Debug + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    InternalResourceType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static
 > Model for DiscreteParallelProcess<ReceiveParameterType, ReceiveType, InternalResourceType, SendType> where Self: Process {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> {
         async move {
@@ -1274,7 +1274,7 @@ impl<
     }
 }
 
-impl<U: Clone + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
+impl<U: Clone + Debug + Send + 'static> Process for DiscreteParallelProcess<(), Option<U>, U, U> {
     type LogDetailsType = DiscreteProcessLogType<U>;
 
     fn update_state_impl(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {

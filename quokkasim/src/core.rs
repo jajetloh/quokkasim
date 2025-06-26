@@ -153,9 +153,9 @@ pub trait StateEq {
 
 pub trait Stock<
     ContainerType: Clone + 'static,
-    ReceiveType: Clone + Send + 'static,
-    SendParameterType: Clone + Send + 'static,
-    SendType: Clone + Send + 'static,
+    ReceiveType: Clone + Debug + Send + 'static,
+    SendParameterType: Clone + Debug + Send + 'static,
+    SendType: Clone + Debug + Send + 'static,
 > where Self: Model {
     type StockState: StateEq + Clone + Debug;
     type LogDetailsType: Clone;
