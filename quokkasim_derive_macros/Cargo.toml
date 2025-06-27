@@ -1,7 +1,7 @@
 [package]
 name = "quokkasim_derive_macros"
 description = "Derive macros for the QuokkaSim simulation framework."
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 readme = "../README.md"
 repository = "https://github.com/jajetloh/quokkasim"
