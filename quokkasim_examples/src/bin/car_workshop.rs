@@ -25,84 +25,87 @@ impl CustomLoggerConnection for ComponentLogger {
     }
 }
 
-fn main() {
-    let mut df = DistributionFactory::new(3214);
 
-    let mut car_arrivals = ComponentModel::StringSource(
+fn main() {
+
+    let mut arrivals = ComponentModel::StringSource(
         DiscreteSource::new()
-            .with_name("Car Arrivals")
-            .with_code("CA")
-            .with_item_factory(StringItemFactory::default())
-            .with_process_quantity_distr(Distribution::Constant(1.))
-            .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 300., max: 1200. }).unwrap()),
+            .with_name("Arrivals")
+            .with_code("A")
+            .with_item_factory(StringItemFactory { prefix: "Car".into(), next_index: 0, num_digits: 4 })
+            .with_process_time_distr(Distribution::Constant(900.)),
         Mailbox::new()
     );
+
     let mut ready_to_service = ComponentModel::StringStock(
         DiscreteStock::new()
             .with_name("Ready to Service")
-            .with_code("RTS")
+            .with_code("Q1")
             .with_low_capacity(0)
-            .with_max_capacity(100),
+            .with_max_capacity(3),
         Mailbox::new()
     );
+
     let mut car_hoists = (0..3).into_iter().map(|i| {
         ComponentModel::StringProcess(
             DiscreteProcess::new()
-                .with_name(&format!("Car Hoist {}", i + 1))
-                .with_code(&format!("CH{}", i + 1))
-                .with_process_quantity_distr(Distribution::Constant(1.))
-                .with_process_time_distr(df.create(DistributionConfig::Uniform { min: 600., max: 1800. }).unwrap()),
+                .with_name(&format!("Car Hoist {}", i))
+                .with_code(&format!("P{}", i))
+                .with_process_time_distr(Distribution::Constant(1800.)),
             Mailbox::new()
         )
     }).collect::<Vec<_>>();
+
     let mut ready_to_depart = ComponentModel::StringStock(
         DiscreteStock::new()
             .with_name("Ready to Depart")
-            .with_code("RTD")
+            .with_code("Q2")
             .with_low_capacity(0)
-            .with_max_capacity(100),
-        Mailbox::new()
-    );
-    let mut car_departures = ComponentModel::StringSink(
-        DiscreteSink::new()
-            .with_name("Car Departures")
-            .with_code("CD"),
+            .with_max_capacity(3),
         Mailbox::new()
     );
 
-    connect_components!(&mut car_arrivals, &mut ready_to_service).unwrap();
-    car_hoists.iter_mut().for_each(|mut hoist| {
+    let mut departures = ComponentModel::StringSink(
+        DiscreteSink::new()
+            .with_name("Departures")
+            .with_code("D")
+            .with_process_time_distr(Distribution::Constant(1.)),
+        Mailbox::new()
+    );
+
+    connect_components!(&mut arrivals, &mut ready_to_service).unwrap();
+
+    for mut hoist in car_hoists.iter_mut() {
         connect_components!(&mut ready_to_service, &mut hoist).unwrap();
         connect_components!(&mut hoist, &mut ready_to_depart).unwrap();
-    });
-    connect_components!(&mut ready_to_depart, &mut car_departures).unwrap();
+    }
+    connect_components!(&mut ready_to_depart, &mut departures).unwrap();
 
-    let mut process_logger = ComponentLogger::StringProcessLogger(DiscreteProcessLogger::new("CarProcessLogger"));
-    let mut stock_logger = ComponentLogger::StringStockLogger(DiscreteStockLogger::new("CarStockLogger"));
+    let mut process_logger = ComponentLogger::StringProcessLogger(DiscreteProcessLogger::new("ProcessLogger"));
+    let mut stock_logger = ComponentLogger::StringStockLogger(DiscreteStockLogger::new("StockLogger"));
 
-    car_hoists.iter_mut().for_each(|mut hoist| {
-        connect_logger!(&mut process_logger, &mut hoist).unwrap();
-    });
-    connect_logger!(&mut process_logger, &mut car_arrivals).unwrap();
-    connect_logger!(&mut process_logger, &mut car_departures).unwrap();
+    connect_logger!(&mut process_logger, &mut arrivals).unwrap();
+    for mut car_hoist in car_hoists.iter_mut() {
+        connect_logger!(&mut process_logger, &mut car_hoist).unwrap();
+    }
+    connect_logger!(&mut process_logger, &mut departures).unwrap();
     connect_logger!(&mut stock_logger, &mut ready_to_service).unwrap();
     connect_logger!(&mut stock_logger, &mut ready_to_depart).unwrap();
 
     let mut sim_init = SimInit::new();
-    sim_init = register_component!(sim_init, car_arrivals);
+    sim_init = register_component!(sim_init, arrivals);
     sim_init = register_component!(sim_init, ready_to_service);
     for hoist in car_hoists {
         sim_init = register_component!(sim_init, hoist);
     }
     sim_init = register_component!(sim_init, ready_to_depart);
-    sim_init = register_component!(sim_init, car_departures);
+    sim_init = register_component!(sim_init, departures);
 
-    let start_time = MonotonicTime::try_from_date_time(2025, 6, 1, 8, 0, 0, 0).unwrap();
-    let (mut sim, mut sched) = sim_init.init(start_time.clone()).unwrap();
-    
-    sim.step_until(start_time + Duration::from_secs(60 * 60 * 24 * 30)).unwrap();
+    let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 8, 0, 0, 0).unwrap();
+    let (mut sim, mut scheduler) = sim_init.init(start_time).unwrap();
+    sim.step_until(start_time + Duration::from_secs(3600 * 9)).unwrap();
 
-    let output_dir = "outputs/car_workshop";
+    let output_dir = "output/car_workshop";
     create_dir_all(output_dir).unwrap();
     process_logger.write_csv(output_dir).unwrap();
     stock_logger.write_csv(output_dir).unwrap();
