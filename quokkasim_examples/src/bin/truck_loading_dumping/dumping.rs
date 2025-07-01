@@ -29,7 +29,7 @@ pub struct DumpingProcess {
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
 
     time_to_next_process_event: Option<Duration>,
-time_to_next_delay_event: Option<Duration>,
+    time_to_next_delay_event: Option<Duration>,
     next_event_index: u64,
     previous_check_time: MonotonicTime,
 }
