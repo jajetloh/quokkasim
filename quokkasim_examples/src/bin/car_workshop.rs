@@ -105,7 +105,7 @@ fn main() {
     let (mut sim, mut scheduler) = sim_init.init(start_time).unwrap();
     sim.step_until(start_time + Duration::from_secs(3600 * 9)).unwrap();
 
-    let output_dir = "output/car_workshop";
+    let output_dir = "outputs/car_workshop";
     create_dir_all(output_dir).unwrap();
     process_logger.write_csv(output_dir).unwrap();
     stock_logger.write_csv(output_dir).unwrap();
