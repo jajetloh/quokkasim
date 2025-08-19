@@ -1,2 +1,2 @@
 [workspace]
-members = ["quokkasim", "quokkasim_examples", "quokkasim_derive_macros"]
+members = ["quokkasim"]
