@@ -1,0 +1,4 @@
+time,event_id,source_event_id,element_name,element_type,event
+2025-07-01 00:00:00,ENV_000000,INIT_000000,EnvironmentController,BasicEnvironment,Normal
+2025-07-01 01:00:00,ENV_000001,SCH_000000,EnvironmentController,BasicEnvironment,Stopped
+2025-07-01 02:00:00,ENV_000002,SCH_000000,EnvironmentController,BasicEnvironment,Normal

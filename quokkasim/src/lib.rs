@@ -16,7 +16,6 @@ pub mod nexosim {
     pub use nexosim::registry::*;
     pub use nexosim::server;
 }
-pub mod v3;
 
 use std::{fs, path::{Path, PathBuf}};
 

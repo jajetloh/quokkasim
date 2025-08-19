@@ -1,6 +1,0 @@
-{
-    "$schema": "my_schema.json",
-    "productId": 1234,
-    "productName": "Widget",
-    "price": 12.00
-}

@@ -1,0 +1,12 @@
+time,event_id,source_event_id,element_name,element_type,event_type,total,inflows,outflows,reason
+1970-01-01 00:00:00 UTC,P1_000000,INIT_000000,Process,VectorProcess,WithdrawRequest,,,,
+1970-01-01 00:00:00 UTC,P1_000001,P1_000000,Process,VectorProcess,ProcessStart,10.0,[10.0],,
+1970-01-01 00:00:04 UTC,P1_000002,E1_000001,Process,VectorProcess,ProcessStopped,,,,Stopped by environment
+1970-01-01 00:00:24 UTC,P1_000003,E1_000002,Process,VectorProcess,ProcessContinue,,,,Resumed by environment
+1970-01-01 00:00:27 UTC,P1_000004,P1_000001,Process,VectorProcess,DelayStart,,,,ProcessDelay
+1970-01-01 00:00:29 UTC,P1_000005,P1_000004,Process,VectorProcess,DelayEnd,,,,ProcessDelay
+1970-01-01 00:00:32 UTC,P1_000006,P1_000005,Process,VectorProcess,ProcessSuccess,10.0,,[10.0],
+1970-01-01 00:00:32 UTC,P1_000007,P1_000006,Process,VectorProcess,WithdrawRequest,,,,
+1970-01-01 00:00:32 UTC,P1_000008,P1_000007,Process,VectorProcess,ProcessStart,10.0,[10.0],,
+1970-01-01 00:00:36 UTC,P1_000009,P1_000008,Process,VectorProcess,DelayStart,,,,ProcessDelay
+1970-01-01 00:00:38 UTC,P1_000010,P1_000009,Process,VectorProcess,DelayEnd,,,,ProcessDelay

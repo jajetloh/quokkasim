@@ -1,0 +1,4 @@
+time,event_id,source_event_id,element_name,element_type,event
+1970-01-01 00:00:00,E1_000000,INIT_000000,Environment,BasicEnvironment,Normal
+1970-01-01 00:00:04,E1_000001,SCH_000000,Environment,BasicEnvironment,Stopped
+1970-01-01 00:00:24,E1_000002,SCH_000000,Environment,BasicEnvironment,Normal

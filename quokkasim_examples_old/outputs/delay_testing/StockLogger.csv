@@ -1,0 +1,5 @@
+time,event_id,source_event_id,element_name,element_type,log_type,balance,vector_total,vector,new_state
+1970-01-01 00:00:00 UTC,S1_000000,P1_000000,Stock1,VectorStock,remove,90.0,10.0,10.0,
+1970-01-01 00:00:32 UTC,S2_000000,P1_000006,Stock2,VectorStock,add,10.0,10.0,10.0,
+1970-01-01 00:00:32 UTC,S1_000001,P1_000007,Stock1,VectorStock,remove,80.0,10.0,10.0,
+1970-01-01 00:00:32.000000001 UTC,S2_000001,S2_000000,Stock2,VectorStock,emit_change,,,,Normal

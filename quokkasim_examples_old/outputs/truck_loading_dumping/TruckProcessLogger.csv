@@ -1,0 +1,527 @@
+time,event_id,element_name,element_type,event_type,truck_id,total,fe,other_elements,fe_%,magnetite,hematite,limonite,message
+2025-05-01 00:00:00 UTC,PR-LOADING_000000,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:00 UTC,PR-LOADING_000001,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:00 UTC,PR-LOADMOV_000000,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:00 UTC,PR-DUMPING_000000,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:00 UTC,PR-DUMPMOV_000000,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:00.533123939 UTC,PR-LOADING_000002,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:00.533123939 UTC,PR-LOADING_000003,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:00.533123939 UTC,PR-LOADING_000004,loading_process,LoadingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:00.533123940 UTC,PR-LOADMOV_000001,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:00.533123940 UTC,PR-LOADMOV_000002,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:00:00.533123940 UTC,PR-LOADMOV_000003,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:00.533123941 UTC,PR-LOADMOV_000004,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:06.930611209 UTC,PR-LOADMOV_000005,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:00:06.930611209 UTC,PR-LOADMOV_000006,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:06.930611210 UTC,PR-LOADMOV_000007,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:06.930611210 UTC,PR-DUMPING_000001,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:06.930611210 UTC,PR-DUMPING_000002,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:06.930611211 UTC,PR-LOADMOV_000008,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:09.952383939 UTC,PR-DUMPING_000003,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:09.952383939 UTC,PR-DUMPING_000004,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:09.952383940 UTC,PR-DUMPMOV_000001,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:09.952383940 UTC,PR-DUMPMOV_000002,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:00:09.952383940 UTC,PR-DUMPING_000005,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:09.952383940 UTC,PR-DUMPMOV_000003,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:09.952383941 UTC,PR-DUMPMOV_000004,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:09.952383941 UTC,PR-DUMPING_000006,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:14.727475740 UTC,PR-LOADING_000005,loading_process,LoadingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:14.727475740 UTC,PR-LOADING_000006,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:14.727475740 UTC,PR-LOADING_000007,loading_process,LoadingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:14.727475741 UTC,PR-DUMPMOV_000005,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:14.727475741 UTC,PR-LOADMOV_000009,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:14.727475741 UTC,PR-LOADMOV_000010,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:00:14.727475741 UTC,PR-LOADMOV_000011,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:14.727475742 UTC,PR-LOADMOV_000012,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:38.783301310 UTC,PR-LOADING_000008,loading_process,LoadingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:38.783301310 UTC,PR-LOADING_000009,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:38.783301311 UTC,PR-LOADMOV_000013,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:38.783301311 UTC,PR-LOADING_000010,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:38.783301311 UTC,PR-LOADMOV_000014,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:00:38.783301311 UTC,PR-LOADMOV_000015,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:38.783301312 UTC,PR-LOADING_000011,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:38.783301312 UTC,PR-LOADMOV_000016,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:46.213656683 UTC,PR-DUMPMOV_000006,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:00:46.213656683 UTC,PR-DUMPMOV_000007,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:46.213656684 UTC,PR-DUMPMOV_000008,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:46.213656684 UTC,PR-LOADING_000012,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:46.213656684 UTC,PR-LOADING_000013,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:46.213656685 UTC,PR-DUMPMOV_000009,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:48.582761198 UTC,PR-LOADING_000014,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:00:48.582761198 UTC,PR-LOADING_000015,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:48.582761199 UTC,PR-LOADING_000016,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:48.582761199 UTC,PR-LOADMOV_000017,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:48.582761199 UTC,PR-LOADMOV_000018,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:00:48.582761199 UTC,PR-LOADMOV_000019,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:00:48.582761200 UTC,PR-LOADING_000017,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:00:48.582761200 UTC,PR-LOADMOV_000020,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.012015367 UTC,PR-LOADMOV_000021,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:01:17.012015367 UTC,PR-LOADMOV_000022,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.012015368 UTC,PR-DUMPING_000007,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.012015368 UTC,PR-LOADMOV_000023,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.012015368 UTC,PR-DUMPING_000008,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:01:17.012015369 UTC,PR-LOADMOV_000024,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.089941447 UTC,PR-DUMPING_000009,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:01:17.089941447 UTC,PR-DUMPING_000010,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:01:17.089941448 UTC,PR-DUMPMOV_000010,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.089941448 UTC,PR-DUMPING_000011,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:01:17.089941448 UTC,PR-DUMPMOV_000011,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:01:17.089941448 UTC,PR-DUMPMOV_000012,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.089941449 UTC,PR-DUMPMOV_000013,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:17.089941449 UTC,PR-DUMPING_000012,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:01:18.025054400 UTC,PR-DUMPMOV_000014,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:01:18.025054400 UTC,PR-DUMPMOV_000015,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:18.025054401 UTC,PR-DUMPMOV_000016,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:18.025054401 UTC,PR-LOADING_000018,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:18.025054401 UTC,PR-LOADING_000019,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:01:18.025054402 UTC,PR-DUMPMOV_000017,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:24.999545933 UTC,PR-LOADING_000020,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:01:24.999545933 UTC,PR-LOADING_000021,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:01:24.999545934 UTC,PR-LOADMOV_000025,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:24.999545934 UTC,PR-LOADING_000022,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:01:24.999545934 UTC,PR-LOADMOV_000026,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:01:24.999545934 UTC,PR-LOADMOV_000027,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:24.999545935 UTC,PR-LOADMOV_000028,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:01:24.999545935 UTC,PR-LOADING_000023,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:02:48.693444320 UTC,PR-LOADMOV_000029,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:02:48.693444320 UTC,PR-LOADMOV_000030,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:48.693444321 UTC,PR-DUMPING_000013,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:48.693444321 UTC,PR-LOADMOV_000031,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:48.693444321 UTC,PR-DUMPING_000014,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:02:48.693444322 UTC,PR-LOADMOV_000032,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:49.680970500 UTC,PR-DUMPING_000015,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:02:49.680970500 UTC,PR-DUMPING_000016,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:02:49.680970501 UTC,PR-DUMPMOV_000018,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:49.680970501 UTC,PR-DUMPING_000017,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:02:49.680970501 UTC,PR-DUMPMOV_000019,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:02:49.680970501 UTC,PR-DUMPMOV_000020,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:49.680970502 UTC,PR-DUMPMOV_000021,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:02:49.680970502 UTC,PR-DUMPING_000018,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:03:01.531284655 UTC,PR-DUMPMOV_000022,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:03:01.531284655 UTC,PR-DUMPMOV_000023,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:01.531284656 UTC,PR-DUMPMOV_000024,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:01.531284656 UTC,PR-LOADING_000024,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:01.531284656 UTC,PR-LOADING_000025,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:03:01.531284657 UTC,PR-DUMPMOV_000025,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:05.059697354 UTC,PR-LOADMOV_000033,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:03:05.059697354 UTC,PR-LOADMOV_000034,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:05.059697355 UTC,PR-DUMPING_000019,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:05.059697355 UTC,PR-LOADMOV_000035,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:05.059697355 UTC,PR-DUMPING_000020,dumping_process,DumpingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:03:05.059697356 UTC,PR-LOADMOV_000036,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:10.596736979 UTC,PR-DUMPING_000021,dumping_process,DumpingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:03:10.596736979 UTC,PR-DUMPING_000022,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:03:10.596736980 UTC,PR-DUMPMOV_000026,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:10.596736980 UTC,PR-DUMPMOV_000027,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:03:10.596736980 UTC,PR-DUMPING_000023,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:03:10.596736980 UTC,PR-DUMPMOV_000028,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:10.596736981 UTC,PR-DUMPMOV_000029,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:10.596736981 UTC,PR-DUMPING_000024,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:03:42.543723729 UTC,PR-LOADING_000026,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:03:42.543723729 UTC,PR-LOADING_000027,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:03:42.543723730 UTC,PR-LOADMOV_000037,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:42.543723730 UTC,PR-LOADING_000028,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:03:42.543723730 UTC,PR-LOADMOV_000038,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:03:42.543723730 UTC,PR-LOADMOV_000039,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:42.543723731 UTC,PR-LOADMOV_000040,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:03:42.543723731 UTC,PR-LOADING_000029,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:04:17.041212474 UTC,PR-DUMPMOV_000030,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:04:17.041212474 UTC,PR-DUMPMOV_000031,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:17.041212475 UTC,PR-DUMPMOV_000032,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:17.041212475 UTC,PR-LOADING_000030,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:17.041212475 UTC,PR-LOADING_000031,loading_process,LoadingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:04:17.041212476 UTC,PR-DUMPMOV_000033,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:24.099649323 UTC,PR-LOADING_000032,loading_process,LoadingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:04:24.099649323 UTC,PR-LOADING_000033,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:04:24.099649324 UTC,PR-LOADMOV_000041,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:24.099649324 UTC,PR-LOADMOV_000042,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:04:24.099649324 UTC,PR-LOADMOV_000043,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:24.099649324 UTC,PR-LOADING_000034,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:04:24.099649325 UTC,PR-LOADMOV_000044,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:04:24.099649325 UTC,PR-LOADING_000035,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:05:27.453208154 UTC,PR-LOADMOV_000045,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:05:27.453208154 UTC,PR-LOADMOV_000046,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:27.453208155 UTC,PR-LOADMOV_000047,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:27.453208155 UTC,PR-DUMPING_000025,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:27.453208155 UTC,PR-DUMPING_000026,dumping_process,DumpingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:05:27.453208156 UTC,PR-LOADMOV_000048,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:39.471425112 UTC,PR-DUMPING_000027,dumping_process,DumpingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:05:39.471425112 UTC,PR-DUMPING_000028,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:05:39.471425113 UTC,PR-DUMPMOV_000034,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:39.471425113 UTC,PR-DUMPMOV_000035,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:05:39.471425113 UTC,PR-DUMPING_000029,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:05:39.471425113 UTC,PR-DUMPMOV_000036,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:39.471425114 UTC,PR-DUMPMOV_000037,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:39.471425114 UTC,PR-DUMPING_000030,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:05:48.800891498 UTC,PR-LOADMOV_000049,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:05:48.800891498 UTC,PR-LOADMOV_000050,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:48.800891499 UTC,PR-LOADMOV_000051,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:48.800891499 UTC,PR-DUMPING_000031,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:05:48.800891499 UTC,PR-DUMPING_000032,dumping_process,DumpingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:05:48.800891500 UTC,PR-LOADMOV_000052,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:06:04.878884671 UTC,PR-DUMPING_000033,dumping_process,DumpingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:06:04.878884671 UTC,PR-DUMPING_000034,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:06:04.878884672 UTC,PR-DUMPMOV_000038,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:06:04.878884672 UTC,PR-DUMPING_000035,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:06:04.878884672 UTC,PR-DUMPMOV_000039,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:06:04.878884672 UTC,PR-DUMPMOV_000040,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:06:04.878884673 UTC,PR-DUMPMOV_000041,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:06:04.878884673 UTC,PR-DUMPING_000036,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:08:03.690028597 UTC,PR-DUMPMOV_000042,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:08:03.690028597 UTC,PR-DUMPMOV_000043,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:03.690028598 UTC,PR-DUMPMOV_000044,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:03.690028598 UTC,PR-LOADING_000036,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:03.690028598 UTC,PR-LOADING_000037,loading_process,LoadingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:08:03.690028599 UTC,PR-DUMPMOV_000045,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:22.183912328 UTC,PR-LOADING_000038,loading_process,LoadingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:08:22.183912328 UTC,PR-LOADING_000039,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:08:22.183912329 UTC,PR-LOADMOV_000053,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:22.183912329 UTC,PR-LOADING_000040,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:08:22.183912329 UTC,PR-LOADMOV_000054,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:08:22.183912329 UTC,PR-LOADMOV_000055,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:22.183912330 UTC,PR-LOADMOV_000056,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:08:22.183912330 UTC,PR-LOADING_000041,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:09:17.814802730 UTC,PR-DUMPMOV_000046,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:09:17.814802730 UTC,PR-DUMPMOV_000047,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:17.814802731 UTC,PR-DUMPMOV_000048,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:17.814802731 UTC,PR-LOADING_000042,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:17.814802731 UTC,PR-LOADING_000043,loading_process,LoadingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:09:17.814802732 UTC,PR-DUMPMOV_000049,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:47.783575121 UTC,PR-LOADING_000044,loading_process,LoadingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:09:47.783575121 UTC,PR-LOADING_000045,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:09:47.783575122 UTC,PR-LOADMOV_000057,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:47.783575122 UTC,PR-LOADING_000046,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:09:47.783575122 UTC,PR-LOADMOV_000058,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:09:47.783575122 UTC,PR-LOADMOV_000059,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:47.783575123 UTC,PR-LOADMOV_000060,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:09:47.783575123 UTC,PR-LOADING_000047,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:11:54.692992609 UTC,PR-LOADMOV_000061,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:11:54.692992609 UTC,PR-LOADMOV_000062,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:11:54.692992610 UTC,PR-LOADMOV_000063,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:11:54.692992610 UTC,PR-DUMPING_000037,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:11:54.692992610 UTC,PR-DUMPING_000038,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:11:54.692992611 UTC,PR-LOADMOV_000064,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:03.700134835 UTC,PR-DUMPING_000039,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:12:03.700134835 UTC,PR-DUMPING_000040,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:03.700134836 UTC,PR-DUMPMOV_000050,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:03.700134836 UTC,PR-DUMPING_000041,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:03.700134836 UTC,PR-DUMPMOV_000051,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:12:03.700134836 UTC,PR-DUMPMOV_000052,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:03.700134837 UTC,PR-DUMPMOV_000053,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:03.700134837 UTC,PR-DUMPING_000042,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:04.110517085 UTC,PR-LOADMOV_000065,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:12:04.110517085 UTC,PR-LOADMOV_000066,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.110517086 UTC,PR-DUMPING_000043,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.110517086 UTC,PR-LOADMOV_000067,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.110517086 UTC,PR-DUMPING_000044,dumping_process,DumpingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:12:04.110517087 UTC,PR-LOADMOV_000068,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.637789322 UTC,PR-DUMPING_000045,dumping_process,DumpingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:12:04.637789322 UTC,PR-DUMPING_000046,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:04.637789323 UTC,PR-DUMPMOV_000054,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.637789323 UTC,PR-DUMPING_000047,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:04.637789323 UTC,PR-DUMPMOV_000055,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:12:04.637789323 UTC,PR-DUMPMOV_000056,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.637789324 UTC,PR-DUMPMOV_000057,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:04.637789324 UTC,PR-DUMPING_000048,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:10.965056150 UTC,PR-DUMPMOV_000058,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:12:10.965056150 UTC,PR-DUMPMOV_000059,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:10.965056151 UTC,PR-DUMPMOV_000060,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:10.965056151 UTC,PR-LOADING_000048,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:10.965056151 UTC,PR-LOADING_000049,loading_process,LoadingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:12:10.965056152 UTC,PR-DUMPMOV_000061,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:19.551875698 UTC,PR-LOADING_000050,loading_process,LoadingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:12:19.551875698 UTC,PR-LOADING_000051,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:19.551875699 UTC,PR-LOADMOV_000069,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:19.551875699 UTC,PR-LOADING_000052,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:12:19.551875699 UTC,PR-LOADMOV_000070,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:12:19.551875699 UTC,PR-LOADMOV_000071,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:19.551875700 UTC,PR-LOADMOV_000072,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:12:19.551875700 UTC,PR-LOADING_000053,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:13:51.785841533 UTC,PR-DUMPMOV_000062,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:13:51.785841533 UTC,PR-DUMPMOV_000063,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:51.785841534 UTC,PR-DUMPMOV_000064,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:51.785841534 UTC,PR-LOADING_000054,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:51.785841534 UTC,PR-LOADING_000055,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:13:51.785841535 UTC,PR-DUMPMOV_000065,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:53.362844412 UTC,PR-LOADING_000056,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:13:53.362844412 UTC,PR-LOADING_000057,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:13:53.362844413 UTC,PR-LOADMOV_000073,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:53.362844413 UTC,PR-LOADING_000058,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:13:53.362844413 UTC,PR-LOADMOV_000074,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:13:53.362844413 UTC,PR-LOADMOV_000075,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:53.362844414 UTC,PR-LOADMOV_000076,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:13:53.362844414 UTC,PR-LOADING_000059,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:14:02.593710263 UTC,PR-LOADMOV_000077,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:14:02.593710263 UTC,PR-LOADMOV_000078,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:02.593710264 UTC,PR-LOADMOV_000079,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:02.593710264 UTC,PR-DUMPING_000049,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:02.593710264 UTC,PR-DUMPING_000050,dumping_process,DumpingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:14:02.593710265 UTC,PR-LOADMOV_000080,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:11.248259563 UTC,PR-DUMPING_000051,dumping_process,DumpingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:14:11.248259563 UTC,PR-DUMPING_000052,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:14:11.248259564 UTC,PR-DUMPMOV_000066,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:11.248259564 UTC,PR-DUMPING_000053,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:14:11.248259564 UTC,PR-DUMPMOV_000067,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:14:11.248259564 UTC,PR-DUMPMOV_000068,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:11.248259565 UTC,PR-DUMPMOV_000069,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:11.248259565 UTC,PR-DUMPING_000054,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:14:12.286878946 UTC,PR-LOADMOV_000081,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:14:12.286878946 UTC,PR-LOADMOV_000082,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:12.286878947 UTC,PR-DUMPING_000055,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:12.286878947 UTC,PR-LOADMOV_000083,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:12.286878947 UTC,PR-DUMPING_000056,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:14:12.286878948 UTC,PR-LOADMOV_000084,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:17.432093752 UTC,PR-DUMPING_000057,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:14:17.432093752 UTC,PR-DUMPING_000058,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:14:17.432093753 UTC,PR-DUMPMOV_000070,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:17.432093753 UTC,PR-DUMPING_000059,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:14:17.432093753 UTC,PR-DUMPMOV_000071,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:14:17.432093753 UTC,PR-DUMPMOV_000072,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:17.432093754 UTC,PR-DUMPMOV_000073,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:14:17.432093754 UTC,PR-DUMPING_000060,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:19.174671408 UTC,PR-DUMPMOV_000074,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:15:19.174671408 UTC,PR-DUMPMOV_000075,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:19.174671409 UTC,PR-DUMPMOV_000076,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:19.174671409 UTC,PR-LOADING_000060,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:19.174671409 UTC,PR-LOADING_000061,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:15:19.174671410 UTC,PR-DUMPMOV_000077,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:23.247133088 UTC,PR-LOADING_000062,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:15:23.247133088 UTC,PR-LOADING_000063,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:23.247133089 UTC,PR-LOADING_000064,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:23.247133089 UTC,PR-LOADMOV_000085,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:23.247133089 UTC,PR-LOADMOV_000086,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:15:23.247133089 UTC,PR-LOADMOV_000087,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:23.247133090 UTC,PR-LOADMOV_000088,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:23.247133090 UTC,PR-LOADING_000065,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:47.408843797 UTC,PR-LOADMOV_000089,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:15:47.408843797 UTC,PR-LOADMOV_000090,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:47.408843798 UTC,PR-DUMPING_000061,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:47.408843798 UTC,PR-LOADMOV_000091,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:47.408843798 UTC,PR-DUMPING_000062,dumping_process,DumpingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:15:47.408843799 UTC,PR-LOADMOV_000092,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:49.376729176 UTC,PR-DUMPING_000063,dumping_process,DumpingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:15:49.376729176 UTC,PR-DUMPING_000064,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:49.376729177 UTC,PR-DUMPMOV_000078,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:49.376729177 UTC,PR-DUMPING_000065,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:49.376729177 UTC,PR-DUMPMOV_000079,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:15:49.376729177 UTC,PR-DUMPMOV_000080,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:49.376729178 UTC,PR-DUMPMOV_000081,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:49.376729178 UTC,PR-DUMPING_000066,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:15:55.102851155 UTC,PR-DUMPMOV_000082,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:15:55.102851155 UTC,PR-DUMPMOV_000083,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:55.102851156 UTC,PR-DUMPMOV_000084,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:55.102851156 UTC,PR-LOADING_000066,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:15:55.102851156 UTC,PR-LOADING_000067,loading_process,LoadingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:15:55.102851157 UTC,PR-DUMPMOV_000085,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:02.104670902 UTC,PR-LOADING_000068,loading_process,LoadingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:16:02.104670902 UTC,PR-LOADING_000069,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:02.104670903 UTC,PR-LOADMOV_000093,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:02.104670903 UTC,PR-LOADING_000070,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:02.104670903 UTC,PR-LOADMOV_000094,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:16:02.104670903 UTC,PR-LOADMOV_000095,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:02.104670904 UTC,PR-LOADMOV_000096,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:02.104670904 UTC,PR-LOADING_000071,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:12.116673241 UTC,PR-LOADMOV_000097,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:16:12.116673241 UTC,PR-LOADMOV_000098,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.116673242 UTC,PR-LOADMOV_000099,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.116673242 UTC,PR-DUMPING_000067,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.116673242 UTC,PR-DUMPING_000068,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:16:12.116673243 UTC,PR-LOADMOV_000100,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.991353709 UTC,PR-DUMPMOV_000086,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:16:12.991353709 UTC,PR-DUMPMOV_000087,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.991353710 UTC,PR-DUMPMOV_000088,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.991353710 UTC,PR-LOADING_000072,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:12.991353710 UTC,PR-LOADING_000073,loading_process,LoadingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:16:12.991353711 UTC,PR-DUMPMOV_000089,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:24.560644036 UTC,PR-LOADING_000074,loading_process,LoadingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:16:24.560644036 UTC,PR-LOADING_000075,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:24.560644037 UTC,PR-LOADMOV_000101,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:24.560644037 UTC,PR-LOADING_000076,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:24.560644037 UTC,PR-LOADMOV_000102,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:16:24.560644037 UTC,PR-LOADMOV_000103,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:24.560644038 UTC,PR-LOADMOV_000104,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:24.560644038 UTC,PR-LOADING_000077,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:28.046667217 UTC,PR-DUMPING_000069,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:16:28.046667217 UTC,PR-DUMPING_000070,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:28.046667218 UTC,PR-DUMPMOV_000090,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:28.046667218 UTC,PR-DUMPMOV_000091,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:16:28.046667218 UTC,PR-DUMPING_000071,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:16:28.046667218 UTC,PR-DUMPMOV_000092,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:28.046667219 UTC,PR-DUMPMOV_000093,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:16:28.046667219 UTC,PR-DUMPING_000072,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:17:26.126507857 UTC,PR-LOADMOV_000105,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:17:26.126507857 UTC,PR-LOADMOV_000106,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:26.126507858 UTC,PR-DUMPING_000073,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:26.126507858 UTC,PR-LOADMOV_000107,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:26.126507858 UTC,PR-DUMPING_000074,dumping_process,DumpingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:17:26.126507859 UTC,PR-LOADMOV_000108,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:38.193557418 UTC,PR-DUMPING_000075,dumping_process,DumpingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:17:38.193557418 UTC,PR-DUMPING_000076,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:17:38.193557419 UTC,PR-DUMPMOV_000094,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:38.193557419 UTC,PR-DUMPING_000077,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:17:38.193557419 UTC,PR-DUMPMOV_000095,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:17:38.193557419 UTC,PR-DUMPMOV_000096,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:38.193557420 UTC,PR-DUMPMOV_000097,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:17:38.193557420 UTC,PR-DUMPING_000078,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:18:43.392127952 UTC,PR-LOADMOV_000109,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:18:43.392127952 UTC,PR-LOADMOV_000110,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:43.392127953 UTC,PR-DUMPING_000079,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:43.392127953 UTC,PR-LOADMOV_000111,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:43.392127953 UTC,PR-DUMPING_000080,dumping_process,DumpingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:18:43.392127954 UTC,PR-LOADMOV_000112,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:45.298783444 UTC,PR-DUMPING_000081,dumping_process,DumpingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:18:45.298783444 UTC,PR-DUMPING_000082,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:18:45.298783445 UTC,PR-DUMPMOV_000098,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:45.298783445 UTC,PR-DUMPING_000083,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:18:45.298783445 UTC,PR-DUMPMOV_000099,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:18:45.298783445 UTC,PR-DUMPMOV_000100,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:45.298783446 UTC,PR-DUMPMOV_000101,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:18:45.298783446 UTC,PR-DUMPING_000084,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:08.178649335 UTC,PR-DUMPMOV_000102,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:19:08.178649335 UTC,PR-DUMPMOV_000103,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.178649336 UTC,PR-DUMPMOV_000104,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.178649336 UTC,PR-LOADING_000078,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.178649336 UTC,PR-LOADING_000079,loading_process,LoadingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:19:08.178649337 UTC,PR-DUMPMOV_000105,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.546996576 UTC,PR-LOADING_000080,loading_process,LoadingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:19:08.546996576 UTC,PR-LOADING_000081,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:08.546996577 UTC,PR-LOADMOV_000113,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.546996577 UTC,PR-LOADING_000082,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:08.546996577 UTC,PR-LOADMOV_000114,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:19:08.546996577 UTC,PR-LOADMOV_000115,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.546996578 UTC,PR-LOADMOV_000116,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:08.546996578 UTC,PR-LOADING_000083,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:12.967163460 UTC,PR-LOADMOV_000117,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:19:12.967163460 UTC,PR-LOADMOV_000118,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:12.967163461 UTC,PR-DUMPING_000085,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:12.967163461 UTC,PR-LOADMOV_000119,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:12.967163461 UTC,PR-DUMPING_000086,dumping_process,DumpingProcess,ProcessStart,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:19:12.967163462 UTC,PR-LOADMOV_000120,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:37.971665125 UTC,PR-DUMPING_000087,dumping_process,DumpingProcess,ProcessSuccess,Truck_01,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:19:37.971665125 UTC,PR-DUMPING_000088,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:37.971665126 UTC,PR-DUMPMOV_000106,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:37.971665126 UTC,PR-DUMPING_000089,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:37.971665126 UTC,PR-DUMPMOV_000107,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_01,,,,,,,,
+2025-05-01 00:19:37.971665126 UTC,PR-DUMPMOV_000108,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:37.971665127 UTC,PR-DUMPMOV_000109,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:37.971665127 UTC,PR-DUMPING_000090,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:39.206594917 UTC,PR-DUMPMOV_000110,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:19:39.206594917 UTC,PR-DUMPMOV_000111,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:39.206594918 UTC,PR-DUMPMOV_000112,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:39.206594918 UTC,PR-LOADING_000084,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:39.206594918 UTC,PR-LOADING_000085,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:19:39.206594919 UTC,PR-DUMPMOV_000113,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:41.751020810 UTC,PR-LOADING_000086,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:19:41.751020810 UTC,PR-LOADING_000087,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:41.751020811 UTC,PR-LOADMOV_000121,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:41.751020811 UTC,PR-LOADING_000088,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:19:41.751020811 UTC,PR-LOADMOV_000122,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:19:41.751020811 UTC,PR-LOADMOV_000123,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:41.751020812 UTC,PR-LOADMOV_000124,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:19:41.751020812 UTC,PR-LOADING_000089,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:20:02.998152135 UTC,PR-DUMPMOV_000114,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:20:02.998152135 UTC,PR-DUMPMOV_000115,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:02.998152136 UTC,PR-DUMPMOV_000116,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:02.998152136 UTC,PR-LOADING_000090,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:02.998152136 UTC,PR-LOADING_000091,loading_process,LoadingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:20:02.998152137 UTC,PR-DUMPMOV_000117,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:12.284131517 UTC,PR-LOADMOV_000125,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:20:12.284131517 UTC,PR-LOADMOV_000126,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:12.284131518 UTC,PR-DUMPING_000091,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:12.284131518 UTC,PR-DUMPING_000092,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:20:12.284131518 UTC,PR-LOADMOV_000127,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:12.284131519 UTC,PR-LOADMOV_000128,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:16.620967949 UTC,PR-DUMPING_000093,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:20:16.620967949 UTC,PR-DUMPING_000094,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:20:16.620967950 UTC,PR-DUMPMOV_000118,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:16.620967950 UTC,PR-DUMPING_000095,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:20:16.620967950 UTC,PR-DUMPMOV_000119,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:20:16.620967950 UTC,PR-DUMPMOV_000120,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:16.620967951 UTC,PR-DUMPMOV_000121,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:16.620967951 UTC,PR-DUMPING_000096,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:20:33.581734067 UTC,PR-LOADING_000092,loading_process,LoadingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:20:33.581734067 UTC,PR-LOADING_000093,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:20:33.581734068 UTC,PR-LOADMOV_000129,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:33.581734068 UTC,PR-LOADMOV_000130,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:20:33.581734068 UTC,PR-LOADING_000094,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:20:33.581734068 UTC,PR-LOADMOV_000131,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:33.581734069 UTC,PR-LOADMOV_000132,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:20:33.581734069 UTC,PR-LOADING_000095,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:21:08.663005124 UTC,PR-DUMPMOV_000122,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:21:08.663005124 UTC,PR-DUMPMOV_000123,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:08.663005125 UTC,PR-LOADING_000096,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:08.663005125 UTC,PR-DUMPMOV_000124,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:08.663005125 UTC,PR-LOADING_000097,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:21:08.663005126 UTC,PR-DUMPMOV_000125,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:13.442627687 UTC,PR-LOADING_000098,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:21:13.442627687 UTC,PR-LOADING_000099,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:21:13.442627688 UTC,PR-LOADMOV_000133,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:13.442627688 UTC,PR-LOADING_000100,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:21:13.442627688 UTC,PR-LOADMOV_000134,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:21:13.442627688 UTC,PR-LOADMOV_000135,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:13.442627689 UTC,PR-LOADMOV_000136,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:21:13.442627689 UTC,PR-LOADING_000101,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:22:10.798098432 UTC,PR-LOADMOV_000137,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:22:10.798098432 UTC,PR-LOADMOV_000138,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:10.798098433 UTC,PR-DUMPING_000097,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:10.798098433 UTC,PR-LOADMOV_000139,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:10.798098433 UTC,PR-DUMPING_000098,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:22:10.798098434 UTC,PR-LOADMOV_000140,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:12.300800013 UTC,PR-DUMPING_000099,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:22:12.300800013 UTC,PR-DUMPING_000100,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:22:12.300800014 UTC,PR-DUMPMOV_000126,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:12.300800014 UTC,PR-DUMPMOV_000127,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:22:12.300800014 UTC,PR-DUMPMOV_000128,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:12.300800014 UTC,PR-DUMPING_000101,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:22:12.300800015 UTC,PR-DUMPING_000102,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:22:12.300800015 UTC,PR-DUMPMOV_000129,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:30.333218974 UTC,PR-DUMPMOV_000130,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:22:30.333218974 UTC,PR-DUMPMOV_000131,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:30.333218975 UTC,PR-DUMPMOV_000132,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:30.333218975 UTC,PR-LOADING_000102,loading_process,LoadingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:30.333218975 UTC,PR-LOADING_000103,loading_process,LoadingProcess,ProcessStart,Truck_00,5.0,3.0000000000000004,2.0,0.6000000000000001,0.5,0.25,0.7500000000000001,
+2025-05-01 00:22:30.333218976 UTC,PR-DUMPMOV_000133,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:53.349821913 UTC,PR-LOADING_000104,loading_process,LoadingProcess,ProcessSuccess,Truck_00,5.0,3.0000000000000004,2.0,0.6000000000000001,0.5,0.25,0.7500000000000001,
+2025-05-01 00:22:53.349821913 UTC,PR-LOADING_000105,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,No ore available upstream
+2025-05-01 00:22:53.349821914 UTC,PR-LOADMOV_000141,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:53.349821914 UTC,PR-LOADING_000106,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,No ore available upstream
+2025-05-01 00:22:53.349821914 UTC,PR-LOADMOV_000142,loaded_truck_movements,LoadedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:22:53.349821914 UTC,PR-LOADMOV_000143,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:53.349821915 UTC,PR-LOADMOV_000144,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:22:53.349821915 UTC,PR-LOADING_000107,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,No ore available upstream
+2025-05-01 00:24:38.025685094 UTC,PR-DUMPMOV_000134,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_01,,,,,,,,
+2025-05-01 00:24:38.025685094 UTC,PR-DUMPMOV_000135,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:24:38.025685095 UTC,PR-DUMPMOV_000136,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:24:38.025685095 UTC,PR-LOADING_000108,loading_process,LoadingProcess,ProcessFailure,,,,,,,,,No ore available upstream
+2025-05-01 00:26:40.584717235 UTC,PR-LOADMOV_000145,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:26:40.584717235 UTC,PR-LOADMOV_000146,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:40.584717236 UTC,PR-LOADMOV_000147,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:40.584717236 UTC,PR-DUMPING_000103,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:40.584717236 UTC,PR-DUMPING_000104,dumping_process,DumpingProcess,ProcessStart,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:26:40.584717237 UTC,PR-LOADMOV_000148,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:42.540518642 UTC,PR-DUMPING_000105,dumping_process,DumpingProcess,ProcessSuccess,Truck_02,5.0,3.0,2.0,0.6,0.5,0.25,0.75,
+2025-05-01 00:26:42.540518642 UTC,PR-DUMPING_000106,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:26:42.540518643 UTC,PR-DUMPMOV_000137,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:42.540518643 UTC,PR-DUMPING_000107,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:26:42.540518643 UTC,PR-DUMPMOV_000138,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_02,,,,,,,,
+2025-05-01 00:26:42.540518643 UTC,PR-DUMPMOV_000139,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:42.540518644 UTC,PR-DUMPMOV_000140,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:26:42.540518644 UTC,PR-DUMPING_000108,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:27:06.010135519 UTC,PR-DUMPMOV_000141,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_02,,,,,,,,
+2025-05-01 00:27:06.010135519 UTC,PR-DUMPMOV_000142,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:29.549057165 UTC,PR-LOADMOV_000149,loaded_truck_movements,LoadedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:27:29.549057165 UTC,PR-LOADMOV_000150,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:29.549057166 UTC,PR-LOADMOV_000151,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:29.549057166 UTC,PR-DUMPING_000109,dumping_process,DumpingProcess,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:29.549057166 UTC,PR-DUMPING_000110,dumping_process,DumpingProcess,ProcessStart,Truck_00,5.0,3.0000000000000004,2.0,0.6000000000000001,0.5,0.25,0.7500000000000001,
+2025-05-01 00:27:29.549057167 UTC,PR-LOADMOV_000152,loaded_truck_movements,LoadedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:41.056390853 UTC,PR-DUMPING_000111,dumping_process,DumpingProcess,ProcessSuccess,Truck_00,5.0,3.0000000000000004,2.0,0.6000000000000001,0.5,0.25,0.7500000000000001,
+2025-05-01 00:27:41.056390853 UTC,PR-DUMPING_000112,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:27:41.056390854 UTC,PR-DUMPMOV_000143,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:41.056390854 UTC,PR-DUMPMOV_000144,dumped_truck_movements,DumpedTruckMovements,TruckMovementStart,Truck_00,,,,,,,,
+2025-05-01 00:27:41.056390854 UTC,PR-DUMPING_000113,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:27:41.056390854 UTC,PR-DUMPMOV_000145,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:41.056390855 UTC,PR-DUMPMOV_000146,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
+2025-05-01 00:27:41.056390855 UTC,PR-DUMPING_000114,dumping_process,DumpingProcess,ProcessFailure,,,,,,,,,Upstream truck stock is empty or not connected
+2025-05-01 00:29:59.144395100 UTC,PR-DUMPMOV_000147,dumped_truck_movements,DumpedTruckMovements,TruckMovementSuccess,Truck_00,,,,,,,,
+2025-05-01 00:29:59.144395100 UTC,PR-DUMPMOV_000148,dumped_truck_movements,DumpedTruckMovements,WithdrawRequest,,,,,,,,,
