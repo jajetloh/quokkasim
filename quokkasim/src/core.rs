@@ -3,8 +3,20 @@ use serde::Serialize;
 
 use crate::{common::Distribution, delays::DelayModes, nexosim::{Output, Requestor, ActionKey, MonotonicTime, Context, Model}};
 
-#[derive(Debug, Clone)]
-pub struct EventId {}
+#[derive(Debug, Clone, Serialize)]
+/// A short, lightweight identifier for an event. Very useful for understanding causal flow of events via log files.
+/// Conventionally of the form `PROC_123456`, with a prefix uniquely identifying the process, and suffix an auto-incrementing number.
+pub struct EventId(pub String);
+
+impl EventId {
+    pub fn from_init() -> EventId {
+        EventId("INIT_000000".to_string())
+    }
+
+    pub fn from_scheduler() -> EventId {
+        EventId("SCH_000000".to_string())
+    }
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum BasicEnvironmentState {
@@ -12,12 +24,47 @@ pub enum BasicEnvironmentState {
     Stopped,
 }
 
+#[derive(Debug, Clone, Serialize)]
 pub enum VectorStockState {
     Normal { occupied: f64, empty: f64 },
     Full { occupied: f64, empty: f64 },
     Empty { occupied: f64, empty: f64 },
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct VectorProcessLog<
+    T: ContinuousResource,
+> {
+    pub time: String,
+    pub event_id: EventId,
+    pub source_event_id: EventId,
+    pub element_name: String,
+    pub element_type: String,
+    pub details: VectorProcessLogType<T>,
+}
+
+impl<T: ContinuousResource + Debug + Serialize> Log for VectorProcessLog<T> {
+    type LogDetailsType = VectorProcessLogType<T>;
+    fn to_log(
+            time: MonotonicTime,
+            event_id: EventId,
+            source_event_id: EventId,
+            element_name: String,
+            element_type: String,
+            details: Self::LogDetailsType,
+        ) -> Self {
+        VectorProcessLog {
+            time: time.to_chrono_date_time(0).unwrap().to_string(),
+            event_id,
+            source_event_id,
+            element_name,
+            element_type,
+            details,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub enum VectorProcessLogType<T: ContinuousResource> {
     WithdrawRequest,
     ProcessStart { quantity: f64, vector: T },
@@ -30,8 +77,8 @@ pub enum VectorProcessLogType<T: ContinuousResource> {
     StateChange { new_state: VectorStockState },
 }
 
-#[derive(Clone)]
-pub struct VectorProcessLog {}
+// #[derive(Clone)]
+// pub struct VectorProcessLog {}
 
 pub struct DefaultProcess<
     // ReceiveParameterType: Clone + Send + Debug + 'static,
@@ -40,6 +87,7 @@ pub struct DefaultProcess<
     // SendType: Clone + Send + Debug + 'static,
     // VectorStockState: Clone + Send + Debug + 'static,
     // VectorProcessLog: Clone + Send + Debug + 'static,
+    ProcessLog: Clone + Send + Debug + Serialize + Log + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -52,7 +100,7 @@ pub struct DefaultProcess<
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(f64, EventId), ResourceType>,
     pub push_downstream: Output<(ResourceType, EventId)>,
-    pub log_emitter: Output<VectorProcessLog>,
+    pub log_emitter: Output<ProcessLog>,
 
     // Configuration
     pub process_quantity_distr: Distribution,
@@ -78,6 +126,7 @@ impl<
     // SendType: Clone + Send + Debug,
     // VectorStockState: Clone + Send + Debug,
     // VectorProcessLog: Clone + Send + Debug,
+    ProcessLog: Clone + Send + Debug + Serialize + Log,
 > Model for DefaultProcess<
     // ReceiveParameterType,
     // ReceiveType,
@@ -85,6 +134,7 @@ impl<
     // SendType,
     // VectorStockState,
     // VectorProcessLog,
+    ProcessLog,
 > {}
 
 impl<
@@ -94,6 +144,7 @@ impl<
     // SendType: Clone + Send + Debug,
     // VectorStockState: Clone + Send + Debug,
     // VectorProcessLog: Clone + Send + Debug,
+    ProcessLog: Clone + Send + Debug + Serialize + Log,
 > Default for DefaultProcess<
     // ReceiveParameterType,
     // ReceiveType,
@@ -101,6 +152,7 @@ impl<
     // SendType,
     // VectorStockState,
     // VectorProcessLog,
+    ProcessLog,
 > {
     fn default() -> Self {
         DefaultProcess {
@@ -131,20 +183,33 @@ impl<
     }
 }
 
+trait Log {
+    type LogDetailsType: Serialize + Debug;
+    fn to_log(
+        time: MonotonicTime,
+        event_id: EventId,
+        source_event_id: EventId,
+        element_name: String,
+        element_type: String,
+        details: Self::LogDetailsType,
+    ) -> Self;
+}
+
 impl<
     // ReceiveParameterType: Clone + Send + Debug, == f64
     // ReceiveType: Clone + Send + Debug, == ResourceType
-    ResourceType: Clone + Send + Debug + ContinuousResource,
+    ResourceType: Clone + Send + Debug + Serialize + ContinuousResource,
     // SendType: Clone + Send + Debug, // == ResourceType
     // VectorStockState: Clone + Send + Debug,
     // VectorProcessLog: Clone + Send + Debug,
+    // ProcessLog: Clone + Send + Debug + Serialize + Log,
 > DefaultProcess<
     // ReceiveParameterType,
     // ReceiveType,
     ResourceType,
     // SendType,
     // VectorStockState,
-    // VectorProcessLog,
+    VectorProcessLog<ResourceType>,
 > {
     fn update_state(
         &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
@@ -294,17 +359,17 @@ impl<
         }
     }
 
-    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: Self::LogDetailsType) -> impl Future<Output = EventId> {
+    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<ResourceType>) -> impl Future<Output = EventId> {
         async move {
             let new_event_id: EventId = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
-            let log = VectorProcessLog {
-                time: now.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: new_event_id.clone(),
+            let log = VectorProcessLog::to_log(
+                now,
+                new_event_id.clone(),
                 source_event_id,
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                event: details,
-            };
+                self.element_name.clone(),
+                self.element_type.clone(),
+                details,
+            );
             self.log_emitter.send(log.clone()).await;
             self.next_event_index += 1;
 
