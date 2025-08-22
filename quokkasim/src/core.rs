@@ -44,7 +44,7 @@ impl StockState for VectorStockState {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct VectorProcessLog<
-    T: ContinuousResource,
+    T: VectorResource,
 > {
     pub time: String,
     pub event_id: EventId,
@@ -54,7 +54,7 @@ pub struct VectorProcessLog<
     pub details: VectorProcessLogType<T>,
 }
 
-impl<T: ContinuousResource + Debug + Serialize> Log for VectorProcessLog<T> {
+impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
     type LogDetailsType = VectorProcessLogType<T>;
     fn to_log(
             time: MonotonicTime,
@@ -76,7 +76,7 @@ impl<T: ContinuousResource + Debug + Serialize> Log for VectorProcessLog<T> {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub enum VectorProcessLogType<T: ContinuousResource> {
+pub enum VectorProcessLogType<T: VectorResource> {
     WithdrawRequest,
     ProcessStart { quantity: f64, vector: T },
     ProcessSuccess { quantity: f64, vector: T },
@@ -88,16 +88,8 @@ pub enum VectorProcessLogType<T: ContinuousResource> {
     StateChange { new_state: VectorStockState },
 }
 
-// #[derive(Clone)]
-// pub struct VectorProcessLog {}
-
 pub struct DefaultProcess<
-    // ReceiveParameterType: Clone + Send + Debug + 'static,
-    // ReceiveType: Clone + Send + Debug + 'static,
     ResourceType: Clone + Send + Debug + 'static,
-    // SendType: Clone + Send + Debug + 'static,
-    // VectorStockState: Clone + Send + Debug + 'static,
-    // VectorProcessLog: Clone + Send + Debug + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + Log + 'static,
 > {
     // Identification
@@ -131,38 +123,18 @@ pub struct DefaultProcess<
 }
 
 impl<
-    // ReceiveParameterType: Clone + Send + Debug,
-    // ReceiveType: Clone + Send + Debug,
     ResourceType: Clone + Send + Debug,
-    // SendType: Clone + Send + Debug,
-    // VectorStockState: Clone + Send + Debug,
-    // VectorProcessLog: Clone + Send + Debug,
     ProcessLog: Clone + Send + Debug + Serialize + Log,
 > Model for DefaultProcess<
-    // ReceiveParameterType,
-    // ReceiveType,
     ResourceType,
-    // SendType,
-    // VectorStockState,
-    // VectorProcessLog,
     ProcessLog,
 > {}
 
 impl<
-    // ReceiveParameterType: Clone + Send + Debug,
-    // ReceiveType: Clone + Send + Debug,
     ResourceType: Clone + Send + Debug,
-    // SendType: Clone + Send + Debug,
-    // VectorStockState: Clone + Send + Debug,
-    // VectorProcessLog: Clone + Send + Debug,
     ProcessLog: Clone + Send + Debug + Serialize + Log,
 > Default for DefaultProcess<
-    // ReceiveParameterType,
-    // ReceiveType,
     ResourceType,
-    // SendType,
-    // VectorStockState,
-    // VectorProcessLog,
     ProcessLog,
 > {
     fn default() -> Self {
@@ -194,7 +166,7 @@ impl<
     }
 }
 
-trait Log {
+pub trait Log {
     type LogDetailsType: Serialize + Debug;
     fn to_log(
         time: MonotonicTime,
@@ -207,19 +179,9 @@ trait Log {
 }
 
 impl<
-    // ReceiveParameterType: Clone + Send + Debug, == f64
-    // ReceiveType: Clone + Send + Debug, == ResourceType
-    ResourceType: Clone + Send + Debug + Serialize + ContinuousResource,
-    // SendType: Clone + Send + Debug, // == ResourceType
-    // VectorStockState: Clone + Send + Debug,
-    // VectorProcessLog: Clone + Send + Debug,
-    // ProcessLog: Clone + Send + Debug + Serialize + Log,
+    ResourceType: Clone + Send + Debug + Serialize + VectorResource,
 > DefaultProcess<
-    // ReceiveParameterType,
-    // ReceiveType,
     ResourceType,
-    // SendType,
-    // VectorStockState,
     VectorProcessLog<ResourceType>,
 > {
     fn update_state(
@@ -389,12 +351,12 @@ impl<
     }
 }
 
-pub trait Projectable<T> where Self: ContinuousResource {
+pub trait Projectable<T> where Self: VectorResource {
     fn project(self, arg: T) -> Self;
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct VectorStockLog<T: ContinuousResource> {
+pub struct VectorStockLog<T: VectorResource> {
     pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
@@ -402,7 +364,7 @@ pub struct VectorStockLog<T: ContinuousResource> {
     pub element_type: String,
     pub details: VectorStockLogType<T>,
 }
-impl<T: ContinuousResource + Debug + Serialize> Log for VectorStockLog<T> {
+impl<T: VectorResource + Debug + Serialize> Log for VectorStockLog<T> {
     type LogDetailsType = VectorStockLogType<T>;
     fn to_log(
         time: MonotonicTime,
@@ -424,7 +386,7 @@ impl<T: ContinuousResource + Debug + Serialize> Log for VectorStockLog<T> {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub enum VectorStockLogType<T: ContinuousResource> {
+pub enum VectorStockLogType<T: VectorResource> {
     Add { balance: f64, vector: T },
     Remove { balance: f64, vector: T },
     StateChange { new_state: VectorStockState },
@@ -440,7 +402,7 @@ impl StockState for ExampleStockState {
     }
 }
 
-pub struct DefaultStock<T, S: StockState> where T: ContinuousResource + Clone + Serialize + Send + 'static {
+pub struct DefaultStock<T, S: StockState> where T: VectorResource + Clone + Serialize + Send + 'static {
     // Identification
     pub element_name: String,
     pub element_code: String,
@@ -462,11 +424,7 @@ pub struct DefaultStock<T, S: StockState> where T: ContinuousResource + Clone + 
     next_event_id: u64,
 }
 
-trait WithStockState<S> {
-    fn get_state(&mut self) -> S;
-}
-
-impl<T: ContinuousResource + Clone + Serialize + Send + 'static> DefaultStock<T, VectorStockState> where Self: Model {
+impl<T: VectorResource + Clone + Serialize + Send + 'static> DefaultStock<T, VectorStockState> where Self: Model {
 
     fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
@@ -570,7 +528,7 @@ impl<T: ContinuousResource + Clone + Serialize + Send + 'static> DefaultStock<T,
     }
 }
 
-pub trait ContinuousResource {
+pub trait VectorResource {
     fn add(&mut self, arg: Self);
     fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T>;
     fn multiply(&mut self, arg: f64);
@@ -594,7 +552,7 @@ impl<const N: usize> Projectable<f64> for [f64; N] {
     }
 }
 
-impl ContinuousResource for f64 {
+impl VectorResource for f64 {
     fn add(&mut self, arg: Self) {
         *self += arg;
     }
@@ -620,7 +578,7 @@ impl ContinuousResource for f64 {
     }
 }
 
-impl<const N: usize> ContinuousResource for [f64; N] {
+impl<const N: usize> VectorResource for [f64; N] {
     fn add(&mut self, arg: Self) {
         for (a, b) in self.iter_mut().zip(arg.iter()) {
             *a += *b;
@@ -659,10 +617,8 @@ pub trait Connect<A, B> {
 }
 
 pub struct Connection;
-
-// impl<T: ContinuousResource, U: StockState> Connect<DefaultProcess<T>, DefaultStock<T, U>> for Connection {
 impl<
-    T: ContinuousResource + Clone + Send + Debug + Serialize + 'static,
+    T: VectorResource + Clone + Send + Debug + Serialize + 'static,
     U: Clone + Send + Debug + Serialize + Log + 'static,
     S: StockState + Clone + Send + Debug + 'static
 > Connect<DefaultProcess<T, U>, DefaultStock<T, S>> for Connection {

@@ -32,6 +32,6 @@ paste = "1.0"
 quokkasim_derive_macros = "0.2.2"
 anyhow = "1.0.99"
 
-[[bin]]
-name = "cargo-quokkasim"
-path = "src/bin/cargo-quokkasim.rs"
+# [[bin]]
+# name = "cargo-quokkasim"
+# path = "src/bin/cargo-quokkasim.rs"
