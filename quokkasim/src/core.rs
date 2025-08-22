@@ -31,6 +31,17 @@ pub enum VectorStockState {
     Empty { occupied: f64, empty: f64 },
 }
 
+impl StockState for VectorStockState {
+    fn is_same_state(&self, other: &Self) -> bool {
+        match (self, other) {
+            (VectorStockState::Empty { .. }, VectorStockState::Empty { .. }) => true,
+            (VectorStockState::Normal { .. }, VectorStockState::Normal { .. }) => true,
+            (VectorStockState::Full { .. }, VectorStockState::Full { .. }) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct VectorProcessLog<
     T: ContinuousResource,
@@ -378,15 +389,58 @@ impl<
     }
 }
 
-pub trait Projectable<T: ContinuousResource> {
-    fn project(self) -> T;
+pub trait Projectable<T> where Self: ContinuousResource {
+    fn project(self, arg: T) -> Self;
 }
 
-pub trait StockState {}
-pub struct ExampleStockState {}
-impl StockState for ExampleStockState {}
+#[derive(Debug, Clone, Serialize)]
+pub struct VectorStockLog<T: ContinuousResource> {
+    pub time: String,
+    pub event_id: EventId,
+    pub source_event_id: EventId,
+    pub element_name: String,
+    pub element_type: String,
+    pub details: VectorStockLogType<T>,
+}
+impl<T: ContinuousResource + Debug + Serialize> Log for VectorStockLog<T> {
+    type LogDetailsType = VectorStockLogType<T>;
+    fn to_log(
+        time: MonotonicTime,
+        event_id: EventId,
+        source_event_id: EventId,
+        element_name: String,
+        element_type: String,
+        details: Self::LogDetailsType,
+    ) -> Self {
+        VectorStockLog {
+            time: time.to_chrono_date_time(0).unwrap().to_string(),
+            event_id,
+            source_event_id,
+            element_name,
+            element_type,
+            details,
+        }
+    }
+}
 
-pub struct DefaultStock<T, S> where T: ContinuousResource, S: StockState {
+#[derive(Debug, Clone, Serialize)]
+pub enum VectorStockLogType<T: ContinuousResource> {
+    Add { balance: f64, vector: T },
+    Remove { balance: f64, vector: T },
+    StateChange { new_state: VectorStockState },
+}
+
+pub trait StockState {
+    fn is_same_state(&self, other: &Self) -> bool;
+}
+pub struct ExampleStockState {}
+impl StockState for ExampleStockState {
+    fn is_same_state(&self, other: &Self) -> bool {
+        true
+    }
+}
+
+pub struct DefaultStock<T, S: StockState> where T: ContinuousResource + Clone + Serialize + Send + 'static {
     // Identification
     pub element_name: String,
     pub element_code: String,
@@ -404,7 +458,7 @@ pub struct DefaultStock<T, S> where T: ContinuousResource, S: StockState {
     pub resource: T,
 
     // Internals
-    prev_state: Option<VectorStockState>,
+    prev_state: Option<S>,
     next_event_id: u64,
 }
 
@@ -412,11 +466,9 @@ trait WithStockState<S> {
     fn get_state(&mut self) -> S;
 }
 
-impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
-    // type StockState = S;
-    // type LogDetailsType = VectorStockLogType<T>;
+impl<T: ContinuousResource + Clone + Serialize + Send + 'static> DefaultStock<T, VectorStockState> where Self: Model {
 
-    fn get_state(&mut self) -> S {
+    fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
         let empty = self.max_capacity - occupied;
         if empty <= 0.0 {
@@ -428,7 +480,7 @@ impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
         }
     }
 
-    fn get_previous_state(&mut self) -> &Option<S> {
+    fn get_previous_state(&mut self) -> &Option<VectorStockState> {
         &self.prev_state
     }
     fn set_previous_state(&mut self) {
@@ -441,7 +493,7 @@ impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
     fn add_impl(
         &mut self,
         payload: &mut (T, EventId),
-        cx: &mut ::nexosim::model::Context<Self>
+        cx: &mut Context<Self>
     ) -> impl Future<Output=()> {
         async move {
             self.prev_state = Some(self.get_state().clone());
@@ -467,7 +519,7 @@ impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
         &mut self,
         payload: &mut (f64, EventId),
         cx: &mut ::nexosim::model::Context<Self>
-    ) -> impl Future<Output=T> {
+    ) -> impl Future<Output=T> where T: Projectable<f64> {
         async move {
             self.prev_state = Some(self.get_state());
             let result = self.resource.remove(payload.0);
@@ -493,14 +545,14 @@ impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
         }
     }
 
-    fn emit_change(&mut self, payload: (Self::StockState, EventId), cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
+    fn emit_change(&mut self, payload: (VectorStockState, EventId), cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
         async move {
             let nm = self.log(cx.time(), payload.1, VectorStockLogType::StateChange { new_state: payload.0 }).await;
             self.state_emitter.send(nm).await;
         }
     }
 
-    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: Self::LogDetailsType) -> impl Future<Output = EventId> {
+    fn log<StockLogType: Into<VectorStockLogType<T>>>(&mut self, now: MonotonicTime, source_event_id: EventId, details: StockLogType) -> impl Future<Output = EventId> {
         async move {
             let new_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_id));
             let log = VectorStockLog {
@@ -509,7 +561,7 @@ impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
                 source_event_id,
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
-                details,
+                details: details.into(),
             };
             self.log_emitter.send(log.clone()).await;
             self.next_event_id += 1;
@@ -520,10 +572,26 @@ impl DefaultStock<T, S> where T: ContinuousResource, S: StockState {
 
 pub trait ContinuousResource {
     fn add(&mut self, arg: Self);
-    fn remove(&mut self, arg: Self) -> Self;
+    fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T>;
     fn multiply(&mut self, arg: f64);
     fn total(&self) -> f64;
     fn remove_all(&mut self) -> Self;
+}
+
+impl Projectable<f64> for f64 {
+    fn project(self, arg: f64) -> f64 {
+        arg
+    }
+}
+
+impl<const N: usize> Projectable<f64> for [f64; N] {
+    fn project(self, arg: f64) -> [f64; N] {
+        let mut result = self;
+        for a in result.iter_mut() {
+            *a = arg;
+        }
+        result
+    }
 }
 
 impl ContinuousResource for f64 {
@@ -531,9 +599,9 @@ impl ContinuousResource for f64 {
         *self += arg;
     }
 
-    fn remove(&mut self, arg: Self) -> Self {
+    fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T> {
         let removed = *self;
-        *self -= arg;
+        *self -= self.project(arg);
         removed
     }
 
@@ -552,16 +620,16 @@ impl ContinuousResource for f64 {
     }
 }
 
-impl ContinuousResource for [f64; N] {
+impl<const N: usize> ContinuousResource for [f64; N] {
     fn add(&mut self, arg: Self) {
         for (a, b) in self.iter_mut().zip(arg.iter()) {
             *a += *b;
         }
     }
 
-    fn remove(&mut self, arg: Self) -> Self {
-        let removed = *self;
-        for (a, b) in self.iter_mut().zip(arg.iter()) {
+    fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T> {
+        let removed = self.project(arg);
+        for (a, b) in self.iter_mut().zip(removed.iter()) {
             *a -= *b;
         }
         removed
@@ -592,8 +660,13 @@ pub trait Connect<A, B> {
 
 pub struct Connection;
 
-impl<T: ContinuousResource, U: StockState> Connect<DefaultProcess<T>, DefaultStock<T, U>> for Connection {
-    fn connect(&mut self, a: &mut DefaultProcess<T>, b: &mut DefaultStock<T, U>) -> Result<(), String> {
+// impl<T: ContinuousResource, U: StockState> Connect<DefaultProcess<T>, DefaultStock<T, U>> for Connection {
+impl<
+    T: ContinuousResource + Clone + Send + Debug + Serialize + 'static,
+    U: Clone + Send + Debug + Serialize + Log + 'static,
+    S: StockState + Clone + Send + Debug + 'static
+> Connect<DefaultProcess<T, U>, DefaultStock<T, S>> for Connection {
+    fn connect(&mut self, a: &mut DefaultProcess<T, U>, b: &mut DefaultStock<T, S>) -> Result<(), String> {
         // Example connection logic
         Ok(())
     }
