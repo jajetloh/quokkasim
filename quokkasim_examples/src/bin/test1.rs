@@ -4,33 +4,28 @@ use std::fmt::Debug;
 use quokkasim::core::EventId;
 
 fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
-    let mut s1: DefaultStock<f64, VectorStockState> = DefaultStock::new(
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        5.,
-        100.,
-        100.,
-    );
+    let mut s1: DefaultStock<f64, VectorStockState> = DefaultStock::new()
+        .with_name("TestStock1")
+        .with_code("S1")
+        .with_low_capacity(5.)
+        .with_max_capacity(100.)
+        .with_initial_resource(100.);
     let s1_mbox = Mailbox::new();
     let s1_addr = s1_mbox.address();
-    let mut p1: DefaultProcess<f64, VectorProcessLog<f64>> = DefaultProcess::new(
-        "TestProcess1".to_string(),
-        "TestProcess1".to_string(),
-        "TestProcess1".to_string(),
-        Distribution::Constant(1.),
-        Distribution::Constant(2.0),
-    );
+    let mut p1: DefaultProcess<f64, VectorProcessLog<f64>> = DefaultProcess::new()
+        .with_name("TestProcess1")
+        .with_code("P1")
+        .with_type("ProcessType1")
+        .with_process_quantity_distr(Distribution::Constant(1.))
+        .with_process_time_distr(Distribution::Constant(2.0));
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
-    let mut s2: DefaultStock<f64, VectorStockState> = DefaultStock::new(
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        5.,
-        100.,
-        0.,
-    );
+    let mut s2: DefaultStock<f64, VectorStockState> = DefaultStock::new()
+        .with_name("TestStock2")
+        .with_code("S2")
+        .with_low_capacity(5.)
+        .with_max_capacity(100.)
+        .with_initial_resource(0.);
     let s2_mbox = Mailbox::new();
     let s2_addr = s2_mbox.address();
 
@@ -79,33 +74,28 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
 
 
 fn bench_array_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
-    let mut s1: DefaultStock<[f64; 5], VectorStockState> = DefaultStock::new(
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        5.,
-        100.,
-        [50., 40., 30., 20., 10.],
-    );
+    let mut s1: DefaultStock<[f64; 5], VectorStockState> = DefaultStock::new()
+        .with_name("TestStock1")
+        .with_code("S1")
+        .with_low_capacity(5.)
+        .with_max_capacity(100.)
+        .with_initial_resource([50., 40., 30., 20., 10.]);
     let s1_mbox = Mailbox::new();
     let s1_addr = s1_mbox.address();
-    let mut p1: DefaultProcess<[f64; 5], VectorProcessLog<[f64; 5]>> = DefaultProcess::new(
-        "TestProcess1".to_string(),
-        "TestProcess1".to_string(),
-        "TestProcess1".to_string(),
-        Distribution::Constant(1.),
-        Distribution::Constant(2.0),
-    );
+    let mut p1: DefaultProcess<[f64; 5], VectorProcessLog<[f64; 5]>> = DefaultProcess::new()
+        .with_name("TestProcess1")
+        .with_code("P1")
+        .with_type("ProcessType1")
+        .with_process_quantity_distr(Distribution::Constant(1.))
+        .with_process_time_distr(Distribution::Constant(2.0));
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
-    let mut s2: DefaultStock<[f64; 5], VectorStockState> = DefaultStock::new(
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        5.,
-        100.,
-        [0., 0., 0., 0., 0.],
-    );
+    let mut s2: DefaultStock<[f64; 5], VectorStockState> = DefaultStock::new()
+        .with_name("TestStock2")
+        .with_code("S2")
+        .with_low_capacity(5.)
+        .with_max_capacity(100.)
+        .with_initial_resource([0., 0., 0., 0., 0.]);
     let s2_mbox = Mailbox::new();
     let s2_addr = s2_mbox.address();
 
@@ -239,13 +229,12 @@ impl Default for IronOre {
 }
 
 fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
-    let mut s1: DefaultStock<_, VectorStockState> = DefaultStock::new(
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        5.,
-        100.,
-        IronOre {
+    let mut s1: DefaultStock<_, VectorStockState> = DefaultStock::new()
+        .with_name("TestStock1")
+        .with_code("S1")
+        .with_low_capacity(5.)
+        .with_max_capacity(100.)
+        .with_initial_resource(IronOre {
             fe: 50.,
             si: 40.,
             al: 5.,
@@ -253,17 +242,15 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
             hematite: 10.,
             limonite: 5.,
             sericite: 2.,
-        },
-    );
+        });
     let s1_mbox = Mailbox::new();
     let s1_addr = s1_mbox.address();
-    let mut p1: DefaultProcess<IronOre, VectorProcessLog<IronOre>> = DefaultProcess::new(
-        "TestProcess1".to_string(),
-        "TestProcess1".to_string(),
-        "TestProcess1".to_string(),
-        Distribution::Constant(1.),
-        Distribution::Constant(2.0),
-    );
+    let mut p1: DefaultProcess<IronOre, VectorProcessLog<IronOre>> = DefaultProcess::new()
+        .with_name("TestProcess1")
+        .with_code("P1")
+        .with_type("ProcessType1")
+        .with_process_quantity_distr(Distribution::Constant(1.))
+        .with_process_time_distr(Distribution::Constant(2.0));
     p1.delay_modes.modify(DelayModeChange::Add(DelayMode {
         name: "TestDelay".to_string(),
         until_delay_distr: Distribution::Constant(5.1),
@@ -271,17 +258,14 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     }));
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
-    let mut s2: DefaultStock<_, VectorStockState> = DefaultStock::new(
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        5.,
-        100.,
-        IronOre::default(),
-    );
+    let mut s2: DefaultStock<_, VectorStockState> = DefaultStock::new()
+        .with_name("TestStock2")
+        .with_code("S2")
+        .with_low_capacity(5.)
+        .with_max_capacity(100.)
+        .with_initial_resource(IronOre::default());
     let s2_mbox = Mailbox::new();
     let s2_addr = s2_mbox.address();
-
 
     // Connections
 
