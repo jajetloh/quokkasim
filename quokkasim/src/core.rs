@@ -546,7 +546,7 @@ impl<T: VectorResource + Clone + Serialize + Send + 'static, S: StockState> Defa
     }
 }
 
-impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStock<T, VectorStockState> where Self: Model {
+impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStock<T, VectorStockState> {
 
     fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
@@ -557,6 +557,15 @@ impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStoc
             VectorStockState::Empty { occupied, empty }
         } else {
             VectorStockState::Normal { occupied, empty }
+        }
+    }
+
+    fn get_state_async(&mut self) -> impl Future<Output = VectorStockState> {
+        // TODO: Allow above to also have context arg?
+        async move {
+            let state = self.get_state();
+            self.prev_state = Some(state.clone());
+            state
         }
     }
 
@@ -600,6 +609,15 @@ impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStoc
                 cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
             }
             self.prev_state = Some(current_state);
+        }
+    }
+
+    fn remove(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = T> + where T: Projectable<f64> {
+        async move {
+            // self.pre_remove(&mut payload, cx).await;
+            let result = self.remove_impl(&mut payload, cx).await;
+            self.post_remove(&mut payload, cx).await;
+            result
         }
     }
 
@@ -743,29 +761,43 @@ impl<const N: usize> VectorResource for [f64; N] {
 }
 
 pub trait Connect<A: Model, B: Model> {
-    fn connect(&mut self, a: (&mut A, Address<A>), b: (&mut B, Address<B>)) -> Result<(), String>;
+    fn connect(&mut self, a: (&mut A, &Address<A>), b: (&mut B, &Address<B>)) -> Result<(), String>;
 }
 
 pub struct Connection;
 
-// impl<T: ContinuousResource, U: StockState> Connect<DefaultProcess<T>, DefaultStock<T, U>> for Connection {
 impl<
     T: VectorResource + Clone + Send + Debug + Serialize + 'static,
-    U: Clone + Send + Debug + Serialize + 'static,
-    // S: StockState + Clone + Send + Debug + 'static
-> Connect<DefaultProcess<T, U>, DefaultStock<T, VectorStockState>> for Connection
-    where DefaultProcess<T, U>: Model,
+> Connect<DefaultProcess<T, VectorProcessLog<T>>, DefaultStock<T, VectorStockState>> for Connection
+    where DefaultProcess<T, VectorProcessLog<T>>: Model,
           DefaultStock<T, VectorStockState>: Model
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultProcess<T, U>, Address<DefaultProcess<T, U>>),
-        b: (&mut DefaultStock<T, VectorStockState>, Address<DefaultStock<T, VectorStockState>>),
+        a: (&mut DefaultProcess<T, VectorProcessLog<T>>, &Address<DefaultProcess<T, VectorProcessLog<T>>>),
+        b: (&mut DefaultStock<T, VectorStockState>, &Address<DefaultStock<T, VectorStockState>>),
     ) -> Result<(), String> {
-        a.0.push_downstream.connect(DefaultStock::add, b.1);
+        a.0.push_downstream.connect(DefaultStock::add, b.1.clone());
+        a.0.req_downstream.connect(DefaultStock::get_state_async, b.1.clone());
+        b.0.state_emitter.connect(DefaultProcess::update_state, a.1);
         Ok(())
     }
 }
 
-
-
+impl<
+    T: VectorResource + Clone + Send + Debug + Serialize + Projectable<f64> + 'static,
+> Connect<DefaultStock<T, VectorStockState>, DefaultProcess<T, VectorProcessLog<T>>> for Connection
+    where DefaultProcess<T, VectorProcessLog<T>>: Model,
+          DefaultStock<T, VectorStockState>: Model
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultStock<T, VectorStockState>, &Address<DefaultStock<T, VectorStockState>>),
+        b: (&mut DefaultProcess<T, VectorProcessLog<T>>, &Address<DefaultProcess<T, VectorProcessLog<T>>>),
+    ) -> Result<(), String> {
+        b.0.withdraw_upstream.connect(DefaultStock::remove, a.1.clone());
+        b.0.req_upstream.connect(DefaultStock::get_state_async, a.1.clone());
+        a.0.state_emitter.connect(DefaultProcess::update_state, b.1);
+        Ok(())
+    }
+}

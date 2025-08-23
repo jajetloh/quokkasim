@@ -34,10 +34,18 @@ fn main() {
     let s2_mbox = Mailbox::new();
     let s2_addr = s2_mbox.address();
 
+    // Connections
+
     let mut c = Connection {};
-    c.connect((&mut p1, p1_addr), (&mut s2, s2_addr)).unwrap();
+    c.connect((&mut s1, &s1_addr), (&mut p1, &p1_addr)).unwrap();
+    c.connect((&mut p1, &p1_addr), (&mut s2, &s2_addr)).unwrap();
+    
+    // Loggers
+    
     let process_logger = EventSlot::new();
     p1.log_emitter.connect_sink(&process_logger);
+
+    // Execution
 
     let mut sim_init = SimInit::new();
     sim_init = sim_init.add_model(s1, s1_mbox, "TestStock1");
