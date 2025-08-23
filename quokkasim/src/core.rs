@@ -1,7 +1,7 @@
 use std::{fmt::Debug, time::Duration};
 use serde::{ser::SerializeStruct, Serialize};
 
-use crate::{common::Distribution, delays::DelayModes, nexosim::{Output, Requestor, ActionKey, MonotonicTime, Context, Model}};
+use crate::{common::Distribution, delays::DelayModes, nexosim::{Output, Requestor, ActionKey, MonotonicTime, Address, Context, Model, InitializedModel}};
 
 #[derive(Debug, Clone, Serialize)]
 /// A short, lightweight identifier for an event. Very useful for understanding causal flow of events via log files.
@@ -169,12 +169,63 @@ pub struct DefaultProcess<
 }
 
 impl<
-    ResourceType: Clone + Send + Debug,
-    ProcessLog: Clone + Send + Debug + Serialize,
+    ResourceType: Clone + Send + Debug + 'static,
+    ProcessLog: Clone + Send + Debug + Serialize + 'static
+> DefaultProcess<
+    ResourceType,
+    ProcessLog
+> {
+    pub fn new(
+        element_name: String,
+        element_code: String,
+        element_type: String,
+        process_quantity_distr: Distribution,
+        process_time_distr: Distribution,
+    ) -> Self {
+        let (req_upstream, req_downstream, req_environment) = (Requestor::default(), Requestor::default(), Requestor::default());
+        let (withdraw_upstream, push_downstream, log_emitter) = (Requestor::default(), Output::new(), Output::new());
+        
+        DefaultProcess {
+            element_name,
+            element_code,
+            element_type,
+            req_upstream,
+            req_downstream,
+            req_environment,
+            withdraw_upstream,
+            push_downstream,
+            log_emitter,
+
+            process_quantity_distr,
+            process_time_distr,
+            delay_modes: DelayModes::default(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
+            scheduled_event: None,
+            next_event_index: 0,
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+}
+
+impl<
+    ResourceType: Clone + Send + Debug + Serialize + VectorResource,
 > Model for DefaultProcess<
     ResourceType,
-    ProcessLog,
-> {}
+    VectorProcessLog<ResourceType>,
+> {
+    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let source_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
+            self.update_state(source_event_id, ctx).await;
+            self.into()
+        }
+    }
+}
 
 impl<
     ResourceType: Clone + Send + Debug,
@@ -475,7 +526,27 @@ pub struct DefaultStock<T, S: StockState> where T: VectorResource + Clone + Seri
     next_event_id: u64,
 }
 
-impl<T: VectorResource + Clone + Serialize + Send + 'static> DefaultStock<T, VectorStockState> where Self: Model {
+impl<T: VectorResource + Clone + Serialize + Send + 'static, S: StockState + Send + 'static> Model for DefaultStock<T, S> where T: VectorResource + Clone + Serialize + Send + 'static, S: StockState {}
+
+impl<T: VectorResource + Clone + Serialize + Send + 'static, S: StockState> DefaultStock<T, S> {
+    pub fn new(element_name: String, element_code: String, element_type: String, low_capacity: f64, max_capacity: f64, resource: T) -> Self {
+        let (log_emitter, state_emitter) = (Output::new(), Output::new());
+        DefaultStock {
+            element_name,
+            element_code,
+            element_type,
+            log_emitter,
+            state_emitter,
+            low_capacity,
+            max_capacity,
+            resource,
+            prev_state: None,
+            next_event_id: 0,
+        }
+    }
+}
+
+impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStock<T, VectorStockState> where Self: Model {
 
     fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
@@ -497,6 +568,14 @@ impl<T: VectorResource + Clone + Serialize + Send + 'static> DefaultStock<T, Vec
     }
     fn get_resource(&self) -> &T {
         &self.resource
+    }
+
+    pub fn add(&mut self, mut payload: (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + where T: 'static {
+        async move {
+            // self.pre_add(&mut payload, cx).await;
+            self.add_impl(&mut payload, cx).await;
+            self.post_add(&mut payload, cx).await;
+        }
     }
 
     fn add_impl(
@@ -663,8 +742,8 @@ impl<const N: usize> VectorResource for [f64; N] {
     }
 }
 
-pub trait Connect<A, B> {
-    fn connect(&mut self, a: &mut A, b: &mut B) -> Result<(), String>;
+pub trait Connect<A: Model, B: Model> {
+    fn connect(&mut self, a: (&mut A, Address<A>), b: (&mut B, Address<B>)) -> Result<(), String>;
 }
 
 pub struct Connection;
@@ -673,10 +752,20 @@ pub struct Connection;
 impl<
     T: VectorResource + Clone + Send + Debug + Serialize + 'static,
     U: Clone + Send + Debug + Serialize + 'static,
-    S: StockState + Clone + Send + Debug + 'static
-> Connect<DefaultProcess<T, U>, DefaultStock<T, S>> for Connection {
-    fn connect(&mut self, a: &mut DefaultProcess<T, U>, b: &mut DefaultStock<T, S>) -> Result<(), String> {
-        // Example connection logic
+    // S: StockState + Clone + Send + Debug + 'static
+> Connect<DefaultProcess<T, U>, DefaultStock<T, VectorStockState>> for Connection
+    where DefaultProcess<T, U>: Model,
+          DefaultStock<T, VectorStockState>: Model
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultProcess<T, U>, Address<DefaultProcess<T, U>>),
+        b: (&mut DefaultStock<T, VectorStockState>, Address<DefaultStock<T, VectorStockState>>),
+    ) -> Result<(), String> {
+        a.0.push_downstream.connect(DefaultStock::add, b.1);
         Ok(())
     }
 }
+
+
+
