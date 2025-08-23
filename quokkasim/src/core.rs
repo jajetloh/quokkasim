@@ -1,5 +1,5 @@
 use std::{fmt::Debug, time::Duration};
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
 
 use crate::{common::Distribution, delays::DelayModes, nexosim::{Output, Requestor, ActionKey, MonotonicTime, Context, Model}};
 
@@ -44,7 +44,7 @@ impl StockState for VectorStockState {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct VectorProcessLog<
-    T: VectorResource,
+    T: VectorResource + Debug + Serialize,
 > {
     pub time: String,
     pub event_id: EventId,
@@ -54,15 +54,74 @@ pub struct VectorProcessLog<
     pub details: VectorProcessLogType<T>,
 }
 
-impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
-    type LogDetailsType = VectorProcessLogType<T>;
+#[derive(Debug, Clone)]
+pub enum VectorProcessLogType<T: VectorResource> {
+    WithdrawRequest,
+    ProcessStart { quantity: f64, vector: T },
+    ProcessSuccess { quantity: f64, vector: T },
+    ProcessFailure { reason: &'static str },
+    ProcessStopped { reason: &'static str },
+    ProcessContinue { reason: &'static str },
+    DelayStart { delay_name: String },
+    DelayEnd { delay_name: String },
+    StateChange { new_state: VectorStockState },
+}
+impl<T: VectorResource + Debug + Serialize> Serialize for VectorProcessLogType<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("VectorProcessLogType", 2)?;
+        match self {
+            VectorProcessLogType::WithdrawRequest => state.serialize_field("type", "WithdrawRequest")?,
+            VectorProcessLogType::ProcessStart { quantity, vector } => {
+                state.serialize_field("type", "ProcessStart")?;
+                state.serialize_field("quantity", quantity)?;
+                state.serialize_field("vector", vector)?;
+            }
+            VectorProcessLogType::ProcessSuccess { quantity, vector } => {
+                state.serialize_field("type", "ProcessSuccess")?;
+                state.serialize_field("quantity", quantity)?;
+                state.serialize_field("vector", vector)?;
+            }
+            VectorProcessLogType::ProcessFailure { reason } => {
+                state.serialize_field("type", "ProcessFailure")?;
+                state.serialize_field("reason", reason)?;
+            }
+            VectorProcessLogType::ProcessStopped { reason } => {
+                state.serialize_field("type", "ProcessStopped")?;
+                state.serialize_field("reason", reason)?;
+            }
+            VectorProcessLogType::ProcessContinue { reason } => {
+                state.serialize_field("type", "ProcessContinue")?;
+                state.serialize_field("reason", reason)?;
+            }
+            VectorProcessLogType::DelayStart { delay_name } => {
+                state.serialize_field("type", "DelayStart")?;
+                state.serialize_field("delay_name", delay_name)?;
+            }
+            VectorProcessLogType::DelayEnd { delay_name } => {
+                state.serialize_field("type", "DelayEnd")?;
+                state.serialize_field("delay_name", delay_name)?;
+            }
+            VectorProcessLogType::StateChange { new_state } => {
+                state.serialize_field("type", "StateChange")?;
+                state.serialize_field("new_state", new_state)?;
+            }
+        }
+        state.end()
+    }
+}
+impl<T: VectorResource + Debug + Serialize> VectorProcessLog<T> {
+// impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
+    // type LogDetailsType = VectorProcessLogType<T>;
     fn to_log(
             time: MonotonicTime,
             event_id: EventId,
             source_event_id: EventId,
             element_name: String,
             element_type: String,
-            details: Self::LogDetailsType,
+            details: VectorProcessLogType<T>,
         ) -> Self {
         VectorProcessLog {
             time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -75,22 +134,9 @@ impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub enum VectorProcessLogType<T: VectorResource> {
-    WithdrawRequest,
-    ProcessStart { quantity: f64, vector: T },
-    ProcessSuccess { quantity: f64, vector: T },
-    ProcessFailure { reason: &'static str },
-    ProcessStopped { reason: &'static str },
-    ProcessContinue { reason: &'static str },
-    DelayStart { delay_name: String },
-    DelayEnd { delay_name: String },
-    StateChange { new_state: VectorStockState },
-}
-
 pub struct DefaultProcess<
     ResourceType: Clone + Send + Debug + 'static,
-    ProcessLog: Clone + Send + Debug + Serialize + Log + 'static,
+    ProcessLog: Clone + Send + Debug + Serialize + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -124,7 +170,7 @@ pub struct DefaultProcess<
 
 impl<
     ResourceType: Clone + Send + Debug,
-    ProcessLog: Clone + Send + Debug + Serialize + Log,
+    ProcessLog: Clone + Send + Debug + Serialize,
 > Model for DefaultProcess<
     ResourceType,
     ProcessLog,
@@ -132,7 +178,7 @@ impl<
 
 impl<
     ResourceType: Clone + Send + Debug,
-    ProcessLog: Clone + Send + Debug + Serialize + Log,
+    ProcessLog: Clone + Send + Debug + Serialize,
 > Default for DefaultProcess<
     ResourceType,
     ProcessLog,
@@ -166,16 +212,20 @@ impl<
     }
 }
 
-pub trait Log {
-    type LogDetailsType: Serialize + Debug;
-    fn to_log(
-        time: MonotonicTime,
-        event_id: EventId,
-        source_event_id: EventId,
-        element_name: String,
-        element_type: String,
-        details: Self::LogDetailsType,
-    ) -> Self;
+// pub trait Log {
+//     type LogDetailsType: Serialize + Debug;
+//     fn to_log(
+//         time: MonotonicTime,
+//         event_id: EventId,
+//         source_event_id: EventId,
+//         element_name: String,
+//         element_type: String,
+//         details: Self::LogDetailsType,
+//     ) -> Self;
+// }
+
+pub trait ToLogRecord<DetailsType, LogType> {
+    fn to_record(&self, details: DetailsType) -> LogType;
 }
 
 impl<
@@ -364,15 +414,16 @@ pub struct VectorStockLog<T: VectorResource> {
     pub element_type: String,
     pub details: VectorStockLogType<T>,
 }
-impl<T: VectorResource + Debug + Serialize> Log for VectorStockLog<T> {
-    type LogDetailsType = VectorStockLogType<T>;
+// impl<T: VectorResource + Debug + Serialize> Log for VectorStockLog<T> {
+impl<T: VectorResource + Debug + Serialize> VectorStockLog<T> {
+    // type LogDetailsType = VectorStockLogType<T>;
     fn to_log(
         time: MonotonicTime,
         event_id: EventId,
         source_event_id: EventId,
         element_name: String,
         element_type: String,
-        details: Self::LogDetailsType,
+        details: VectorStockLogType<T>,
     ) -> Self {
         VectorStockLog {
             time: time.to_chrono_date_time(0).unwrap().to_string(),
@@ -617,9 +668,11 @@ pub trait Connect<A, B> {
 }
 
 pub struct Connection;
+
+// impl<T: ContinuousResource, U: StockState> Connect<DefaultProcess<T>, DefaultStock<T, U>> for Connection {
 impl<
     T: VectorResource + Clone + Send + Debug + Serialize + 'static,
-    U: Clone + Send + Debug + Serialize + Log + 'static,
+    U: Clone + Send + Debug + Serialize + 'static,
     S: StockState + Clone + Send + Debug + 'static
 > Connect<DefaultProcess<T, U>, DefaultStock<T, S>> for Connection {
     fn connect(&mut self, a: &mut DefaultProcess<T, U>, b: &mut DefaultStock<T, S>) -> Result<(), String> {
