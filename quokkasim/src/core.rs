@@ -1,9 +1,9 @@
 use std::{fmt::Debug, time::Duration};
-use serde::{ser::SerializeStruct, Serialize};
+use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
 use crate::{common::Distribution, delays::DelayModes, nexosim::{Output, Requestor, ActionKey, MonotonicTime, Address, Context, Model, InitializedModel}};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// A short, lightweight identifier for an event. Very useful for understanding causal flow of events via log files.
 /// Conventionally of the form `PROC_123456`, with a prefix uniquely identifying the process, and suffix an auto-incrementing number.
 pub struct EventId(pub String);
@@ -42,7 +42,7 @@ impl StockState for VectorStockState {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct VectorProcessLog<
     T: VectorResource + Debug + Serialize,
 > {
@@ -52,6 +52,36 @@ pub struct VectorProcessLog<
     pub element_name: String,
     pub element_type: String,
     pub details: VectorProcessLogType<T>,
+}
+
+impl<T: VectorResource + Debug + Serialize + Clone> Serialize for VectorProcessLog<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("VectorProcessLog", 6)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) = match &self.details {
+            VectorProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
+            VectorProcessLogType::ProcessStart { quantity, vector } => ("ProcessStart", Some(*quantity), Some(vector.clone()), None),
+            VectorProcessLogType::ProcessSuccess { quantity, vector } => ("ProcessSuccess", Some(*quantity), Some(vector.clone()), None),
+            VectorProcessLogType::ProcessFailure { reason } => ("ProcessFailure", None, None, Some(reason.to_string())),
+            VectorProcessLogType::ProcessStopped { reason } => ("ProcessStopped", None, None, Some(reason.to_string())),
+            VectorProcessLogType::ProcessContinue { reason } => ("ProcessContinue", None, None, Some(reason.to_string())),
+            VectorProcessLogType::DelayStart { delay_name } => ("DelayStart", None, None, Some(delay_name.clone())),
+            VectorProcessLogType::DelayEnd { delay_name } => ("DelayEnd", None, None, Some(delay_name.clone())),
+            VectorProcessLogType::StateChange { new_state } => ("StateChange", None, None, Some(format!("{:?}", new_state))),
+        };
+        state.serialize_field("event_type", &event_type)?;
+        state.serialize_field("total", &total)?;
+        state.serialize_field("resource", &resource)?;
+        state.serialize_field("reason", &reason)?;
+        state.end()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,52 +96,7 @@ pub enum VectorProcessLogType<T: VectorResource> {
     DelayEnd { delay_name: String },
     StateChange { new_state: VectorStockState },
 }
-impl<T: VectorResource + Debug + Serialize> Serialize for VectorProcessLogType<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("VectorProcessLogType", 2)?;
-        match self {
-            VectorProcessLogType::WithdrawRequest => state.serialize_field("type", "WithdrawRequest")?,
-            VectorProcessLogType::ProcessStart { quantity, vector } => {
-                state.serialize_field("type", "ProcessStart")?;
-                state.serialize_field("quantity", quantity)?;
-                state.serialize_field("vector", vector)?;
-            }
-            VectorProcessLogType::ProcessSuccess { quantity, vector } => {
-                state.serialize_field("type", "ProcessSuccess")?;
-                state.serialize_field("quantity", quantity)?;
-                state.serialize_field("vector", vector)?;
-            }
-            VectorProcessLogType::ProcessFailure { reason } => {
-                state.serialize_field("type", "ProcessFailure")?;
-                state.serialize_field("reason", reason)?;
-            }
-            VectorProcessLogType::ProcessStopped { reason } => {
-                state.serialize_field("type", "ProcessStopped")?;
-                state.serialize_field("reason", reason)?;
-            }
-            VectorProcessLogType::ProcessContinue { reason } => {
-                state.serialize_field("type", "ProcessContinue")?;
-                state.serialize_field("reason", reason)?;
-            }
-            VectorProcessLogType::DelayStart { delay_name } => {
-                state.serialize_field("type", "DelayStart")?;
-                state.serialize_field("delay_name", delay_name)?;
-            }
-            VectorProcessLogType::DelayEnd { delay_name } => {
-                state.serialize_field("type", "DelayEnd")?;
-                state.serialize_field("delay_name", delay_name)?;
-            }
-            VectorProcessLogType::StateChange { new_state } => {
-                state.serialize_field("type", "StateChange")?;
-                state.serialize_field("new_state", new_state)?;
-            }
-        }
-        state.end()
-    }
-}
+
 impl<T: VectorResource + Debug + Serialize> VectorProcessLog<T> {
 // impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
     // type LogDetailsType = VectorProcessLogType<T>;
@@ -263,18 +248,6 @@ impl<
     }
 }
 
-// pub trait Log {
-//     type LogDetailsType: Serialize + Debug;
-//     fn to_log(
-//         time: MonotonicTime,
-//         event_id: EventId,
-//         source_event_id: EventId,
-//         element_name: String,
-//         element_type: String,
-//         details: Self::LogDetailsType,
-//     ) -> Self;
-// }
-
 pub trait ToLogRecord<DetailsType, LogType> {
     fn to_record(&self, details: DetailsType) -> LogType;
 }
@@ -289,6 +262,7 @@ impl<
         &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
     ) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
+            println!("Updating process state for {} at time {}", self.element_name, cx.time());
             // Update variables from elapsed time
             if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
                 if *scheduled_time <= cx.time() {
@@ -358,6 +332,8 @@ impl<
                 (None, false) => {
                     let us_state = self.req_upstream.send(()).await.next();
                     let ds_state = self.req_downstream.send(()).await.next();
+
+                    println!("Checking upstream and downstream states: {:?} {:?}", us_state, ds_state);
                     match (&us_state, &ds_state) {
                         (
                             Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
@@ -612,7 +588,7 @@ impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStoc
         }
     }
 
-    fn remove(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = T> + where T: Projectable<f64> {
+    pub fn remove(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = T> + where T: Projectable<f64> {
         async move {
             // self.pre_remove(&mut payload, cx).await;
             let result = self.remove_impl(&mut payload, cx).await;
