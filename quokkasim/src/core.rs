@@ -668,11 +668,8 @@ impl Projectable<f64> for f64 {
 
 impl<const N: usize> Projectable<f64> for [f64; N] {
     fn project(self, arg: f64) -> [f64; N] {
-        let mut result = self;
-        for a in result.iter_mut() {
-            *a = arg;
-        }
-        result
+        let total = self.total();
+        self.map(|x| x / total * arg)
     }
 }
 
