@@ -100,7 +100,7 @@ pub enum VectorProcessLogType<T: VectorResource> {
 impl<T: VectorResource + Debug + Serialize> VectorProcessLog<T> {
 // impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
     // type LogDetailsType = VectorProcessLogType<T>;
-    fn to_log(
+    pub fn to_log(
             time: MonotonicTime,
             event_id: EventId,
             source_event_id: EventId,
@@ -146,11 +146,11 @@ pub struct DefaultProcess<
     pub env_state: BasicEnvironmentState,
     
     // Internals
-    time_to_next_process_event: Option<Duration>,
-    time_to_next_delay_event: Option<Duration>,
-    scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    next_event_index: u64,
-    previous_check_time: MonotonicTime,
+    pub time_to_next_process_event: Option<Duration>,
+    pub time_to_next_delay_event: Option<Duration>,
+    pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
+    pub next_event_index: u64,
+    pub previous_check_time: MonotonicTime,
 }
 
 impl<
@@ -258,7 +258,7 @@ impl<
     ResourceType,
     VectorProcessLog<ResourceType>,
 > {
-    fn update_state(
+    pub fn update_state(
         &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
     ) -> impl Future<Output = ()> + Send where Self: Model {
         async move {
@@ -536,7 +536,7 @@ impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStoc
         }
     }
 
-    fn get_state_async(&mut self) -> impl Future<Output = VectorStockState> {
+    pub fn get_state_async(&mut self) -> impl Future<Output = VectorStockState> {
         // TODO: Allow above to also have context arg?
         async move {
             let state = self.get_state();
