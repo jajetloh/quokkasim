@@ -252,13 +252,22 @@ pub trait ToLogRecord<DetailsType, LogType> {
     fn to_record(&self, details: DetailsType) -> LogType;
 }
 
+pub trait Process<T> where Self: Model {
+    fn update_state(
+        &mut self, source_event_id: EventId, cx: &mut Context<Self>
+    ) -> impl Future<Output = ()> + Send;
+    fn log(
+        &mut self, now: MonotonicTime, source_event_id: EventId, details: T
+    ) -> impl Future<Output = EventId>;
+}
+
 impl<
     ResourceType: Clone + Send + Debug + Serialize + VectorResource,
-> DefaultProcess<
+> Process<VectorProcessLogType<ResourceType>> for DefaultProcess<
     ResourceType,
     VectorProcessLog<ResourceType>,
 > {
-    pub fn update_state(
+    fn update_state(
         &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
     ) -> impl Future<Output = ()> + Send where Self: Model {
         async move {

@@ -339,7 +339,7 @@ impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> std::ops::D
     }
 }
 
-impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> MyCustomProcess<T> {
+impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> Process<VectorProcessLogType<T>> for MyCustomProcess<T> {
     fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<T>) -> impl Future<Output = EventId> {
         async move {
             println!("Here is some new stuff, hey {}!", self.custom_field);
