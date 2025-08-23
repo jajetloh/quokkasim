@@ -441,7 +441,7 @@ pub struct VectorStockLog<T: VectorResource> {
     pub element_type: String,
     pub details: VectorStockLogType<T>,
 }
-// impl<T: VectorResource + Debug + Serialize> Log for VectorStockLog<T> {
+
 impl<T: VectorResource + Debug + Serialize> VectorStockLog<T> {
     // type LogDetailsType = VectorStockLogType<T>;
     fn to_log(
@@ -682,8 +682,8 @@ impl VectorResource for f64 {
     }
 
     fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T> {
-        let removed = *self;
-        *self -= self.project(arg);
+        let removed = self.project(arg);
+        *self -= removed;
         removed
     }
 
