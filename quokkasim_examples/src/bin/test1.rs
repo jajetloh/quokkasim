@@ -264,6 +264,11 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
         Distribution::Constant(1.),
         Distribution::Constant(2.0),
     );
+    p1.delay_modes.modify(DelayModeChange::Add(DelayMode {
+        name: "TestDelay".to_string(),
+        until_delay_distr: Distribution::Constant(5.1),
+        until_fix_distr: Distribution::Constant(0.2),
+    }));
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
     let mut s2: DefaultStock<_, VectorStockState> = DefaultStock::new(
