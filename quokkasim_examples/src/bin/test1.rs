@@ -301,188 +301,14 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     input_add_to_s2.connect(DefaultStock::add, &s2_addr);
     registry.add_event_source(input_add_to_s2, "remove_from_s2").unwrap();
 
-    let mut output = EventQueue::new();
-    p1.log_emitter.connect_sink(&output);
-    registry.add_event_sink(output.into_reader(), "process_log").unwrap();
+    let output_process_log = EventQueue::new();
+    p1.log_emitter.connect_sink(&output_process_log);
+    registry.add_event_sink(output_process_log.into_reader(), "process_log").unwrap();
 
-    // Execution
-
-    let mut sim_init = SimInit::new();
-    sim_init = sim_init.add_model(s1, s1_mbox, "TestStock1");
-    sim_init = sim_init.add_model(s2, s2_mbox, "TestStock2");
-    sim_init = sim_init.add_model(p1, p1_mbox, "TestProcess1");
-    let (mut simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
-
-    process_logger.into_iter().for_each(|log| {
-        println!("Process Log: {:?}", log);
-    });
-
-    Ok((simu, registry))
-}
-
-
-struct MyCustomProcess<T: VectorResource + Clone + Send + Debug + Serialize + 'static> {
-    process: DefaultProcess<T, VectorProcessLog<T>>,
-    custom_field: f64,
-}
-
-impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> std::ops::Deref for MyCustomProcess<T> {
-    type Target = DefaultProcess<T, VectorProcessLog<T>>;
-    fn deref(&self) -> &Self::Target {
-        &self.process
-    }
-}
-
-impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> std::ops::DerefMut for MyCustomProcess<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.process
-    }
-}
-
-impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> Process<VectorProcessLogType<T>> for MyCustomProcess<T> {
-    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<T>) -> impl Future<Output = EventId> {
-        async move {
-            println!("Here is some new stuff, hey {}!", self.custom_field);
-            let new_event_id: EventId = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
-            let log = VectorProcessLog::to_log(
-                now,
-                new_event_id.clone(),
-                source_event_id,
-                self.element_name.clone(),
-                self.element_type.clone(),
-                details,
-            );
-            self.log_emitter.send(log.clone()).await;
-            self.next_event_index += 1;
-
-            new_event_id
-        }
-    }
-    fn update_state(&mut self, source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
-        async move {
-            let inner_cx = unsafe {
-                &mut *(cx as *mut Context<MyCustomProcess<T>> as *mut Context<DefaultProcess<T, VectorProcessLog<T>>>)
-            };
-            DefaultProcess::update_state(&mut self.process, source_event_id, inner_cx).await;
-        }
-    }
-}
-
-impl<T: VectorResource + Clone + Send + Debug + Serialize + 'static> Model for MyCustomProcess<T> {
-    fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
-        async move {
-            self.update_state(EventId::from_init(), cx).await;
-            self.into()
-        }
-    }
-}
-
-impl<
-    T: VectorResource + Clone + Send + Debug + Serialize + 'static,
-> Connect<MyCustomProcess<T>, DefaultStock<T, VectorStockState>> for Connection
-    where MyCustomProcess<T>: Model,
-          DefaultStock<T, VectorStockState>: Model
-{
-    fn connect(
-        &mut self,
-        a: (&mut MyCustomProcess<T>, &Address<MyCustomProcess<T>>),
-        b: (&mut DefaultStock<T, VectorStockState>, &Address<DefaultStock<T, VectorStockState>>),
-    ) -> Result<(), String> {
-        a.0.push_downstream.connect(DefaultStock::add, b.1.clone());
-        a.0.req_downstream.connect(DefaultStock::get_state_async, b.1.clone());
-        b.0.state_emitter.connect(MyCustomProcess::update_state, a.1);
-        Ok(())
-    }
-}
-
-impl<
-    T: VectorResource + Clone + Send + Debug + Serialize + Projectable<f64> + 'static,
-> Connect<DefaultStock<T, VectorStockState>, MyCustomProcess<T>> for Connection
-    where MyCustomProcess<T>: Model,
-          DefaultStock<T, VectorStockState>: Model
-{
-    fn connect(
-        &mut self,
-        a: (&mut DefaultStock<T, VectorStockState>, &Address<DefaultStock<T, VectorStockState>>),
-        b: (&mut MyCustomProcess<T>, &Address<MyCustomProcess<T>>),
-    ) -> Result<(), String> {
-        b.0.withdraw_upstream.connect(DefaultStock::remove, a.1.clone());
-        b.0.req_upstream.connect(DefaultStock::get_state_async, a.1.clone());
-        a.0.state_emitter.connect(MyCustomProcess::update_state, b.1);
-        Ok(())
-    }
-}
-
-fn bench_custom_process(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
-
-    let mut s1: DefaultStock<_, VectorStockState> = DefaultStock::new(
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        "TestStock1".to_string(),
-        5.,
-        100.,
-        IronOre {
-            fe: 50.,
-            si: 40.,
-            al: 5.,
-            other: 5.,
-            hematite: 10.,
-            limonite: 5.,
-            sericite: 2.,
-        },
-    );
-    let s1_mbox = Mailbox::new();
-    let s1_addr = s1_mbox.address();
-    let mut p1: MyCustomProcess<IronOre> = MyCustomProcess {
-        process: DefaultProcess::new(
-            "TestProcess1".to_string(),
-            "TestProcess1".to_string(),
-            "TestProcess1".to_string(),
-            Distribution::Constant(1.),
-            Distribution::Constant(2.0),
-        ),
-        custom_field: 123.45,
-    };
-    let p1_mbox = Mailbox::new();
-    let p1_addr = p1_mbox.address();
-    let mut s2: DefaultStock<_, VectorStockState> = DefaultStock::new(
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        "TestStock2".to_string(),
-        5.,
-        100.,
-        IronOre::default(),
-    );
-    let s2_mbox = Mailbox::new();
-    let s2_addr = s2_mbox.address();
-
-
-    // Connections
-
-    let mut c = Connection {};
-    c.connect((&mut s1, &s1_addr), (&mut p1, &p1_addr)).unwrap();
-    c.connect((&mut p1, &p1_addr), (&mut s2, &s2_addr)).unwrap();
-    
-    // Loggers
-    
-    let process_logger = EventSlot::new();
-    p1.log_emitter.connect_sink(&process_logger);
-
-    // Registry
-
-    let mut registry = EndpointRegistry::new();
-    
-    let mut input_add_to_s1 = EventSource::new();
-    input_add_to_s1.connect(DefaultStock::add, &s1_addr);
-    registry.add_event_source(input_add_to_s1, "add_to_s1").unwrap();
-
-    let mut input_add_to_s2 = EventSource::new();
-    input_add_to_s2.connect(DefaultStock::add, &s2_addr);
-    registry.add_event_source(input_add_to_s2, "remove_from_s2").unwrap();
-
-    let mut output = EventQueue::new();
-    p1.log_emitter.connect_sink(&output);
-    registry.add_event_sink(output.into_reader(), "process_log").unwrap();
+    let output_stock_log = EventQueue::new();
+    s1.log_emitter.connect_sink(&output_stock_log);
+    s2.log_emitter.connect_sink(&output_stock_log);
+    registry.add_event_sink(output_stock_log.into_reader(), "stock_log").unwrap();
 
     // Execution
 
@@ -500,5 +326,5 @@ fn bench_custom_process(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Simu
 }
 
 fn main() {
-    server::run(bench_custom_process, "127.0.0.1:12345".parse().unwrap()).unwrap();
+    server::run(bench_custom_resource, "127.0.0.1:12345".parse().unwrap()).unwrap();
 }
