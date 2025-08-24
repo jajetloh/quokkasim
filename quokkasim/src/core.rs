@@ -130,7 +130,7 @@ impl StockState for VectorStockState {
 
 #[derive(Debug, Clone)]
 pub struct VectorProcessLog<
-    T: FullVectorResource,
+    T: ContinuousResource,
 > {
     pub time: String,
     pub event_id: EventId,
@@ -140,7 +140,7 @@ pub struct VectorProcessLog<
     pub details: VectorProcessLogType<T>,
 }
 
-impl<T: FullVectorResource> Serialize for VectorProcessLog<T> {
+impl<T: ContinuousResource> Serialize for VectorProcessLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -171,7 +171,7 @@ impl<T: FullVectorResource> Serialize for VectorProcessLog<T> {
 }
 
 #[derive(Debug, Clone)]
-pub enum VectorProcessLogType<T: VectorResource> {
+pub enum VectorProcessLogType<T: ContinuousArithmetic> {
     WithdrawRequest,
     ProcessStart { quantity: f64, vector: T },
     ProcessSuccess { quantity: f64, vector: T },
@@ -183,9 +183,7 @@ pub enum VectorProcessLogType<T: VectorResource> {
     StateChange { new_state: VectorStockState },
 }
 
-impl<T: FullVectorResource> VectorProcessLog<T> {
-    // impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
-    // type LogDetailsType = VectorProcessLogType<T>;
+impl<T: ContinuousResource> VectorProcessLog<T> {
     pub fn to_log(
             time: MonotonicTime,
             event_id: EventId,
@@ -241,7 +239,7 @@ pub struct DefaultProcess<
 }
 
 impl<
-    ResourceType: FullVectorResource + 'static,
+    ResourceType: ContinuousResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static
 > Default for DefaultProcess<
     ResourceType,
@@ -277,7 +275,7 @@ impl<
 }
 
 impl<
-    ResourceType: FullVectorResource,
+    ResourceType: ContinuousResource,
 > Model for DefaultProcess<
     ResourceType,
     VectorProcessLog<ResourceType>,
@@ -291,14 +289,14 @@ impl<
     }
 }
 
-impl<ResourceType: FullVectorResource> ToLogRecord<VectorProcessLogType<ResourceType>, VectorProcessLog<ResourceType>> for DefaultProcess<ResourceType, VectorProcessLog<ResourceType>> {
+impl<ResourceType: ContinuousResource> ToLogRecord<VectorProcessLogType<ResourceType>, VectorProcessLog<ResourceType>> for DefaultProcess<ResourceType, VectorProcessLog<ResourceType>> {
     fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: VectorProcessLogType<ResourceType>) -> VectorProcessLog<ResourceType> {
         VectorProcessLog::to_log(self.previous_check_time, event_id, source_event_id, self.element_name.clone(), self.element_type.clone(), details)
     }
 }
 
 impl<
-    T: FullVectorResource + 'static
+    T: ContinuousResource + 'static
 > Process<T, VectorProcessLog<T>> for DefaultProcess<T, VectorProcessLog<T>> {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
@@ -360,7 +358,7 @@ pub trait ToLogRecord<DetailsType, LogType> {
 }
 
 pub trait Process<
-    ResourceType: FullVectorResource + 'static,
+    ResourceType: ContinuousResource + 'static,
     LogRecordType: Clone + Send + 'static,
 > where Self: Model,
         Self: ToLogRecord<VectorProcessLogType<ResourceType>, LogRecordType> {
@@ -566,188 +564,13 @@ pub trait Process<
 
 }
 
-// impl<
-//     ResourceType: Clone + Send + Debug + Serialize + VectorResource,
-// > Process<VectorProcessLogType<ResourceType>> for DefaultProcess<
-//     ResourceType,
-//     VectorProcessLog<ResourceType>,
-// > {
-//     fn update_state(
-//         &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
-//     ) -> impl Future<Output = ()> + Send where Self: Model {
-//         async move {
-//             println!("Updating process state for {} at time {}", self.element_name, cx.time());
-//             // Update variables from elapsed time
-//             // if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
-//             //     if *scheduled_time <= cx.time() {
-//             //         self.scheduled_event = None;
-//             //     }
-//             // }
 
-//             // let time = cx.time();
-//             // let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
-//             // {
-//             //     let is_in_delay = self.delay_modes.active_delay().is_some();
-//             //     let is_in_process = self.process_state.is_some() && !is_in_delay;
-//             //     let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
-
-//             //     // Decrement process time counter (if not delayed or env blocked)
-//             //     if !(is_in_delay || is_env_blocked) {
-//             //         if let Some((mut process_time_left, resource)) = self.process_state.take() {
-//             //             process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
-//             //             if process_time_left.is_zero() {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-//             //                 self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
-//             //             } else {
-//             //                 self.process_state = Some((process_time_left, resource));
-//             //             }
-//             //         }
-//             //     }
-
-//             //     // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
-//             //     // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
-//             //     // when a process is active
-//             //     if !is_env_blocked && (is_in_delay || is_in_process) {
-//             //         let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
-//             //         if delay_transition.has_changed() {
-//             //             if let Some(delay_name) = &delay_transition.from {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
-//             //             }
-//             //             if let Some(delay_name) = &delay_transition.to {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
-//             //             }
-//             //         }
-//             //     }
-//             // }
-
-//             // Update cached environment state
-//             // {
-//             //     let new_env_state = match self.req_environment.send(()).await.next() {
-//             //         Some(x) => x,
-//             //         None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
-//             //     };
-//             //     match (&self.env_state, &new_env_state) {
-//             //         (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-//             //             source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
-//             //             self.env_state = BasicEnvironmentState::Stopped;
-//             //         },
-//             //         (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-//             //             source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
-//             //             self.env_state = BasicEnvironmentState::Normal;
-//             //         }
-//             //         _ => {}
-//             //     }
-//             // }
-
-//             // // Update internal state
-//             // let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
-//             // let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
-//             // match (&self.process_state, has_active_delay) {
-//             //     (None, false) => {
-//             //         let us_state = self.req_upstream.send(()).await.next();
-//             //         let ds_state = self.req_downstream.send(()).await.next();
-
-//             //         println!("Checking upstream and downstream states: {:?} {:?}", us_state, ds_state);
-//             //         match (&us_state, &ds_state) {
-//             //             (
-//             //                 Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
-//             //                 Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
-//             //             ) => {
-//             //                 let process_quantity = self.process_quantity_distr.sample();
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::WithdrawRequest).await;
-//             //                 let moved = self.withdraw_upstream.send((process_quantity, source_event_id.clone())).await.next().unwrap();
-//             //                 let process_duration_secs = self.process_time_distr.sample();
-//             //                 self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
-//             //                 self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
-//             //             },
-//             //             (Some(VectorStockState::Empty {..} ), _) => {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
-//             //                 self.time_to_next_process_event = None;
-//             //             },
-//             //             (None, _) => {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-//             //                 self.time_to_next_process_event = None;
-//             //             },
-//             //             (_, None) => {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
-//             //                 self.time_to_next_process_event = None;
-//             //             },
-//             //             (_, Some(VectorStockState::Full {..} )) => {
-//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
-//             //                 self.time_to_next_process_event = None;
-//             //             },
-//             //         }
-//             //     },
-//             //     (Some((time, _)), false) => {
-//             //         self.time_to_next_process_event = Some(*time);
-//             //     },
-//             //     (_, true) => {
-//             //         self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
-//             //     }
-//             // }
-
-//             // Schedule next event
-//             // if self.process_state.is_some() || has_active_delay || !is_env_stopped {
-//             //     self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
-//             // } else {
-//             //     self.time_to_next_delay_event = None;
-//             // }
-//             // let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
-//             // match time_to_next_event {
-//             //     None => {},
-//             //     Some(time_until_next) => {
-//             //         if time_until_next.is_zero() {
-//             //             panic!("Time until next event is zero!");
-//             //         } else {
-//             //             let next_time = cx.time() + time_until_next;
-
-//             //             // Schedule event if sooner. If so, cancel previous event.
-//             //             if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
-//             //                 if next_time < scheduled_time {
-//             //                     action_key.cancel();
-//             //                     let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
-//             //                     self.scheduled_event = Some((next_time, new_event_key));
-//             //                 } else {
-//             //                     // Put the event back
-//             //                     self.scheduled_event = Some((scheduled_time, action_key));
-//             //                 }
-//             //             } else {
-//             //                 let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
-//             //                 self.scheduled_event = Some((next_time, new_event_key));
-//             //             }
-//             //         };
-//             //     }
-//             // };
-//             // self.previous_check_time = cx.time();
-//         }
-//     }
-
-//     fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<ResourceType>) -> impl Future<Output = EventId> {
-//         async move {
-//             let new_event_id: EventId = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
-//             let log = VectorProcessLog::to_log(
-//                 now,
-//                 new_event_id.clone(),
-//                 source_event_id,
-//                 self.element_name.clone(),
-//                 self.element_type.clone(),
-//                 details,
-//             );
-//             self.log_emitter.send(log.clone()).await;
-//             self.next_event_index += 1;
-
-//             new_event_id
-//         }
-//     }
-// }
-
-pub trait Projectable<T> where Self: VectorResource {
+pub trait Projectable<T> where Self: ContinuousArithmetic {
     fn project(self, arg: T) -> Self;
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct VectorStockLog<T: VectorResource> {
+pub struct VectorStockLog<T: ContinuousArithmetic> {
     pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
@@ -756,7 +579,7 @@ pub struct VectorStockLog<T: VectorResource> {
     pub details: VectorStockLogType<T>,
 }
 
-impl<T: VectorResource + Debug + Serialize> VectorStockLog<T> {
+impl<T: ContinuousArithmetic + Debug + Serialize> VectorStockLog<T> {
     // type LogDetailsType = VectorStockLogType<T>;
     fn to_log(
         time: MonotonicTime,
@@ -778,7 +601,7 @@ impl<T: VectorResource + Debug + Serialize> VectorStockLog<T> {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub enum VectorStockLogType<T: VectorResource> {
+pub enum VectorStockLogType<T: ContinuousArithmetic> {
     Add { balance: f64, vector: T },
     Remove { balance: f64, vector: T },
     StateChange { new_state: VectorStockState },
@@ -795,7 +618,7 @@ impl StockState for ExampleStockState {
 }
 
 #[derive(WithMethods)]
-pub struct DefaultStock<T, S: StockState> where T: VectorResource + Clone + Serialize + Send + 'static {
+pub struct DefaultStock<T, S: StockState> where T: ContinuousArithmetic + Clone + Serialize + Send + 'static {
     // Identification
     pub element_name: String,
     pub element_code: String,
@@ -817,9 +640,9 @@ pub struct DefaultStock<T, S: StockState> where T: VectorResource + Clone + Seri
     next_event_id: u64,
 }
 
-impl<T: FullVectorResource + 'static, S: StockState + Send + 'static> Model for DefaultStock<T, S> {}
+impl<T: ContinuousResource + 'static, S: StockState + Send + 'static> Model for DefaultStock<T, S> {}
 
-impl<T: FullVectorResource + Default + 'static, S: StockState> Default for DefaultStock<T, S> {
+impl<T: ContinuousResource + Default + 'static, S: StockState> Default for DefaultStock<T, S> {
     fn default() -> Self {
         let (log_emitter, state_emitter) = (Output::new(), Output::new());
         DefaultStock {
@@ -837,7 +660,7 @@ impl<T: FullVectorResource + Default + 'static, S: StockState> Default for Defau
     }
 }
 
-impl<T: FullVectorResource + 'static> DefaultStock<T, VectorStockState> {
+impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
 
     fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
@@ -967,7 +790,7 @@ impl<T: FullVectorResource + 'static> DefaultStock<T, VectorStockState> {
     }
 }
 
-pub trait VectorResource {
+pub trait ContinuousArithmetic {
     fn add(&mut self, arg: Self);
     fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T>;
     fn multiply(&mut self, arg: f64);
@@ -975,10 +798,10 @@ pub trait VectorResource {
     fn remove_all(&mut self) -> Self;
 }
 
-pub trait FullVectorResource: VectorResource + Clone + Send + Debug + Serialize {}
-impl<T> FullVectorResource for T
+pub trait ContinuousResource: ContinuousArithmetic + Clone + Send + Debug + Serialize {}
+impl<T> ContinuousResource for T
 where 
-    T: VectorResource + Clone + Send + Debug + Serialize {}
+    T: ContinuousArithmetic + Clone + Send + Debug + Serialize {}
 
 impl Projectable<f64> for f64 {
     fn project(self, arg: f64) -> f64 {
@@ -993,7 +816,7 @@ impl<const N: usize> Projectable<f64> for [f64; N] {
     }
 }
 
-impl VectorResource for f64 {
+impl ContinuousArithmetic for f64 {
     fn add(&mut self, arg: Self) {
         *self += arg;
     }
@@ -1019,7 +842,7 @@ impl VectorResource for f64 {
     }
 }
 
-impl<const N: usize> VectorResource for [f64; N] {
+impl<const N: usize> ContinuousArithmetic for [f64; N] {
     fn add(&mut self, arg: Self) {
         for (a, b) in self.iter_mut().zip(arg.iter()) {
             *a += *b;
@@ -1060,7 +883,7 @@ pub trait Connect<A: Model, B: Model> {
 pub struct Connection;
 
 impl<
-    T: VectorResource + Clone + Send + Debug + Serialize + 'static,
+    T: ContinuousArithmetic + Clone + Send + Debug + Serialize + 'static,
 > Connect<DefaultProcess<T, VectorProcessLog<T>>, DefaultStock<T, VectorStockState>> for Connection
     where DefaultProcess<T, VectorProcessLog<T>>: Model,
           DefaultStock<T, VectorStockState>: Model
@@ -1078,7 +901,7 @@ impl<
 }
 
 impl<
-    T: VectorResource + Clone + Send + Debug + Serialize + Projectable<f64> + 'static,
+    T: ContinuousArithmetic + Clone + Send + Debug + Serialize + Projectable<f64> + 'static,
 > Connect<DefaultStock<T, VectorStockState>, DefaultProcess<T, VectorProcessLog<T>>> for Connection
     where DefaultProcess<T, VectorProcessLog<T>>: Model,
           DefaultStock<T, VectorStockState>: Model
@@ -1096,7 +919,7 @@ impl<
 }
 
 impl<
-    T: VectorResource + Clone + Send + Debug + Serialize + Projectable<f64> + 'static,
+    T: ContinuousArithmetic + Clone + Send + Debug + Serialize + Projectable<f64> + 'static,
 > Connect<BasicEnvironment, DefaultProcess<T, VectorProcessLog<T>>> for Connection
     where DefaultStock<T, VectorStockState>: Model
 {

@@ -168,7 +168,7 @@ impl Projectable<f64> for IronOre {
     }
 }
 
-impl VectorResource for IronOre {
+impl ContinuousArithmetic for IronOre {
     fn total(&self) -> f64 {
         self.fe + self.si + self.al + self.other
     }
