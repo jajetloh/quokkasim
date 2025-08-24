@@ -1,4 +1,4 @@
-use std::{fmt::Debug, time::Duration};
+use std::{ffi::OsString, fmt::Debug, time::Duration};
 use quokkasim_derive_macros::WithMethods;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
@@ -292,52 +292,50 @@ impl<
 }
 
 pub trait ToLogRecord<DetailsType, LogType> {
-    fn to_record(&self, details: DetailsType) -> LogType;
+    fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: DetailsType) -> LogType;
 }
 
-pub trait Process<T> where Self: Model {
-    fn update_state(
-        &mut self, source_event_id: EventId, cx: &mut Context<Self>
-    ) -> impl Future<Output = ()> + Send;
-    fn log(
-        &mut self, now: MonotonicTime, source_event_id: EventId, details: T
-    ) -> impl Future<Output = EventId>;
-}
+pub trait Process<
+    ResourceType: Clone + Send + VectorResource + Debug + Serialize + 'static,
+    LogRecordType: Clone + Send + 'static,
+> where Self: Model,
+        Self: ToLogRecord<VectorProcessLogType<ResourceType>, LogRecordType> {
 
-impl<
-    ResourceType: Clone + Send + Debug + Serialize + VectorResource,
-> Process<VectorProcessLogType<ResourceType>> for DefaultProcess<
-    ResourceType,
-    VectorProcessLog<ResourceType>,
-> {
     fn update_state(
-        &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
-    ) -> impl Future<Output = ()> + Send where Self: Model {
+        &mut self, mut source_event_id: EventId, mut cx: &mut Context<Self>
+    ) -> impl Future<Output = ()> + Send {
         async move {
-            println!("Updating process state for {} at time {}", self.element_name, cx.time());
+            self.update_state_since_last_update(&mut source_event_id, &mut cx).await;
+            self.update_state_decision_logic(&mut source_event_id, &mut cx).await;
+            self.update_state_next_event(&mut source_event_id, &mut cx).await;
+        }
+    }
+
+    fn update_state_since_last_update(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            println!("Updating process state for {} at time {}", self.element_name(), cx.time());
             // Update variables from elapsed time
-            if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+            if let Some((scheduled_time, _)) = self.scheduled_event() {
                 if *scheduled_time <= cx.time() {
-                    self.scheduled_event = None;
+                    *self.scheduled_event() = None;
                 }
             }
-
             let time = cx.time();
-            let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+            let duration_since_prev_check = cx.time().duration_since(*self.previous_check_time());
             {
-                let is_in_delay = self.delay_modes.active_delay().is_some();
-                let is_in_process = self.process_state.is_some() && !is_in_delay;
-                let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
+                let is_in_delay = self.delay_modes().active_delay().is_some();
+                let is_in_process = self.process_state().is_some() && !is_in_delay;
+                let is_env_blocked = matches!(self.env_state(), BasicEnvironmentState::Stopped);
 
                 // Decrement process time counter (if not delayed or env blocked)
                 if !(is_in_delay || is_env_blocked) {
-                    if let Some((mut process_time_left, resource)) = self.process_state.take() {
+                    if let Some((mut process_time_left, resource)) = self.process_state().take() {
                         process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
                         if process_time_left.is_zero() {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
-                            self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+                            self.push_downstream().send((resource.clone(), source_event_id.clone())).await;
                         } else {
-                            self.process_state = Some((process_time_left, resource));
+                            *self.process_state() = Some((process_time_left, resource));
                         }
                     }
                 }
@@ -346,44 +344,48 @@ impl<
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
+                    let delay_transition = self.delay_modes().update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
                         }
                         if let Some(delay_name) = &delay_transition.to {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
                         }
                     }
                 }
             }
+        }
+    }
 
-            // Update cached environment state
+    fn update_state_decision_logic(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            let time = cx.time();
             {
-                let new_env_state = match self.req_environment.send(()).await.next() {
+                let new_env_state = match self.req_environment().send(()).await.next() {
                     Some(x) => x,
                     None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
                 };
-                match (&self.env_state, &new_env_state) {
+                match (&self.env_state(), &new_env_state) {
                     (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                        source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
-                        self.env_state = BasicEnvironmentState::Stopped;
+                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+                        *self.env_state() = BasicEnvironmentState::Stopped;
                     },
                     (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                        source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
-                        self.env_state = BasicEnvironmentState::Normal;
+                        *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
+                        *self.env_state() = BasicEnvironmentState::Normal;
                     }
                     _ => {}
                 }
             }
 
             // Update internal state
-            let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
-            let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
-            match (&self.process_state, has_active_delay) {
+            let is_env_stopped = matches!(self.env_state(), BasicEnvironmentState::Stopped);
+            let has_active_delay = self.delay_modes().active_delay().is_some() || is_env_stopped;
+            match (&self.process_state(), has_active_delay) {
                 (None, false) => {
-                    let us_state = self.req_upstream.send(()).await.next();
-                    let ds_state = self.req_downstream.send(()).await.next();
+                    let us_state = self.req_upstream().send(()).await.next();
+                    let ds_state = self.req_downstream().send(()).await.next();
 
                     println!("Checking upstream and downstream states: {:?} {:?}", us_state, ds_state);
                     match (&us_state, &ds_state) {
@@ -391,47 +393,53 @@ impl<
                             Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
                             Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
                         ) => {
-                            let process_quantity = self.process_quantity_distr.sample();
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::WithdrawRequest).await;
-                            let moved = self.withdraw_upstream.send((process_quantity, source_event_id.clone())).await.next().unwrap();
-                            let process_duration_secs = self.process_time_distr.sample();
-                            self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
-                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
+                            let process_quantity = self.process_quantity_distr().sample();
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::WithdrawRequest).await;
+                            let moved = self.withdraw_upstream().send((process_quantity, source_event_id.clone())).await.next().unwrap();
+                            let process_duration_secs = self.process_time_distr().sample();
+                            *self.process_state() = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
+                            *self.time_to_next_process_event() = Some(Duration::from_secs_f64(process_duration_secs));
                         },
                         (Some(VectorStockState::Empty {..} ), _) => {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
-                            self.time_to_next_process_event = None;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+                            *self.time_to_next_process_event() = None;
                         },
                         (None, _) => {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
-                            self.time_to_next_process_event = None;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+                            *self.time_to_next_process_event() = None;
                         },
                         (_, None) => {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
-                            self.time_to_next_process_event = None;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+                            *self.time_to_next_process_event() = None;
                         },
                         (_, Some(VectorStockState::Full {..} )) => {
-                            source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
-                            self.time_to_next_process_event = None;
+                            *source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+                            *self.time_to_next_process_event() = None;
                         },
                     }
                 },
                 (Some((time, _)), false) => {
-                    self.time_to_next_process_event = Some(*time);
+                    *self.time_to_next_process_event() = Some(*time);
                 },
                 (_, true) => {
-                    self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
+                    *self.time_to_next_process_event() = self.delay_modes().active_delay().map(|(_, delay_state)| *delay_state);
                 }
             }
+        }
+    }
 
-            // Schedule next event
-            if self.process_state.is_some() || has_active_delay || !is_env_stopped {
-                self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+    fn update_state_next_event(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            let is_env_stopped = matches!(self.env_state(), BasicEnvironmentState::Stopped);
+            let has_active_delay = self.delay_modes().active_delay().is_some() || is_env_stopped;
+
+            if self.process_state().is_some() || has_active_delay || !is_env_stopped {
+                *self.time_to_next_delay_event() = self.delay_modes().get_next_event().map(|(_, delay_state)| delay_state.as_duration());
             } else {
-                self.time_to_next_delay_event = None;
+                *self.time_to_next_delay_event() = None;
             }
-            let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+            let time_to_next_event = [self.time_to_next_delay_event().clone(), self.time_to_next_process_event().clone()].into_iter().flatten().min();
             match time_to_next_event {
                 None => {},
                 Some(time_until_next) => {
@@ -441,44 +449,234 @@ impl<
                         let next_time = cx.time() + time_until_next;
 
                         // Schedule event if sooner. If so, cancel previous event.
-                        if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+                        if let Some((scheduled_time, action_key)) = self.scheduled_event().take() {
                             if next_time < scheduled_time {
                                 action_key.cancel();
                                 let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
-                                self.scheduled_event = Some((next_time, new_event_key));
+                                *self.scheduled_event() = Some((next_time, new_event_key));
                             } else {
                                 // Put the event back
-                                self.scheduled_event = Some((scheduled_time, action_key));
+                                *self.scheduled_event() = Some((scheduled_time, action_key));
                             }
                         } else {
                             let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
-                            self.scheduled_event = Some((next_time, new_event_key));
+                            *self.scheduled_event() = Some((next_time, new_event_key));
                         }
                     };
                 }
             };
-            self.previous_check_time = cx.time();
+            *self.previous_check_time() = cx.time();
         }
     }
 
-    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<ResourceType>) -> impl Future<Output = EventId> {
+    fn log(
+        &mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<ResourceType>
+    ) -> impl Future<Output = EventId> + Send {
         async move {
-            let new_event_id: EventId = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
-            let log = VectorProcessLog::to_log(
-                now,
-                new_event_id.clone(),
-                source_event_id,
-                self.element_name.clone(),
-                self.element_type.clone(),
-                details,
-            );
-            self.log_emitter.send(log.clone()).await;
-            self.next_event_index += 1;
-
-            new_event_id
+            let event_id = self.get_next_event_id();
+            let log = self.to_record(source_event_id.clone(), event_id.clone(), details);
+            self.log_emitter().send(log.clone()).await;
+            event_id
         }
     }
+
+    fn element_name(&self) -> &str;
+    fn element_code(&self) -> &str;
+    fn element_type(&self) -> &str;
+    fn get_next_event_id(&mut self) -> EventId;
+    fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
+    fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
+    fn previous_check_time(&mut self) -> &mut MonotonicTime;
+    fn delay_modes(&mut self) -> &mut DelayModes;
+    fn process_state(&mut self) -> &mut Option<(Duration, ResourceType)>;
+    fn env_state(&mut self) -> &mut BasicEnvironmentState;
+    fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState>;
+    fn req_upstream(&mut self) -> &mut Requestor<(), VectorStockState>;
+    fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType>;
+    fn req_downstream(&mut self) -> &mut Requestor<(), VectorStockState>;
+    fn push_downstream(&mut self) -> &mut Output<(ResourceType, EventId)>;
+    fn process_quantity_distr(&mut self) -> &mut Distribution;
+    fn process_time_distr(&mut self) -> &mut Distribution;
+    fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
+    fn time_to_next_delay_event(&mut self) -> &mut Option<Duration>;
+
 }
+
+// impl<
+//     ResourceType: Clone + Send + Debug + Serialize + VectorResource,
+// > Process<VectorProcessLogType<ResourceType>> for DefaultProcess<
+//     ResourceType,
+//     VectorProcessLog<ResourceType>,
+// > {
+//     fn update_state(
+//         &mut self, mut source_event_id: EventId, cx: &mut Context<Self>
+//     ) -> impl Future<Output = ()> + Send where Self: Model {
+//         async move {
+//             println!("Updating process state for {} at time {}", self.element_name, cx.time());
+//             // Update variables from elapsed time
+//             // if let Some((scheduled_time, _)) = self.scheduled_event.as_ref() {
+//             //     if *scheduled_time <= cx.time() {
+//             //         self.scheduled_event = None;
+//             //     }
+//             // }
+
+//             // let time = cx.time();
+//             // let duration_since_prev_check = cx.time().duration_since(self.previous_check_time);
+//             // {
+//             //     let is_in_delay = self.delay_modes.active_delay().is_some();
+//             //     let is_in_process = self.process_state.is_some() && !is_in_delay;
+//             //     let is_env_blocked = matches!(self.env_state, BasicEnvironmentState::Stopped);
+
+//             //     // Decrement process time counter (if not delayed or env blocked)
+//             //     if !(is_in_delay || is_env_blocked) {
+//             //         if let Some((mut process_time_left, resource)) = self.process_state.take() {
+//             //             process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+//             //             if process_time_left.is_zero() {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessSuccess { quantity: resource.total(), vector: resource.clone() }).await;
+//             //                 self.push_downstream.send((resource.clone(), source_event_id.clone())).await;
+//             //             } else {
+//             //                 self.process_state = Some((process_time_left, resource));
+//             //             }
+//             //         }
+//             //     }
+
+//             //     // Only case we don't update state here is if no delay is if we don't want the delay counters to decrement,
+//             //     // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
+//             //     // when a process is active
+//             //     if !is_env_blocked && (is_in_delay || is_in_process) {
+//             //         let delay_transition = self.delay_modes.update_state(duration_since_prev_check);
+//             //         if delay_transition.has_changed() {
+//             //             if let Some(delay_name) = &delay_transition.from {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayEnd { delay_name: delay_name.clone() }).await;
+//             //             }
+//             //             if let Some(delay_name) = &delay_transition.to {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::DelayStart { delay_name: delay_name.clone() }).await;
+//             //             }
+//             //         }
+//             //     }
+//             // }
+
+//             // Update cached environment state
+//             // {
+//             //     let new_env_state = match self.req_environment.send(()).await.next() {
+//             //         Some(x) => x,
+//             //         None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
+//             //     };
+//             //     match (&self.env_state, &new_env_state) {
+//             //         (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+//             //             source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStopped { reason: "Stopped by environment" }).await;
+//             //             self.env_state = BasicEnvironmentState::Stopped;
+//             //         },
+//             //         (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+//             //             source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessContinue { reason: "Resumed by environment" }).await;
+//             //             self.env_state = BasicEnvironmentState::Normal;
+//             //         }
+//             //         _ => {}
+//             //     }
+//             // }
+
+//             // // Update internal state
+//             // let is_env_stopped = matches!(self.env_state, BasicEnvironmentState::Stopped);
+//             // let has_active_delay = self.delay_modes.active_delay().is_some() || is_env_stopped;
+//             // match (&self.process_state, has_active_delay) {
+//             //     (None, false) => {
+//             //         let us_state = self.req_upstream.send(()).await.next();
+//             //         let ds_state = self.req_downstream.send(()).await.next();
+
+//             //         println!("Checking upstream and downstream states: {:?} {:?}", us_state, ds_state);
+//             //         match (&us_state, &ds_state) {
+//             //             (
+//             //                 Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
+//             //                 Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
+//             //             ) => {
+//             //                 let process_quantity = self.process_quantity_distr.sample();
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::WithdrawRequest).await;
+//             //                 let moved = self.withdraw_upstream.send((process_quantity, source_event_id.clone())).await.next().unwrap();
+//             //                 let process_duration_secs = self.process_time_distr.sample();
+//             //                 self.process_state = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessStart { quantity: process_quantity, vector: moved }).await;
+//             //                 self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
+//             //             },
+//             //             (Some(VectorStockState::Empty {..} ), _) => {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is empty" }).await;
+//             //                 self.time_to_next_process_event = None;
+//             //             },
+//             //             (None, _) => {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Upstream is not connected" }).await;
+//             //                 self.time_to_next_process_event = None;
+//             //             },
+//             //             (_, None) => {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is not connected" }).await;
+//             //                 self.time_to_next_process_event = None;
+//             //             },
+//             //             (_, Some(VectorStockState::Full {..} )) => {
+//             //                 source_event_id = self.log(time, source_event_id.clone(), VectorProcessLogType::ProcessFailure { reason: "Downstream is full" }).await;
+//             //                 self.time_to_next_process_event = None;
+//             //             },
+//             //         }
+//             //     },
+//             //     (Some((time, _)), false) => {
+//             //         self.time_to_next_process_event = Some(*time);
+//             //     },
+//             //     (_, true) => {
+//             //         self.time_to_next_process_event = self.delay_modes.active_delay().map(|(_, delay_state)| *delay_state);
+//             //     }
+//             // }
+
+//             // Schedule next event
+//             // if self.process_state.is_some() || has_active_delay || !is_env_stopped {
+//             //     self.time_to_next_delay_event = self.delay_modes.get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+//             // } else {
+//             //     self.time_to_next_delay_event = None;
+//             // }
+//             // let time_to_next_event = [self.time_to_next_delay_event, self.time_to_next_process_event].into_iter().flatten().min();
+//             // match time_to_next_event {
+//             //     None => {},
+//             //     Some(time_until_next) => {
+//             //         if time_until_next.is_zero() {
+//             //             panic!("Time until next event is zero!");
+//             //         } else {
+//             //             let next_time = cx.time() + time_until_next;
+
+//             //             // Schedule event if sooner. If so, cancel previous event.
+//             //             if let Some((scheduled_time, action_key)) = self.scheduled_event.take() {
+//             //                 if next_time < scheduled_time {
+//             //                     action_key.cancel();
+//             //                     let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
+//             //                     self.scheduled_event = Some((next_time, new_event_key));
+//             //                 } else {
+//             //                     // Put the event back
+//             //                     self.scheduled_event = Some((scheduled_time, action_key));
+//             //                 }
+//             //             } else {
+//             //                 let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
+//             //                 self.scheduled_event = Some((next_time, new_event_key));
+//             //             }
+//             //         };
+//             //     }
+//             // };
+//             // self.previous_check_time = cx.time();
+//         }
+//     }
+
+//     fn log(&mut self, now: MonotonicTime, source_event_id: EventId, details: VectorProcessLogType<ResourceType>) -> impl Future<Output = EventId> {
+//         async move {
+//             let new_event_id: EventId = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
+//             let log = VectorProcessLog::to_log(
+//                 now,
+//                 new_event_id.clone(),
+//                 source_event_id,
+//                 self.element_name.clone(),
+//                 self.element_type.clone(),
+//                 details,
+//             );
+//             self.log_emitter.send(log.clone()).await;
+//             self.next_event_index += 1;
+
+//             new_event_id
+//         }
+//     }
+// }
 
 pub trait Projectable<T> where Self: VectorResource {
     fn project(self, arg: T) -> Self;
