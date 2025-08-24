@@ -1,4 +1,4 @@
-use std::{ffi::OsString, fmt::Debug, time::Duration};
+use std::{fmt::Debug, time::Duration};
 use quokkasim_derive_macros::WithMethods;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 
@@ -130,7 +130,7 @@ impl StockState for VectorStockState {
 
 #[derive(Debug, Clone)]
 pub struct VectorProcessLog<
-    T: VectorResource + Debug + Serialize,
+    T: FullVectorResource,
 > {
     pub time: String,
     pub event_id: EventId,
@@ -140,7 +140,7 @@ pub struct VectorProcessLog<
     pub details: VectorProcessLogType<T>,
 }
 
-impl<T: VectorResource + Debug + Serialize + Clone> Serialize for VectorProcessLog<T> {
+impl<T: FullVectorResource> Serialize for VectorProcessLog<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -183,8 +183,8 @@ pub enum VectorProcessLogType<T: VectorResource> {
     StateChange { new_state: VectorStockState },
 }
 
-impl<T: VectorResource + Debug + Serialize> VectorProcessLog<T> {
-// impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
+impl<T: FullVectorResource> VectorProcessLog<T> {
+    // impl<T: VectorResource + Debug + Serialize> Log for VectorProcessLog<T> {
     // type LogDetailsType = VectorProcessLogType<T>;
     pub fn to_log(
             time: MonotonicTime,
@@ -241,7 +241,7 @@ pub struct DefaultProcess<
 }
 
 impl<
-    ResourceType: Clone + Send + Debug + 'static,
+    ResourceType: FullVectorResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static
 > Default for DefaultProcess<
     ResourceType,
@@ -277,7 +277,7 @@ impl<
 }
 
 impl<
-    ResourceType: Clone + Send + Debug + Serialize + VectorResource,
+    ResourceType: FullVectorResource,
 > Model for DefaultProcess<
     ResourceType,
     VectorProcessLog<ResourceType>,
@@ -291,12 +291,76 @@ impl<
     }
 }
 
+impl<ResourceType: FullVectorResource> ToLogRecord<VectorProcessLogType<ResourceType>, VectorProcessLog<ResourceType>> for DefaultProcess<ResourceType, VectorProcessLog<ResourceType>> {
+    fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: VectorProcessLogType<ResourceType>) -> VectorProcessLog<ResourceType> {
+        VectorProcessLog::to_log(self.previous_check_time, event_id, source_event_id, self.element_name.clone(), self.element_type.clone(), details)
+    }
+}
+
+impl<
+    T: FullVectorResource + 'static
+> Process<T, VectorProcessLog<T>> for DefaultProcess<T, VectorProcessLog<T>> {
+    fn element_name(&self) -> &str { &self.element_name }
+    fn element_code(&self) -> &str { &self.element_code }
+    fn element_type(&self) -> &str { &self.element_type }
+    fn get_next_event_id(&mut self) -> EventId {
+        let event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
+        self.next_event_index += 1;
+        event_id
+    }
+    fn log_emitter(&mut self) -> &mut Output<VectorProcessLog<T>> {
+        &mut self.log_emitter
+    }
+    fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
+        &mut self.scheduled_event
+    }
+    fn previous_check_time(&mut self) -> &mut MonotonicTime {
+        &mut self.previous_check_time
+    }
+    fn delay_modes(&mut self) -> &mut DelayModes {
+        &mut self.delay_modes
+    }
+    fn process_state(&mut self) -> &mut Option<(Duration, T)> {
+        &mut self.process_state
+    }
+    fn env_state(&mut self) -> &mut BasicEnvironmentState {
+        &mut self.env_state
+    }
+    fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState> {
+        &mut self.req_environment
+    }
+    fn req_upstream(&mut self) -> &mut Requestor<(), VectorStockState> {
+        &mut self.req_upstream
+    }
+    fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), T> {
+        &mut self.withdraw_upstream
+    }
+    fn req_downstream(&mut self) -> &mut Requestor<(), VectorStockState> {
+        &mut self.req_downstream
+    }
+    fn push_downstream(&mut self) -> &mut Output<(T, EventId)> {
+        &mut self.push_downstream
+    }
+    fn process_quantity_distr(&mut self) -> &mut Distribution {
+        &mut self.process_quantity_distr
+    }
+    fn process_time_distr(&mut self) -> &mut Distribution {
+        &mut self.process_time_distr
+    }
+    fn time_to_next_process_event(&mut self) -> &mut Option<Duration> {
+        &mut self.time_to_next_process_event
+    }
+    fn time_to_next_delay_event(&mut self) -> &mut Option<Duration> {
+        &mut self.time_to_next_delay_event
+    }
+}
+
 pub trait ToLogRecord<DetailsType, LogType> {
     fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: DetailsType) -> LogType;
 }
 
 pub trait Process<
-    ResourceType: Clone + Send + VectorResource + Debug + Serialize + 'static,
+    ResourceType: FullVectorResource + 'static,
     LogRecordType: Clone + Send + 'static,
 > where Self: Model,
         Self: ToLogRecord<VectorProcessLogType<ResourceType>, LogRecordType> {
@@ -753,9 +817,9 @@ pub struct DefaultStock<T, S: StockState> where T: VectorResource + Clone + Seri
     next_event_id: u64,
 }
 
-impl<T: VectorResource + Clone + Serialize + Send + 'static, S: StockState + Send + 'static> Model for DefaultStock<T, S> where T: VectorResource + Clone + Serialize + Send + 'static, S: StockState {}
+impl<T: FullVectorResource + 'static, S: StockState + Send + 'static> Model for DefaultStock<T, S> {}
 
-impl<T: VectorResource + Clone + Serialize + Send + Default + 'static, S: StockState> Default for DefaultStock<T, S> {
+impl<T: FullVectorResource + Default + 'static, S: StockState> Default for DefaultStock<T, S> {
     fn default() -> Self {
         let (log_emitter, state_emitter) = (Output::new(), Output::new());
         DefaultStock {
@@ -773,7 +837,7 @@ impl<T: VectorResource + Clone + Serialize + Send + Default + 'static, S: StockS
     }
 }
 
-impl<T: VectorResource + Clone + Serialize + Debug + Send + 'static> DefaultStock<T, VectorStockState> {
+impl<T: FullVectorResource + 'static> DefaultStock<T, VectorStockState> {
 
     fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
@@ -910,6 +974,11 @@ pub trait VectorResource {
     fn total(&self) -> f64;
     fn remove_all(&mut self) -> Self;
 }
+
+pub trait FullVectorResource: VectorResource + Clone + Send + Debug + Serialize {}
+impl<T> FullVectorResource for T
+where 
+    T: VectorResource + Clone + Send + Debug + Serialize {}
 
 impl Projectable<f64> for f64 {
     fn project(self, arg: f64) -> f64 {
