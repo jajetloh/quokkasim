@@ -130,7 +130,7 @@ impl StockState for VectorStockState {
 
 #[derive(Debug, Clone)]
 pub struct VectorProcessLog<
-    LogDetailsType
+    LogDetailsType,
 > {
     pub time: String,
     pub event_id: EventId,
@@ -140,10 +140,10 @@ pub struct VectorProcessLog<
     pub details: LogDetailsType,
 }
 
-impl<T: ContinuousResource> Serialize for VectorProcessLog<DefaultProcessLogType<T>> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
+impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T> where
+        D: Clone + Into<DefaultProcessLogType<T>> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where
+        S: serde::Serializer
     {
         let mut state = serializer.serialize_struct("VectorProcessLog", 6)?;
         state.serialize_field("time", &self.time)?;
@@ -151,10 +151,11 @@ impl<T: ContinuousResource> Serialize for VectorProcessLog<DefaultProcessLogType
         state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) = match &self.details {
+        let details: DefaultProcessLogType<T> = self.details.clone().into();
+        let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) = match details {
             DefaultProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
-            DefaultProcessLogType::ProcessStart { quantity, vector } => ("ProcessStart", Some(*quantity), Some(vector.clone()), None),
-            DefaultProcessLogType::ProcessSuccess { quantity, vector } => ("ProcessSuccess", Some(*quantity), Some(vector.clone()), None),
+            DefaultProcessLogType::ProcessStart { quantity, vector } => ("ProcessStart", Some(quantity), Some(vector.clone()), None),
+            DefaultProcessLogType::ProcessSuccess { quantity, vector } => ("ProcessSuccess", Some(quantity), Some(vector.clone()), None),
             DefaultProcessLogType::ProcessFailure { reason } => ("ProcessFailure", None, None, Some(reason.to_string())),
             DefaultProcessLogType::ProcessStopped { reason } => ("ProcessStopped", None, None, Some(reason.to_string())),
             DefaultProcessLogType::ProcessContinue { reason } => ("ProcessContinue", None, None, Some(reason.to_string())),
