@@ -145,7 +145,7 @@ impl StockState for VectorStockState {
 #[derive(Debug, Clone)]
 pub struct VectorProcessLog<
     LogDetailsType,
-    T: ContinuousResource
+    ResourceType: ContinuousResource
 > {
     pub time: String,  
     pub event_id: EventId,
@@ -153,20 +153,21 @@ pub struct VectorProcessLog<
     pub element_name: String,
     pub element_type: String,
     pub details: LogDetailsType,
+    
+    pub phantom: std::marker::PhantomData<ResourceType>,
 }
 
-impl<D, T: ContinuousResource> Serialize for LogRecord<D, T> where
-// impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T> where
+impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T> where
         D: Clone + Into<DefaultProcessLogType<T>> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where
         S: serde::Serializer
     {
         let mut state = serializer.serialize_struct("VectorProcessLog", 6)?;
-        state.serialize_field("time", &self.info.time)?;
-        state.serialize_field("event_id", &self.info.event_id)?;
-        state.serialize_field("source_event_id", &self.info.source_event_id)?;
-        state.serialize_field("element_name", &self.info.element_name)?;
-        state.serialize_field("element_type", &self.info.element_type)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
         let details: DefaultProcessLogType<T> = self.details.clone().into();
         let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) = match details {
             DefaultProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
@@ -259,7 +260,7 @@ pub enum DefaultProcessLogType<T: ContinuousResource> {
 pub struct DefaultProcess<
     ResourceType: Clone + Send + Debug + 'static,
     ProcessLog: Clone + Send + Debug + 'static,
-    LogDetailsType: Clone + Send + Debug + 'static,
+    // LogDetailsType: Clone + Send + Debug + 'static,
 > {
     // Identification
     pub element_name: String,
@@ -294,14 +295,15 @@ pub struct DefaultProcess<
 impl<
     ResourceType: ContinuousResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static,
-    LogDetailsType: Clone + Send + Debug + 'static,
+    // LogDetailsType: Clone + Send + Debug + 'static,
 > Default for DefaultProcess<
     ResourceType,
     ProcessLog,
-    LogDetailsType
+    // LogDetailsType
 > {
     fn default() -> Self {
-        DefaultProcess::<ResourceType, ProcessLog, LogDetailsType> {
+        // DefaultProcess::<ResourceType, ProcessLog, LogDetailsType> {
+        DefaultProcess::<ResourceType, ProcessLog> {
             element_name: "DefaultProcess".into(),
             element_code: "".into(),
             element_type: "DefaultProcess".into(),
@@ -334,7 +336,7 @@ impl<
 > Model for DefaultProcess<
     ResourceType,
     VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
-    DefaultProcessLogType<ResourceType>,
+    // DefaultProcessLogType<ResourceType>,
 > where VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize, Self: ToLogRecord<DefaultProcessLogType<ResourceType>, VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>> {
     fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
@@ -351,7 +353,14 @@ impl<
 //     }
 // }
 
-impl<ResourceType: ContinuousResource> ToLogRecord<DefaultProcessLogType<ResourceType>, VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>> for DefaultProcess<ResourceType, VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>, DefaultProcessLogType<ResourceType>> {
+impl<
+    ResourceType: ContinuousResource> ToLogRecord<DefaultProcessLogType<ResourceType>,
+    VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>
+> for DefaultProcess<
+    ResourceType,
+    VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    // DefaultProcessLogType<ResourceType>
+> {
     fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: DefaultProcessLogType<ResourceType>) -> VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
         VectorProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
             time: self.previous_check_time.to_chrono_date_time(0).unwrap().to_string(),
@@ -359,14 +368,23 @@ impl<ResourceType: ContinuousResource> ToLogRecord<DefaultProcessLogType<Resourc
             source_event_id,
             element_name: self.element_name.clone(),
             element_type: self.element_type.clone(),
-            details
+            details,
+            phantom: std::marker::PhantomData,
         }
     }
 }
 
 impl<
     T: ContinuousResource + 'static
-> Process<T, VectorProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>> for DefaultProcess<T, VectorProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
+> Process<
+    T,
+    VectorProcessLog<DefaultProcessLogType<T>, T>,
+    DefaultProcessLogType<T>
+> for DefaultProcess<
+    T,
+    VectorProcessLog<DefaultProcessLogType<T>, T>,
+    // DefaultProcessLogType<T>
+>
 where VectorProcessLog<DefaultProcessLogType<T>, T>: Serialize
 {
     fn element_name(&self) -> &str { &self.element_name }
@@ -377,7 +395,7 @@ where VectorProcessLog<DefaultProcessLogType<T>, T>: Serialize
         self.next_event_index += 1;
         event_id
     }
-    fn log_emitter(&mut self) -> &mut Output<VectorProcessLog<T>> {
+    fn log_emitter(&mut self) -> &mut Output<VectorProcessLog<DefaultProcessLogType<T>, T>> {
         &mut self.log_emitter
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
