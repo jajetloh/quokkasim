@@ -474,7 +474,6 @@ pub trait Process<
 
     fn update_state_since_last_update(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            println!("Updating process state for {} at time {}", self.element_name(), cx.time());
             // Update variables from elapsed time
             if let Some((scheduled_time, _)) = self.scheduled_event() {
                 if *scheduled_time <= cx.time() {
@@ -548,7 +547,6 @@ pub trait Process<
                     let us_state = self.req_upstream().send(()).await.next();
                     let ds_state = self.req_downstream().send(()).await.next();
 
-                    println!("Checking upstream and downstream states: {:?} {:?}", us_state, ds_state);
                     match (&us_state, &ds_state) {
                         (
                             Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
@@ -709,6 +707,7 @@ impl<T: ContinuousArithmetic + Debug + Serialize> VectorStockLog<T> {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[serde(tag = "event_type")]
 pub enum VectorStockLogType<T: ContinuousArithmetic> {
     Add { balance: f64, vector: T },
     Remove { balance: f64, vector: T },
@@ -836,10 +835,15 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
 
     pub fn remove(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = T> + where T: Projectable<f64> {
         async move {
-            // self.pre_remove(&mut payload, cx).await;
             let result = self.remove_impl(&mut payload, cx).await;
             self.post_remove(&mut payload, cx).await;
             result
+        }
+    }
+
+    pub fn remove_void(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + where T: Projectable<f64> {
+        async move {
+            self.remove(payload, cx).await;
         }
     }
 
