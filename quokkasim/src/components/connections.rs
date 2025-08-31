@@ -5,7 +5,7 @@ use crate::{
     components::{continuous_traits::ContinuousResource, environment::BasicEnvironment},
     nexosim::{Address, Model},
     prelude::{
-        DefaultProcess, DefaultProcessLogType, DefaultStock, Process, Projectable, VectorStockState,
+        DefaultProcess, DefaultProcessLogType, DefaultStock, Process, Projectable, ContinuousStockState,
     },
 };
 
@@ -17,17 +17,17 @@ pub trait Connect<A: Model, B: Model> {
 pub struct Connection;
 
 impl<T: ContinuousResource + 'static, R: Clone + Send + Debug + Serialize + 'static>
-    Connect<DefaultProcess<T, R>, DefaultStock<T, VectorStockState>> for Connection
+    Connect<DefaultProcess<T, R>, DefaultStock<T, ContinuousStockState>> for Connection
 where
-    DefaultStock<T, VectorStockState>: Model,
+    DefaultStock<T, ContinuousStockState>: Model,
     DefaultProcess<T, R>: Process<T, R, DefaultProcessLogType<T>>,
 {
     fn connect(
         &mut self,
         a: (&mut DefaultProcess<T, R>, &Address<DefaultProcess<T, R>>),
         b: (
-            &mut DefaultStock<T, VectorStockState>,
-            &Address<DefaultStock<T, VectorStockState>>,
+            &mut DefaultStock<T, ContinuousStockState>,
+            &Address<DefaultStock<T, ContinuousStockState>>,
         ),
     ) -> Result<(), String> {
         a.0.push_downstream.connect(DefaultStock::add, b.1.clone());
@@ -41,16 +41,16 @@ where
 impl<
     T: ContinuousResource + Projectable<f64> + 'static,
     R: Clone + Send + Debug + Serialize + 'static,
-> Connect<DefaultStock<T, VectorStockState>, DefaultProcess<T, R>> for Connection
+> Connect<DefaultStock<T, ContinuousStockState>, DefaultProcess<T, R>> for Connection
 where
-    DefaultStock<T, VectorStockState>: Model,
+    DefaultStock<T, ContinuousStockState>: Model,
     DefaultProcess<T, R>: Process<T, R, DefaultProcessLogType<T>>,
 {
     fn connect(
         &mut self,
         a: (
-            &mut DefaultStock<T, VectorStockState>,
-            &Address<DefaultStock<T, VectorStockState>>,
+            &mut DefaultStock<T, ContinuousStockState>,
+            &Address<DefaultStock<T, ContinuousStockState>>,
         ),
         b: (&mut DefaultProcess<T, R>, &Address<DefaultProcess<T, R>>),
     ) -> Result<(), String> {

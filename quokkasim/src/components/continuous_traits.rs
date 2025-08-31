@@ -7,7 +7,7 @@ use crate::{
     delays::DelayModes,
     distributions::Distribution,
     nexosim::{ActionKey, Context, Model, MonotonicTime, Output, Requestor},
-    prelude::VectorStockState,
+    prelude::ContinuousStockState,
 };
 
 pub trait ContinuousArithmetic {
@@ -251,10 +251,10 @@ pub trait Process<
 
                     match (&us_state, &ds_state) {
                         (
-                            Some(VectorStockState::Normal { .. })
-                            | Some(VectorStockState::Full { .. }),
-                            Some(VectorStockState::Empty { .. })
-                            | Some(VectorStockState::Normal { .. }),
+                            Some(ContinuousStockState::Normal { .. })
+                            | Some(ContinuousStockState::Full { .. }),
+                            Some(ContinuousStockState::Empty { .. })
+                            | Some(ContinuousStockState::Normal { .. }),
                         ) => {
                             let process_quantity = self.process_quantity_distr().sample();
                             *source_event_id = self
@@ -285,7 +285,7 @@ pub trait Process<
                             *self.time_to_next_process_event() =
                                 Some(Duration::from_secs_f64(process_duration_secs));
                         }
-                        (Some(VectorStockState::Empty { .. }), _) => {
+                        (Some(ContinuousStockState::Empty { .. }), _) => {
                             *source_event_id = self
                                 .log(
                                     time,
@@ -315,7 +315,7 @@ pub trait Process<
                                 .await;
                             *self.time_to_next_process_event() = None;
                         }
-                        (_, Some(VectorStockState::Full { .. })) => {
+                        (_, Some(ContinuousStockState::Full { .. })) => {
                             *source_event_id = self
                                 .log(
                                     time,
@@ -430,9 +430,9 @@ pub trait Process<
     fn process_state(&mut self) -> &mut Option<(Duration, ResourceType)>;
     fn env_state(&mut self) -> &mut BasicEnvironmentState;
     fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState>;
-    fn req_upstream(&mut self) -> &mut Requestor<(), VectorStockState>;
+    fn req_upstream(&mut self) -> &mut Requestor<(), ContinuousStockState>;
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType>;
-    fn req_downstream(&mut self) -> &mut Requestor<(), VectorStockState>;
+    fn req_downstream(&mut self) -> &mut Requestor<(), ContinuousStockState>;
     fn push_downstream(&mut self) -> &mut Output<(ResourceType, EventId)>;
     fn process_quantity_distr(&mut self) -> &mut Distribution;
     fn process_time_distr(&mut self) -> &mut Distribution;
@@ -440,8 +440,8 @@ pub trait Process<
     fn time_to_next_delay_event(&mut self) -> &mut Option<Duration>;
 
     fn log_type_withdraw_request(&self) -> LogDetailsType;
-    fn log_type_process_start(&self, quantity: f64, vector: ResourceType) -> LogDetailsType;
-    fn log_type_process_success(&self, quantity: f64, vector: ResourceType) -> LogDetailsType;
+    fn log_type_process_start(&self, quantity: f64, resource: ResourceType) -> LogDetailsType;
+    fn log_type_process_success(&self, quantity: f64, resource: ResourceType) -> LogDetailsType;
     fn log_type_process_failure(&self, reason: &'static str) -> LogDetailsType;
     fn log_type_process_stopped(&self, reason: &'static str) -> LogDetailsType;
     fn log_type_process_continue(&self, reason: &'static str) -> LogDetailsType;
