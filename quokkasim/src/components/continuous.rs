@@ -26,8 +26,27 @@ impl StockState for ContinuousStockState {
     }
 }
 
+impl<T: ContinuousResource> ToLogRecord<ContinuousStockLogType<T>, ContinuousStockLog<T>> for DefaultStock<T, ContinuousStockState, ContinuousStockLog<T>> {
+    fn to_record(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        event_id: EventId,
+        details: ContinuousStockLogType<T>,
+    ) -> ContinuousStockLog<T> {
+        ContinuousStockLog::to_log(
+            now,
+            event_id,
+            source_event_id,
+            self.element_name.clone(),
+            self.element_type.clone(),
+            details,
+        )
+    }
+}
+
 #[derive(WithMethods)]
-pub struct DefaultStock<T, S: StockState>
+pub struct DefaultStock<T, S: StockState, RecordLogType: Clone + Send + 'static>
 where
     T: ContinuousArithmetic + Clone + Serialize + Send + 'static,
 {
@@ -37,7 +56,7 @@ where
     pub element_type: String,
 
     // Ports
-    pub log_emitter: Output<ContinuousStockLog<T>>,
+    pub log_emitter: Output<RecordLogType>,
     pub state_emitter: Output<EventId>,
 
     // Configuration
@@ -49,12 +68,12 @@ where
 
     // Internals
     prev_state: Option<S>,
-    next_event_id: u64,
+    next_event_index: u64,
 }
 
-impl<T: ContinuousResource + 'static, S: StockState + Send + 'static> Model for DefaultStock<T, S> {}
+impl<T: ContinuousResource + 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + 'static> Model for DefaultStock<T, S, RecordLogType> {}
 
-impl<T: ContinuousResource + Default + 'static, S: StockState> Default for DefaultStock<T, S> {
+impl<T: ContinuousResource + Default + 'static, S: StockState, RecordLogType: Clone + Send + 'static> Default for DefaultStock<T, S, RecordLogType> {
     fn default() -> Self {
         let (log_emitter, state_emitter) = (Output::new(), Output::new());
         DefaultStock {
@@ -67,12 +86,24 @@ impl<T: ContinuousResource + Default + 'static, S: StockState> Default for Defau
             max_capacity: 0.0,
             resource: T::default(),
             prev_state: None,
-            next_event_id: 0,
+            next_event_index: 0,
         }
     }
 }
 
-impl<T: ContinuousResource + 'static> DefaultStock<T, ContinuousStockState> {
+impl<
+    ResourceType: ContinuousResource + 'static,
+    LogRecordType: Clone + Send + 'static,
+> Stock<
+    ResourceType,
+    ContinuousStockState,
+    LogRecordType,
+    ContinuousStockLogType<ResourceType>,
+> for DefaultStock<ResourceType, ContinuousStockState, LogRecordType>
+where
+    LogRecordType: Serialize,
+    Self: ToLogRecord<ContinuousStockLogType<ResourceType>, LogRecordType>,
+{
     fn get_state(&mut self) -> ContinuousStockState {
         let occupied = self.resource.total();
         let empty = self.max_capacity - occupied;
@@ -85,206 +116,31 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, ContinuousStockState> {
         }
     }
 
-    pub fn get_state_async(&mut self) -> impl Future<Output = ContinuousStockState> {
-        // TODO: Allow above to also have context arg?
-        async move {
-            let state = self.get_state();
-            self.prev_state = Some(state.clone());
-            state
-        }
+    fn log_emitter(&mut self) -> &mut Output<LogRecordType> {
+        &mut self.log_emitter
     }
 
-    fn get_previous_state(&mut self) -> &Option<ContinuousStockState> {
-        &self.prev_state
-    }
-    fn set_previous_state(&mut self) {
-        self.prev_state = Some(self.get_state());
-    }
-    fn get_resource(&self) -> &T {
-        &self.resource
-    }
-
-    pub fn add(
-        &mut self,
-        mut payload: (T, EventId),
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()>
-    where
-        T: 'static,
-    {
-        async move {
-            // self.pre_add(&mut payload, cx).await;
-            self.add_impl(&mut payload, cx).await;
-            self.post_add(&mut payload, cx).await;
-        }
+    fn get_next_event_id(&mut self) -> EventId {
+        let event_id = EventId(format!(
+            "{}_{:06}",
+            self.element_code, self.next_event_index
+        ));
+        self.next_event_index += 1;
+        event_id
     }
 
-    fn add_impl(
-        &mut self,
-        payload: &mut (T, EventId),
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> {
-        async move {
-            self.prev_state = Some(self.get_state().clone());
-            self.resource.add(payload.0.clone());
-            payload.1 = self
-                .log(
-                    cx.time(),
-                    payload.1.clone(),
-                    ContinuousStockLogType::Add {
-                        balance: self.resource.total(),
-                        resource: payload.0.clone(),
-                    },
-                )
-                .await;
-        }
-    }
+    fn previous_state(&mut self) -> &mut Option<ContinuousStockState> { &mut self.prev_state }
+    fn resource(&mut self) -> &mut ResourceType { &mut self.resource }
+    fn state_emitter(&mut self) -> &mut Output<EventId> { &mut self.state_emitter }
 
-    fn post_add(
-        &mut self,
-        payload: &mut (T, EventId),
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> {
-        async move {
-            let previous_state = self.prev_state.clone();
-            let current_state = self.get_state().clone();
-            if previous_state.is_none()
-                || !previous_state
-                    .as_ref()
-                    .unwrap()
-                    .is_same_state(&current_state)
-            {
-                // Send 1ns in future to avoid infinite loops with processes
-                let next_time = cx.time() + Duration::from_nanos(1);
-                cx.schedule_event(
-                    next_time,
-                    Self::emit_change,
-                    (current_state.clone(), payload.1.clone()),
-                )
-                .unwrap();
-            }
-            self.prev_state = Some(current_state);
-        }
+    fn log_type_add(&self, balance: f64, resource: ResourceType) -> ContinuousStockLogType<ResourceType> {
+        ContinuousStockLogType::Add { balance, resource }
     }
-
-    pub fn remove(
-        &mut self,
-        mut payload: (f64, EventId),
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = T>
-    where
-        T: Projectable<f64>,
-    {
-        async move {
-            let result = self.remove_impl(&mut payload, cx).await;
-            self.post_remove(&mut payload, cx).await;
-            result
-        }
+    fn log_type_remove(&self, balance: f64, resource: ResourceType) -> ContinuousStockLogType<ResourceType> {
+        ContinuousStockLogType::Remove { balance, resource }
     }
-
-    pub fn remove_void(
-        &mut self,
-        mut payload: (f64, EventId),
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()>
-    where
-        T: Projectable<f64>,
-    {
-        async move {
-            self.remove(payload, cx).await;
-        }
-    }
-
-    fn remove_impl(
-        &mut self,
-        payload: &mut (f64, EventId),
-        cx: &mut ::nexosim::model::Context<Self>,
-    ) -> impl Future<Output = T>
-    where
-        T: Projectable<f64>,
-    {
-        async move {
-            self.prev_state = Some(self.get_state());
-            let result = self.resource.remove(payload.0);
-            payload.1 = self
-                .log(
-                    cx.time(),
-                    payload.1.clone(),
-                    ContinuousStockLogType::Remove {
-                        balance: self.resource.total(),
-                        resource: result.clone(),
-                    },
-                )
-                .await;
-            result
-        }
-    }
-
-    fn post_remove(
-        &mut self,
-        payload: &mut (f64, EventId),
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> {
-        async move {
-            let previous_state = self.prev_state.clone();
-            let current_state = self.get_state().clone();
-            match previous_state {
-                None => {}
-                Some(prev_state) => {
-                    if !prev_state.is_same_state(&current_state) {
-                        let next_time = cx.time() + Duration::from_nanos(1);
-                        cx.schedule_event(
-                            next_time,
-                            Self::emit_change,
-                            (current_state.clone(), payload.1.clone()),
-                        )
-                        .unwrap();
-                    }
-                }
-            }
-            self.prev_state = Some(current_state);
-        }
-    }
-
-    fn emit_change(
-        &mut self,
-        payload: (ContinuousStockState, EventId),
-        cx: &mut nexosim::model::Context<Self>,
-    ) -> impl Future<Output = ()> {
-        async move {
-            let nm = self
-                .log(
-                    cx.time(),
-                    payload.1,
-                    ContinuousStockLogType::StateChange {
-                        new_state: payload.0,
-                    },
-                )
-                .await;
-            self.state_emitter.send(nm).await;
-        }
-    }
-
-    fn log<StockLogType: Into<ContinuousStockLogType<T>>>(
-        &mut self,
-        now: MonotonicTime,
-        source_event_id: EventId,
-        details: StockLogType,
-    ) -> impl Future<Output = EventId> {
-        async move {
-            let new_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_id));
-            let log = ContinuousStockLog {
-                time: now.to_chrono_date_time(0).unwrap().to_string(),
-                event_id: new_event_id.clone(),
-                source_event_id,
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: details.into(),
-            };
-            self.log_emitter.send(log.clone()).await;
-            self.next_event_id += 1;
-            new_event_id
-        }
+    fn log_type_state_change(&self, new_state: ContinuousStockState) -> ContinuousStockLogType<ResourceType> {
+        ContinuousStockLogType::StateChange { new_state }
     }
 }
 
@@ -510,13 +366,13 @@ impl<ResourceType: ContinuousResource>
 {
     fn to_record(
         &mut self,
+        now: MonotonicTime,
         source_event_id: EventId,
         event_id: EventId,
         details: DefaultProcessLogType<ResourceType>,
     ) -> ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
         ContinuousProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
-            time: self
-                .previous_check_time
+            time: now
                 .to_chrono_date_time(0)
                 .unwrap()
                 .to_string(),

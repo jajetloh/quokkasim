@@ -1,17 +1,16 @@
 use quokkasim::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use quokkasim::core::EventId;
 
 fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
-    let mut s1: DefaultStock<f64, ContinuousStockState> = DefaultStock::new()
+    let mut s1: DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>> = DefaultStock::new()
         .with_name("TestStock1")
         .with_code("S1")
         .with_low_capacity(5.)
         .with_max_capacity(100.)
         .with_initial_resource(100.);
-    let s1_mbox = Mailbox::new();
-    let s1_addr = s1_mbox.address();
+    let s1_mbox: Mailbox<DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>>> = Mailbox::new();
+    let s1_addr: Address<DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>>> = s1_mbox.address();
     let mut p1: DefaultProcess<f64, ContinuousProcessLog<DefaultProcessLogType<f64>, f64>> = DefaultProcess::new()
         .with_name("TestProcess1")
         .with_code("P1")
@@ -20,15 +19,14 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
         .with_process_time_distr(Distribution::Constant(2.0));
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
-    let mut s2: DefaultStock<f64, ContinuousStockState> = DefaultStock::new()
+    let mut s2: DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>> = DefaultStock::new()
         .with_name("TestStock2")
         .with_code("S2")
         .with_low_capacity(5.)
         .with_max_capacity(100.)
         .with_initial_resource(0.);
-    let s2_mbox = Mailbox::new();
-    let s2_addr = s2_mbox.address();
-
+    let s2_mbox: Mailbox<DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>>> = Mailbox::new();
+    let s2_addr: Address<DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>>> = s2_mbox.address();
 
     // Connections
 
@@ -45,11 +43,11 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
 
     let mut registry = EndpointRegistry::new();
     
-    let mut input_add_to_s1 = EventSource::new();
+    let mut input_add_to_s1: EventSource<(f64, EventId)> = EventSource::new();
     input_add_to_s1.connect(DefaultStock::add, &s1_addr);
     registry.add_event_source(input_add_to_s1, "add_to_s1").unwrap();
 
-    let mut input_add_to_s2 = EventSource::new();
+    let mut input_add_to_s2: EventSource<(f64, EventId)> = EventSource::new();
     input_add_to_s2.connect(DefaultStock::add, &s2_addr);
     registry.add_event_source(input_add_to_s2, "remove_from_s2").unwrap();
 
@@ -74,7 +72,7 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
 
 
 fn bench_array_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
-    let mut s1: DefaultStock<[f64; 5], ContinuousStockState> = DefaultStock::new()
+    let mut s1: DefaultStock<[f64; 5], ContinuousStockState, ContinuousStockLog<[f64; 5]>> = DefaultStock::new()
         .with_name("TestStock1")
         .with_code("S1")
         .with_low_capacity(5.)
@@ -90,7 +88,7 @@ fn bench_array_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Simulatio
         .with_process_time_distr(Distribution::Constant(2.0));
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
-    let mut s2: DefaultStock<[f64; 5], ContinuousStockState> = DefaultStock::new()
+    let mut s2: DefaultStock<[f64; 5], ContinuousStockState, ContinuousStockLog<[f64; 5]>> = DefaultStock::new()
         .with_name("TestStock2")
         .with_code("S2")
         .with_low_capacity(5.)
@@ -230,7 +228,7 @@ impl Default for IronOre {
 
 fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
     let mut df = DistributionFactory::new(12345);
-    let mut s1: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s1: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock1")
         .with_code("S1")
         .with_low_capacity(5.)
@@ -261,7 +259,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
 
-    let mut s2: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s2: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock2")
         .with_code("S2")
         .with_low_capacity(5.)
@@ -284,7 +282,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p2_mbox = Mailbox::new();
     let p2_addr = p2_mbox.address();
 
-    let mut s3: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s3: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock3")
         .with_code("S3")
         .with_low_capacity(5.)
@@ -321,7 +319,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p4_mbox = Mailbox::new();
     let p4_addr = p4_mbox.address();
 
-    let mut s4: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s4: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock4")
         .with_code("S4")
         .with_low_capacity(5.)
@@ -393,7 +391,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
 
 fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError> {
     let mut df = DistributionFactory::new(12345);
-    let mut s1: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s1: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock1")
         .with_code("S1")
         .with_low_capacity(5.)
@@ -416,7 +414,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p1_mbox = Mailbox::new();
     let p1_addr = p1_mbox.address();
 
-    let mut s2: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s2: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock2")
         .with_code("S2")
         .with_low_capacity(5.)
@@ -438,7 +436,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p2_mbox = Mailbox::new();
     let p2_addr = p2_mbox.address();
 
-    let mut s3: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s3: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock3")
         .with_code("S3")
         .with_low_capacity(5.)
@@ -469,14 +467,13 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p4_mbox = Mailbox::new();
     let p4_addr = p4_mbox.address();
 
-    let mut s4: DefaultStock<_, ContinuousStockState> = DefaultStock::new()
+    let mut s4: DefaultStock<_, ContinuousStockState, ContinuousStockLog<_>> = DefaultStock::new()
         .with_name("TestStock4")
         .with_code("S4")
         .with_low_capacity(5.)
         .with_max_capacity(10000.);
     let s4_mbox = Mailbox::new();
     let s4_addr = s4_mbox.address();
-
 
     // Connections
 
@@ -490,6 +487,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
 
     c.connect((&mut s3, &s3_addr), (&mut p4, &p4_addr)).unwrap();
     c.connect((&mut p4, &p4_addr), (&mut s4, &s4_addr)).unwrap();
+
     // Loggers
     
     let process_logger = EventSlot::new();

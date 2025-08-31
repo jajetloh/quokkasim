@@ -2,11 +2,9 @@ use serde::Serialize;
 use std::fmt::Debug;
 
 use crate::{
-    components::{continuous_traits::ContinuousResource, environment::BasicEnvironment},
-    nexosim::{Address, Model},
-    prelude::{
-        DefaultProcess, DefaultProcessLogType, DefaultStock, Process, Projectable, ContinuousStockState,
-    },
+    common::ToLogRecord, components::{continuous_traits::{ContinuousResource, Stock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::{
+        ContinuousStockLogType, ContinuousStockState, DefaultProcess, DefaultProcessLogType, DefaultStock, Process, Projectable
+    }
 };
 
 pub trait Connect<A: Model, B: Model> {
@@ -16,18 +14,20 @@ pub trait Connect<A: Model, B: Model> {
 
 pub struct Connection;
 
-impl<T: ContinuousResource + 'static, R: Clone + Send + Debug + Serialize + 'static>
-    Connect<DefaultProcess<T, R>, DefaultStock<T, ContinuousStockState>> for Connection
+impl<T: ContinuousResource + 'static, R: Clone + Send + Debug + Serialize + 'static, StockLogRecord: Clone + Send + Debug + Serialize + 'static>
+    Connect<DefaultProcess<T, R>, DefaultStock<T, ContinuousStockState, StockLogRecord>> for Connection
 where
-    DefaultStock<T, ContinuousStockState>: Model,
+    DefaultStock<T, ContinuousStockState, StockLogRecord>: Model,
+    StockLogRecord: Serialize,
+    DefaultStock<T, ContinuousStockState, StockLogRecord>: ToLogRecord<ContinuousStockLogType<T>, StockLogRecord>,
     DefaultProcess<T, R>: Process<T, R, DefaultProcessLogType<T>>,
 {
     fn connect(
         &mut self,
         a: (&mut DefaultProcess<T, R>, &Address<DefaultProcess<T, R>>),
         b: (
-            &mut DefaultStock<T, ContinuousStockState>,
-            &Address<DefaultStock<T, ContinuousStockState>>,
+            &mut DefaultStock<T, ContinuousStockState, StockLogRecord>,
+            &Address<DefaultStock<T, ContinuousStockState, StockLogRecord>>,
         ),
     ) -> Result<(), String> {
         a.0.push_downstream.connect(DefaultStock::add, b.1.clone());
@@ -41,16 +41,19 @@ where
 impl<
     T: ContinuousResource + Projectable<f64> + 'static,
     R: Clone + Send + Debug + Serialize + 'static,
-> Connect<DefaultStock<T, ContinuousStockState>, DefaultProcess<T, R>> for Connection
+    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+> Connect<DefaultStock<T, ContinuousStockState, StockLogRecord>, DefaultProcess<T, R>> for Connection
 where
-    DefaultStock<T, ContinuousStockState>: Model,
+    DefaultStock<T, ContinuousStockState, StockLogRecord>: Model,
+    StockLogRecord: Serialize,
+    DefaultStock<T, ContinuousStockState, StockLogRecord>: ToLogRecord<ContinuousStockLogType<T>, StockLogRecord>,
     DefaultProcess<T, R>: Process<T, R, DefaultProcessLogType<T>>,
 {
     fn connect(
         &mut self,
         a: (
-            &mut DefaultStock<T, ContinuousStockState>,
-            &Address<DefaultStock<T, ContinuousStockState>>,
+            &mut DefaultStock<T, ContinuousStockState, StockLogRecord>,
+            &Address<DefaultStock<T, ContinuousStockState, StockLogRecord>>,
         ),
         b: (&mut DefaultProcess<T, R>, &Address<DefaultProcess<T, R>>),
     ) -> Result<(), String> {

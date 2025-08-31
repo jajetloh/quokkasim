@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::{fmt::Debug, time::Duration};
 
 use crate::{
-    common::{EventId, ToLogRecord},
+    common::{EventId, StockState, ToLogRecord},
     components::environment::BasicEnvironmentState,
     delays::DelayModes,
     distributions::Distribution,
@@ -413,7 +413,7 @@ pub trait Process<
     ) -> impl Future<Output = EventId> + Send {
         async move {
             let event_id = self.get_next_event_id();
-            let log = self.to_record(source_event_id.clone(), event_id.clone(), details.into());
+            let log = self.to_record(now, source_event_id.clone(), event_id.clone(), details.into());
             self.log_emitter().send(log.clone()).await;
             event_id
         }
@@ -447,4 +447,117 @@ pub trait Process<
     fn log_type_process_continue(&self, reason: &'static str) -> LogDetailsType;
     fn log_type_delay_start(&self, delay_name: String) -> LogDetailsType;
     fn log_type_delay_end(&self, delay_name: String) -> LogDetailsType;
+}
+
+pub trait Stock<
+    ResourceType: ContinuousResource + 'static,
+    StateType: StockState + Clone + Send + 'static,
+    LogRecordType: Clone + Send + 'static,
+    LogDetailsType: Clone + Send + 'static,
+> where
+    Self: Model,
+    Self: ToLogRecord<LogDetailsType, LogRecordType>,
+{
+    fn get_state(&mut self) -> StateType;
+
+    fn get_state_async(&mut self, _: (), _: &mut Context<Self>) -> impl Future<Output = StateType> {
+        async move {
+            self.get_state()
+        }
+    }
+
+    fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
+
+    fn get_next_event_id(&mut self) -> EventId;
+
+    fn previous_state(&mut self) -> &mut Option<StateType>;
+    fn resource(&mut self) -> &mut ResourceType;
+    fn state_emitter(&mut self) -> &mut Output<EventId>;
+
+    fn add(&mut self, payload: (ResourceType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            *self.previous_state() = Some(self.get_state().clone());
+            self.resource().add(payload.0.clone());
+            let total = self.resource().total();
+            let event_id = self
+                .log(
+                    cx.time(),
+                    payload.1.clone(),
+                    self.log_type_add(total, payload.0.clone())
+                )
+                .await;
+
+            let previous_state = self.previous_state().clone();
+            let current_state = self.get_state().clone();
+            if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state)
+            {
+                // Send 1ns in future to avoid infinite loops with processes
+                let next_time = cx.time() + Duration::from_nanos(1);
+                cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), event_id)).unwrap();
+            }
+            *self.previous_state() = Some(current_state);
+        }
+    }
+
+    fn remove<T: Send>(&mut self, payload: (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ResourceType> + Send where ResourceType: Projectable<T> {
+        async move {
+            *self.previous_state() = Some(self.get_state().clone());
+            let removed = self.resource().remove(payload.0);
+            let total = self.resource().total();
+            let event_id = self.log(
+                    cx.time(),
+                    payload.1.clone(),
+                    self.log_type_remove(total, removed.clone())
+                )
+                .await;
+
+            let previous_state = self.previous_state().clone();
+            let current_state = self.get_state().clone();
+            if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state)
+            {
+                // Send 1ns in future to avoid infinite loops with processes
+                let next_time = cx.time() + Duration::from_nanos(1);
+                cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), event_id)).unwrap();
+            }
+            *self.previous_state() = Some(current_state);
+            removed
+        }
+    }
+
+    fn remove_void<T: Send>(&mut self, payload: (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where ResourceType: Projectable<T> {
+        async move {
+            self.remove(payload, cx).await;
+        }
+    }
+
+    fn emit_change(&mut self, payload: (StateType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            let nm = self
+                .log(
+                    cx.time(),
+                    payload.1,
+                    self.log_type_state_change(payload.0.clone()),
+                )
+                .await;
+            self.state_emitter().send(nm).await;
+        }
+    }
+
+    fn log<D: Into<LogDetailsType> + Send>(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        details: D,
+    ) -> impl Future<Output = EventId> + Send {
+        async move {
+            let event_id = self.get_next_event_id();
+            let log = self.to_record(now, source_event_id.clone(), event_id.clone(), details.into());
+            self.log_emitter().send(log.clone()).await;
+            event_id
+        }
+    }
+
+    fn log_type_add(&self, balance: f64, resource: ResourceType) -> LogDetailsType;
+    fn log_type_remove(&self, balance: f64, resource: ResourceType) -> LogDetailsType;
+    fn log_type_state_change(&self, new_state: StateType) -> LogDetailsType;
 }
