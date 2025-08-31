@@ -1,13 +1,20 @@
-use std::{fmt::Debug, time::Duration};
-use quokkasim_derive_macros::WithMethods;
 use serde::Serialize;
+use std::{fmt::Debug, time::Duration};
 
-use crate::{common::EventId, distributions::Distribution, components::environment::BasicEnvironmentState, core::{ToLogRecord}, delays::DelayModes, nexosim::{ActionKey, Context, Model, MonotonicTime, Output, Requestor}, prelude::VectorStockState};
-
+use crate::{
+    common::{EventId, ToLogRecord},
+    components::environment::BasicEnvironmentState,
+    delays::DelayModes,
+    distributions::Distribution,
+    nexosim::{ActionKey, Context, Model, MonotonicTime, Output, Requestor},
+    prelude::VectorStockState,
+};
 
 pub trait ContinuousArithmetic {
     fn add(&mut self, arg: Self);
-    fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T>;
+    fn remove<T>(&mut self, arg: T) -> Self
+    where
+        Self: Projectable<T>;
     fn multiply(&mut self, arg: f64);
     fn total(&self) -> f64;
     fn remove_all(&mut self) -> Self;
@@ -35,7 +42,10 @@ impl ContinuousArithmetic for f64 {
         *self += arg;
     }
 
-    fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T> {
+    fn remove<T>(&mut self, arg: T) -> Self
+    where
+        Self: Projectable<T>,
+    {
         let removed = self.project(arg);
         *self -= removed;
         removed
@@ -63,7 +73,10 @@ impl<const N: usize> ContinuousArithmetic for [f64; N] {
         }
     }
 
-    fn remove<T>(&mut self, arg: T) -> Self where Self: Projectable<T> {
+    fn remove<T>(&mut self, arg: T) -> Self
+    where
+        Self: Projectable<T>,
+    {
         let removed = self.project(arg);
         for (a, b) in self.iter_mut().zip(removed.iter()) {
             *a -= *b;
@@ -91,29 +104,36 @@ impl<const N: usize> ContinuousArithmetic for [f64; N] {
 }
 
 pub trait ContinuousResource: ContinuousArithmetic + Clone + Send + Debug + Serialize {}
-impl<T> ContinuousResource for T
-where 
-    T: ContinuousArithmetic + Clone + Send + Debug + Serialize {}
-
+impl<T> ContinuousResource for T where T: ContinuousArithmetic + Clone + Send + Debug + Serialize {}
 
 pub trait Process<
     ResourceType: ContinuousResource + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
-> where Self: Model,
-        Self: ToLogRecord<LogDetailsType, LogRecordType> {
-
+> where
+    Self: Model,
+    Self: ToLogRecord<LogDetailsType, LogRecordType>,
+{
     fn update_state(
-        &mut self, mut source_event_id: EventId, mut cx: &mut Context<Self>
+        &mut self,
+        mut source_event_id: EventId,
+        mut cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, &mut cx).await;
-            self.update_state_decision_logic(&mut source_event_id, &mut cx).await;
-            self.update_state_next_event(&mut source_event_id, &mut cx).await;
+            self.update_state_since_last_update(&mut source_event_id, &mut cx)
+                .await;
+            self.update_state_decision_logic(&mut source_event_id, &mut cx)
+                .await;
+            self.update_state_next_event(&mut source_event_id, &mut cx)
+                .await;
         }
     }
 
-    fn update_state_since_last_update(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn update_state_since_last_update(
+        &mut self,
+        source_event_id: &mut EventId,
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> + Send {
         async move {
             // Update variables from elapsed time
             if let Some((scheduled_time, _)) = self.scheduled_event() {
@@ -131,10 +151,22 @@ pub trait Process<
                 // Decrement process time counter (if not delayed or env blocked)
                 if !(is_in_delay || is_env_blocked) {
                     if let Some((mut process_time_left, resource)) = self.process_state().take() {
-                        process_time_left = process_time_left.saturating_sub(duration_since_prev_check);
+                        process_time_left =
+                            process_time_left.saturating_sub(duration_since_prev_check);
                         if process_time_left.is_zero() {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_success(resource.total(), resource.clone())).await;
-                            self.push_downstream().send((resource.clone(), source_event_id.clone())).await;
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_process_success(
+                                        resource.total(),
+                                        resource.clone(),
+                                    ),
+                                )
+                                .await;
+                            self.push_downstream()
+                                .send((resource.clone(), source_event_id.clone()))
+                                .await;
                         } else {
                             *self.process_state() = Some((process_time_left, resource));
                         }
@@ -145,13 +177,26 @@ pub trait Process<
                 // which is only the case if we're not processing and not in a delay - i.e. time-until-delay counters only decrement
                 // when a process is active
                 if !is_env_blocked && (is_in_delay || is_in_process) {
-                    let delay_transition = self.delay_modes().update_state(duration_since_prev_check);
+                    let delay_transition =
+                        self.delay_modes().update_state(duration_since_prev_check);
                     if delay_transition.has_changed() {
                         if let Some(delay_name) = &delay_transition.from {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_delay_end(delay_name.clone())).await;
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_delay_end(delay_name.clone()),
+                                )
+                                .await;
                         }
                         if let Some(delay_name) = &delay_transition.to {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_delay_start(delay_name.clone())).await;
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_delay_start(delay_name.clone()),
+                                )
+                                .await;
                         }
                     }
                 }
@@ -159,21 +204,37 @@ pub trait Process<
         }
     }
 
-    fn update_state_decision_logic(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn update_state_decision_logic(
+        &mut self,
+        source_event_id: &mut EventId,
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> + Send {
         async move {
             let time = cx.time();
             {
                 let new_env_state = match self.req_environment().send(()).await.next() {
                     Some(x) => x,
-                    None => BasicEnvironmentState::Normal // Assume always normal operation if no environment state connected
+                    None => BasicEnvironmentState::Normal, // Assume always normal operation if no environment state connected
                 };
                 match (&self.env_state(), &new_env_state) {
                     (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_stopped("Stopped by environment")).await;
+                        *source_event_id = self
+                            .log(
+                                time,
+                                source_event_id.clone(),
+                                self.log_type_process_stopped("Stopped by environment"),
+                            )
+                            .await;
                         *self.env_state() = BasicEnvironmentState::Stopped;
-                    },
+                    }
                     (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                        *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_continue("Resumed by environment")).await;
+                        *source_event_id = self
+                            .log(
+                                time,
+                                source_event_id.clone(),
+                                self.log_type_process_continue("Resumed by environment"),
+                            )
+                            .await;
                         *self.env_state() = BasicEnvironmentState::Normal;
                     }
                     _ => {}
@@ -190,58 +251,121 @@ pub trait Process<
 
                     match (&us_state, &ds_state) {
                         (
-                            Some(VectorStockState::Normal {..}) | Some(VectorStockState::Full {..}),
-                            Some(VectorStockState::Empty {..}) | Some(VectorStockState::Normal {..}),
+                            Some(VectorStockState::Normal { .. })
+                            | Some(VectorStockState::Full { .. }),
+                            Some(VectorStockState::Empty { .. })
+                            | Some(VectorStockState::Normal { .. }),
                         ) => {
                             let process_quantity = self.process_quantity_distr().sample();
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_withdraw_request()).await;
-                            let moved = self.withdraw_upstream().send((process_quantity, source_event_id.clone())).await.next().unwrap();
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_withdraw_request(),
+                                )
+                                .await;
+                            let moved = self
+                                .withdraw_upstream()
+                                .send((process_quantity, source_event_id.clone()))
+                                .await
+                                .next()
+                                .unwrap();
                             let process_duration_secs = self.process_time_distr().sample();
-                            *self.process_state() = Some((Duration::from_secs_f64(process_duration_secs), moved.clone()));
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_start(process_quantity, moved)).await;
-                            *self.time_to_next_process_event() = Some(Duration::from_secs_f64(process_duration_secs));
-                        },
-                        (Some(VectorStockState::Empty {..} ), _) => {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_failure("Upstream is empty")).await;
+                            *self.process_state() = Some((
+                                Duration::from_secs_f64(process_duration_secs),
+                                moved.clone(),
+                            ));
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_process_start(process_quantity, moved),
+                                )
+                                .await;
+                            *self.time_to_next_process_event() =
+                                Some(Duration::from_secs_f64(process_duration_secs));
+                        }
+                        (Some(VectorStockState::Empty { .. }), _) => {
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure("Upstream is empty"),
+                                )
+                                .await;
                             *self.time_to_next_process_event() = None;
-                        },
+                        }
                         (None, _) => {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_failure("Upstream is not connected")).await;
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure("Upstream is not connected"),
+                                )
+                                .await;
                             *self.time_to_next_process_event() = None;
-                        },
+                        }
                         (_, None) => {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_failure("Downstream is not connected")).await;
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure("Downstream is not connected"),
+                                )
+                                .await;
                             *self.time_to_next_process_event() = None;
-                        },
-                        (_, Some(VectorStockState::Full {..} )) => {
-                            *source_event_id = self.log(time, source_event_id.clone(), self.log_type_process_failure("Downstream is full")).await;
+                        }
+                        (_, Some(VectorStockState::Full { .. })) => {
+                            *source_event_id = self
+                                .log(
+                                    time,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure("Downstream is full"),
+                                )
+                                .await;
                             *self.time_to_next_process_event() = None;
-                        },
+                        }
                     }
-                },
+                }
                 (Some((time, _)), false) => {
                     *self.time_to_next_process_event() = Some(*time);
-                },
+                }
                 (_, true) => {
-                    *self.time_to_next_process_event() = self.delay_modes().active_delay().map(|(_, delay_state)| *delay_state);
+                    *self.time_to_next_process_event() = self
+                        .delay_modes()
+                        .active_delay()
+                        .map(|(_, delay_state)| *delay_state);
                 }
             }
         }
     }
 
-    fn update_state_next_event(&mut self, source_event_id: &mut EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn update_state_next_event(
+        &mut self,
+        source_event_id: &mut EventId,
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> + Send {
         async move {
             let is_env_stopped = matches!(self.env_state(), BasicEnvironmentState::Stopped);
             let has_active_delay = self.delay_modes().active_delay().is_some() || is_env_stopped;
 
             if self.process_state().is_some() || has_active_delay || !is_env_stopped {
-                *self.time_to_next_delay_event() = self.delay_modes().get_next_event().map(|(_, delay_state)| delay_state.as_duration());
+                *self.time_to_next_delay_event() = self
+                    .delay_modes()
+                    .get_next_event()
+                    .map(|(_, delay_state)| delay_state.as_duration());
             } else {
                 *self.time_to_next_delay_event() = None;
             }
-            let time_to_next_event = [self.time_to_next_delay_event().clone(), self.time_to_next_process_event().clone()].into_iter().flatten().min();
+            let time_to_next_event = [
+                self.time_to_next_delay_event().clone(),
+                self.time_to_next_process_event().clone(),
+            ]
+            .into_iter()
+            .flatten()
+            .min();
             match time_to_next_event {
-                None => {},
+                None => {}
                 Some(time_until_next) => {
                     if time_until_next.is_zero() {
                         panic!("Time until next event is zero!");
@@ -252,14 +376,26 @@ pub trait Process<
                         if let Some((scheduled_time, action_key)) = self.scheduled_event().take() {
                             if next_time < scheduled_time {
                                 action_key.cancel();
-                                let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
+                                let new_event_key = cx
+                                    .schedule_keyed_event(
+                                        next_time,
+                                        Self::update_state,
+                                        source_event_id.clone(),
+                                    )
+                                    .unwrap();
                                 *self.scheduled_event() = Some((next_time, new_event_key));
                             } else {
                                 // Put the event back
                                 *self.scheduled_event() = Some((scheduled_time, action_key));
                             }
                         } else {
-                            let new_event_key =  cx.schedule_keyed_event(next_time, Self::update_state, source_event_id.clone()).unwrap();
+                            let new_event_key = cx
+                                .schedule_keyed_event(
+                                    next_time,
+                                    Self::update_state,
+                                    source_event_id.clone(),
+                                )
+                                .unwrap();
                             *self.scheduled_event() = Some((next_time, new_event_key));
                         }
                     };
@@ -270,8 +406,11 @@ pub trait Process<
     }
 
     fn log<D: Into<LogDetailsType> + Send>(
-        &mut self, now: MonotonicTime, source_event_id: EventId, details: D
-    ) -> impl Future<Output = EventId> + Send{
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        details: D,
+    ) -> impl Future<Output = EventId> + Send {
         async move {
             let event_id = self.get_next_event_id();
             let log = self.to_record(source_event_id.clone(), event_id.clone(), details.into());
@@ -308,6 +447,4 @@ pub trait Process<
     fn log_type_process_continue(&self, reason: &'static str) -> LogDetailsType;
     fn log_type_delay_start(&self, delay_name: String) -> LogDetailsType;
     fn log_type_delay_end(&self, delay_name: String) -> LogDetailsType;
-
 }
-

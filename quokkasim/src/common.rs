@@ -1,8 +1,4 @@
-use std::{error::Error, fmt::{Display, Formatter, Result as FmtResult}, time::Duration};
-use indexmap::IndexMap;
-use rand::{rngs::SmallRng, SeedableRng};
-use rand_distr::{Distribution as _, Exp, Normal, Triangular, Uniform};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 /// A short, lightweight identifier for an event. Very useful for understanding causal flow of events via log files.
@@ -17,4 +13,12 @@ impl EventId {
     pub fn from_scheduler() -> EventId {
         EventId("SCH_000000".to_string())
     }
+}
+
+pub trait ToLogRecord<DetailsType, LogType> {
+    fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: DetailsType) -> LogType;
+}
+
+pub trait StockState {
+    fn is_same_state(&self, other: &Self) -> bool;
 }

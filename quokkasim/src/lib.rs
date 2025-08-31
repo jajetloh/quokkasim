@@ -3,7 +3,6 @@
 pub mod prelude;
 pub mod common;
 pub mod distributions;
-pub mod core;
 pub mod components;
 pub mod delays;
 pub use strum;
@@ -17,10 +16,6 @@ pub mod nexosim {
     pub use nexosim::registry::*;
     pub use nexosim::server;
 }
-
-use std::{fs, path::{Path, PathBuf}};
-
-
 
 // // pub fn inject_boilerplate(path: PathBuf) -> anyhow::Result<()> {
 // //     let mut src = fs::read_to_string(&path)?;

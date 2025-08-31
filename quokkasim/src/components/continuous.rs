@@ -1,7 +1,10 @@
-use nexosim::{model::Model, ports::{EventQueue, Output, Requestor}};
-use serde::{ser::SerializeStruct, Serialize};
-use tai_time::MonotonicTime;
+use nexosim::{
+    model::Model,
+    ports::{Output, Requestor},
+};
+use serde::{Serialize, ser::SerializeStruct};
 use std::{fmt::Debug, time::Duration};
+use tai_time::MonotonicTime;
 
 use crate::{distributions::Distribution, prelude::*};
 
@@ -24,7 +27,10 @@ impl StockState for VectorStockState {
 }
 
 #[derive(WithMethods)]
-pub struct DefaultStock<T, S: StockState> where T: ContinuousArithmetic + Clone + Serialize + Send + 'static {
+pub struct DefaultStock<T, S: StockState>
+where
+    T: ContinuousArithmetic + Clone + Serialize + Send + 'static,
+{
     // Identification
     pub element_name: String,
     pub element_code: String,
@@ -66,9 +72,7 @@ impl<T: ContinuousResource + Default + 'static, S: StockState> Default for Defau
     }
 }
 
-
 impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
-
     fn get_state(&mut self) -> VectorStockState {
         let occupied = self.resource.total();
         let empty = self.max_capacity - occupied;
@@ -100,7 +104,14 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
         &self.resource
     }
 
-    pub fn add(&mut self, mut payload: (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + where T: 'static {
+    pub fn add(
+        &mut self,
+        mut payload: (T, EventId),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()>
+    where
+        T: 'static,
+    {
         async move {
             // self.pre_add(&mut payload, cx).await;
             self.add_impl(&mut payload, cx).await;
@@ -111,29 +122,59 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
     fn add_impl(
         &mut self,
         payload: &mut (T, EventId),
-        cx: &mut Context<Self>
-    ) -> impl Future<Output=()> {
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> {
         async move {
             self.prev_state = Some(self.get_state().clone());
             self.resource.add(payload.0.clone());
-            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Add { balance: self.resource.total(), vector: payload.0.clone() }).await;
+            payload.1 = self
+                .log(
+                    cx.time(),
+                    payload.1.clone(),
+                    VectorStockLogType::Add {
+                        balance: self.resource.total(),
+                        vector: payload.0.clone(),
+                    },
+                )
+                .await;
         }
     }
 
-    fn post_add(&mut self, payload: &mut (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
+    fn post_add(
+        &mut self,
+        payload: &mut (T, EventId),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> {
         async move {
             let previous_state = self.prev_state.clone();
             let current_state = self.get_state().clone();
-            if previous_state.is_none() || !previous_state.as_ref().unwrap().is_same_state(&current_state) {
+            if previous_state.is_none()
+                || !previous_state
+                    .as_ref()
+                    .unwrap()
+                    .is_same_state(&current_state)
+            {
                 // Send 1ns in future to avoid infinite loops with processes
                 let next_time = cx.time() + Duration::from_nanos(1);
-                cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
+                cx.schedule_event(
+                    next_time,
+                    Self::emit_change,
+                    (current_state.clone(), payload.1.clone()),
+                )
+                .unwrap();
             }
             self.prev_state = Some(current_state);
         }
     }
 
-    pub fn remove(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = T> + where T: Projectable<f64> {
+    pub fn remove(
+        &mut self,
+        mut payload: (f64, EventId),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = T>
+    where
+        T: Projectable<f64>,
+    {
         async move {
             let result = self.remove_impl(&mut payload, cx).await;
             self.post_remove(&mut payload, cx).await;
@@ -141,7 +182,14 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
         }
     }
 
-    pub fn remove_void(&mut self, mut payload: (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + where T: Projectable<f64> {
+    pub fn remove_void(
+        &mut self,
+        mut payload: (f64, EventId),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()>
+    where
+        T: Projectable<f64>,
+    {
         async move {
             self.remove(payload, cx).await;
         }
@@ -150,26 +198,47 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
     fn remove_impl(
         &mut self,
         payload: &mut (f64, EventId),
-        cx: &mut ::nexosim::model::Context<Self>
-    ) -> impl Future<Output=T> where T: Projectable<f64> {
+        cx: &mut ::nexosim::model::Context<Self>,
+    ) -> impl Future<Output = T>
+    where
+        T: Projectable<f64>,
+    {
         async move {
             self.prev_state = Some(self.get_state());
             let result = self.resource.remove(payload.0);
-            payload.1 = self.log(cx.time(), payload.1.clone(), VectorStockLogType::Remove { balance: self.resource.total(), vector: result.clone() }).await;
+            payload.1 = self
+                .log(
+                    cx.time(),
+                    payload.1.clone(),
+                    VectorStockLogType::Remove {
+                        balance: self.resource.total(),
+                        vector: result.clone(),
+                    },
+                )
+                .await;
             result
         }
     }
 
-    fn post_remove(&mut self, payload: &mut (f64, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + {
-          async move {
+    fn post_remove(
+        &mut self,
+        payload: &mut (f64, EventId),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> {
+        async move {
             let previous_state = self.prev_state.clone();
             let current_state = self.get_state().clone();
             match previous_state {
-                None => {},
+                None => {}
                 Some(prev_state) => {
                     if !prev_state.is_same_state(&current_state) {
                         let next_time = cx.time() + Duration::from_nanos(1);
-                        cx.schedule_event(next_time, Self::emit_change, (current_state.clone(), payload.1.clone())).unwrap();
+                        cx.schedule_event(
+                            next_time,
+                            Self::emit_change,
+                            (current_state.clone(), payload.1.clone()),
+                        )
+                        .unwrap();
                     }
                 }
             }
@@ -177,14 +246,31 @@ impl<T: ContinuousResource + 'static> DefaultStock<T, VectorStockState> {
         }
     }
 
-    fn emit_change(&mut self, payload: (VectorStockState, EventId), cx: &mut nexosim::model::Context<Self>) -> impl Future<Output=()> {
+    fn emit_change(
+        &mut self,
+        payload: (VectorStockState, EventId),
+        cx: &mut nexosim::model::Context<Self>,
+    ) -> impl Future<Output = ()> {
         async move {
-            let nm = self.log(cx.time(), payload.1, VectorStockLogType::StateChange { new_state: payload.0 }).await;
+            let nm = self
+                .log(
+                    cx.time(),
+                    payload.1,
+                    VectorStockLogType::StateChange {
+                        new_state: payload.0,
+                    },
+                )
+                .await;
             self.state_emitter.send(nm).await;
         }
     }
 
-    fn log<StockLogType: Into<VectorStockLogType<T>>>(&mut self, now: MonotonicTime, source_event_id: EventId, details: StockLogType) -> impl Future<Output = EventId> {
+    fn log<StockLogType: Into<VectorStockLogType<T>>>(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        details: StockLogType,
+    ) -> impl Future<Output = EventId> {
         async move {
             let new_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_id));
             let log = VectorStockLog {
@@ -240,26 +326,25 @@ pub enum VectorStockLogType<T: ContinuousArithmetic> {
     StateChange { new_state: VectorStockState },
 }
 
-
 #[derive(Debug, Clone)]
-pub struct VectorProcessLog<
-    LogDetailsType,
-    ResourceType: ContinuousResource
-> {
-    pub time: String,  
+pub struct VectorProcessLog<LogDetailsType, ResourceType: ContinuousResource> {
+    pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
     pub element_name: String,
     pub element_type: String,
     pub details: LogDetailsType,
-    
+
     pub phantom: std::marker::PhantomData<ResourceType>,
 }
 
-impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T> where
-        D: Clone + Into<DefaultProcessLogType<T>> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where
-        S: serde::Serializer
+impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T>
+where
+    D: Clone + Into<DefaultProcessLogType<T>>,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
     {
         let mut state = serializer.serialize_struct("VectorProcessLog", 6)?;
         state.serialize_field("time", &self.time)?;
@@ -268,17 +353,34 @@ impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T> where
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
         let details: DefaultProcessLogType<T> = self.details.clone().into();
-        let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) = match details {
-            DefaultProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
-            DefaultProcessLogType::ProcessStart { quantity, vector } => ("ProcessStart", Some(quantity), Some(vector.clone()), None),
-            DefaultProcessLogType::ProcessSuccess { quantity, vector } => ("ProcessSuccess", Some(quantity), Some(vector.clone()), None),
-            DefaultProcessLogType::ProcessFailure { reason } => ("ProcessFailure", None, None, Some(reason.to_string())),
-            DefaultProcessLogType::ProcessStopped { reason } => ("ProcessStopped", None, None, Some(reason.to_string())),
-            DefaultProcessLogType::ProcessContinue { reason } => ("ProcessContinue", None, None, Some(reason.to_string())),
-            DefaultProcessLogType::DelayStart { delay_name } => ("DelayStart", None, None, Some(delay_name.clone())),
-            DefaultProcessLogType::DelayEnd { delay_name } => ("DelayEnd", None, None, Some(delay_name.clone())),
-            DefaultProcessLogType::StateChange { new_state } => ("StateChange", None, None, Some(format!("{:?}", new_state))),
-        };
+        let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) =
+            match details {
+                DefaultProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
+                DefaultProcessLogType::ProcessStart { quantity, vector } => {
+                    ("ProcessStart", Some(quantity), Some(vector.clone()), None)
+                }
+                DefaultProcessLogType::ProcessSuccess { quantity, vector } => {
+                    ("ProcessSuccess", Some(quantity), Some(vector.clone()), None)
+                }
+                DefaultProcessLogType::ProcessFailure { reason } => {
+                    ("ProcessFailure", None, None, Some(reason.to_string()))
+                }
+                DefaultProcessLogType::ProcessStopped { reason } => {
+                    ("ProcessStopped", None, None, Some(reason.to_string()))
+                }
+                DefaultProcessLogType::ProcessContinue { reason } => {
+                    ("ProcessContinue", None, None, Some(reason.to_string()))
+                }
+                DefaultProcessLogType::DelayStart { delay_name } => {
+                    ("DelayStart", None, None, Some(delay_name.clone()))
+                }
+                DefaultProcessLogType::DelayEnd { delay_name } => {
+                    ("DelayEnd", None, None, Some(delay_name.clone()))
+                }
+                DefaultProcessLogType::StateChange { new_state } => {
+                    ("StateChange", None, None, Some(format!("{:?}", new_state)))
+                }
+            };
         state.serialize_field("event_type", &event_type)?;
         state.serialize_field("total", &total)?;
         state.serialize_field("resource", &resource)?;
@@ -286,7 +388,6 @@ impl<D, T: ContinuousResource> Serialize for VectorProcessLog<D, T> where
         state.end()
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub enum DefaultProcessLogType<T: ContinuousResource> {
@@ -310,7 +411,7 @@ pub struct DefaultProcess<
     pub element_name: String,
     pub element_code: String,
     pub element_type: String,
-    
+
     // Ports
     pub req_upstream: Requestor<(), VectorStockState>,
     pub req_downstream: Requestor<(), VectorStockState>,
@@ -327,7 +428,7 @@ pub struct DefaultProcess<
     // Runtime State
     pub process_state: Option<(Duration, ResourceType)>,
     pub env_state: BasicEnvironmentState,
-    
+
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub time_to_next_delay_event: Option<Duration>,
@@ -339,10 +440,8 @@ pub struct DefaultProcess<
 impl<
     ResourceType: ContinuousResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static,
-> Default for DefaultProcess<
-    ResourceType,
-    ProcessLog,
-> {
+> Default for DefaultProcess<ResourceType, ProcessLog>
+{
     fn default() -> Self {
         DefaultProcess::<ResourceType, ProcessLog> {
             element_name: "DefaultProcess".into(),
@@ -372,31 +471,55 @@ impl<
     }
 }
 
-impl<
-    ResourceType: ContinuousResource,
-> Model for DefaultProcess<
-    ResourceType,
-    VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
-> where VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize, Self: ToLogRecord<DefaultProcessLogType<ResourceType>, VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>> {
-    fn init(mut self, ctx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+impl<ResourceType: ContinuousResource> Model
+    for DefaultProcess<
+        ResourceType,
+        VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    >
+where
+    VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize,
+    Self: ToLogRecord<
+            DefaultProcessLogType<ResourceType>,
+            VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        >,
+{
+    fn init(
+        mut self,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
+            let source_event_id = EventId(format!(
+                "{}_{:06}",
+                self.element_code, self.next_event_index
+            ));
             self.update_state(source_event_id, ctx).await;
             self.into()
         }
     }
 }
 
-impl<
-    ResourceType: ContinuousResource> ToLogRecord<DefaultProcessLogType<ResourceType>,
-    VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>
-> for DefaultProcess<
-    ResourceType,
-    VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
-> {
-    fn to_record(&mut self, source_event_id: EventId, event_id: EventId, details: DefaultProcessLogType<ResourceType>) -> VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
+impl<ResourceType: ContinuousResource>
+    ToLogRecord<
+        DefaultProcessLogType<ResourceType>,
+        VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    >
+    for DefaultProcess<
+        ResourceType,
+        VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    >
+{
+    fn to_record(
+        &mut self,
+        source_event_id: EventId,
+        event_id: EventId,
+        details: DefaultProcessLogType<ResourceType>,
+    ) -> VectorProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
         VectorProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
-            time: self.previous_check_time.to_chrono_date_time(0).unwrap().to_string(),
+            time: self
+                .previous_check_time
+                .to_chrono_date_time(0)
+                .unwrap()
+                .to_string(),
             event_id,
             source_event_id,
             element_name: self.element_name.clone(),
@@ -407,23 +530,26 @@ impl<
     }
 }
 
-impl<
-    T: ContinuousResource + 'static
-> Process<
-    T,
-    VectorProcessLog<DefaultProcessLogType<T>, T>,
-    DefaultProcessLogType<T>
-> for DefaultProcess<
-    T,
-    VectorProcessLog<DefaultProcessLogType<T>, T>,
->
-where VectorProcessLog<DefaultProcessLogType<T>, T>: Serialize
+impl<T: ContinuousResource + 'static>
+    Process<T, VectorProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
+    for DefaultProcess<T, VectorProcessLog<DefaultProcessLogType<T>, T>>
+where
+    VectorProcessLog<DefaultProcessLogType<T>, T>: Serialize,
 {
-    fn element_name(&self) -> &str { &self.element_name }
-    fn element_code(&self) -> &str { &self.element_code }
-    fn element_type(&self) -> &str { &self.element_type }
+    fn element_name(&self) -> &str {
+        &self.element_name
+    }
+    fn element_code(&self) -> &str {
+        &self.element_code
+    }
+    fn element_type(&self) -> &str {
+        &self.element_type
+    }
     fn get_next_event_id(&mut self) -> EventId {
-        let event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
+        let event_id = EventId(format!(
+            "{}_{:06}",
+            self.element_code, self.next_event_index
+        ));
         self.next_event_index += 1;
         event_id
     }
@@ -473,12 +599,28 @@ where VectorProcessLog<DefaultProcessLogType<T>, T>: Serialize
         &mut self.time_to_next_delay_event
     }
 
-    fn log_type_withdraw_request(&self) -> DefaultProcessLogType<T> { DefaultProcessLogType::WithdrawRequest }
-    fn log_type_process_start(&self, quantity: f64, vector: T) -> DefaultProcessLogType<T> { DefaultProcessLogType::ProcessStart { quantity, vector } }
-    fn log_type_process_success(&self, quantity: f64, vector: T) -> DefaultProcessLogType<T> { DefaultProcessLogType::ProcessSuccess { quantity, vector } }
-    fn log_type_process_failure(&self, reason: &'static str) -> DefaultProcessLogType<T> { DefaultProcessLogType::ProcessFailure { reason } }
-    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultProcessLogType<T> { DefaultProcessLogType::ProcessStopped { reason } }
-    fn log_type_process_continue(&self, reason: &'static str) -> DefaultProcessLogType<T> { DefaultProcessLogType::ProcessContinue { reason } }
-    fn log_type_delay_start(&self, delay_name: String) -> DefaultProcessLogType<T> { DefaultProcessLogType::DelayStart { delay_name } }
-    fn log_type_delay_end(&self, delay_name: String) -> DefaultProcessLogType<T> { DefaultProcessLogType::DelayEnd { delay_name } }
+    fn log_type_withdraw_request(&self) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::WithdrawRequest
+    }
+    fn log_type_process_start(&self, quantity: f64, vector: T) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessStart { quantity, vector }
+    }
+    fn log_type_process_success(&self, quantity: f64, vector: T) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessSuccess { quantity, vector }
+    }
+    fn log_type_process_failure(&self, reason: &'static str) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessFailure { reason }
+    }
+    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessStopped { reason }
+    }
+    fn log_type_process_continue(&self, reason: &'static str) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessContinue { reason }
+    }
+    fn log_type_delay_start(&self, delay_name: String) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::DelayStart { delay_name }
+    }
+    fn log_type_delay_end(&self, delay_name: String) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::DelayEnd { delay_name }
+    }
 }

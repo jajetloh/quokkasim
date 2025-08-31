@@ -1,9 +1,11 @@
-use std::{fmt::Debug, time::Duration};
 use quokkasim_derive_macros::WithMethods;
-use serde::{ser::SerializeStruct, Deserialize, Serialize};
+use serde::Serialize;
+use std::fmt::Debug;
 
-use crate::{delays::{DelayModeChange, DelayModes}, nexosim::{ActionKey, Address, Context, InitializedModel, Model, MonotonicTime, Output, Requestor}, prelude::{VectorStockState, EventId}};
-
+use crate::{
+    nexosim::{Context, InitializedModel, Model, MonotonicTime, Output},
+    prelude::EventId,
+};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum BasicEnvironmentState {
@@ -11,7 +13,7 @@ pub enum BasicEnvironmentState {
     Stopped,
 }
 
-#[derive(Clone)] 
+#[derive(Clone)]
 pub struct BasicEnvironmentLog {
     pub time: String,
     pub event_id: EventId,
@@ -45,9 +47,13 @@ impl Default for BasicEnvironment {
 }
 
 impl Model for BasicEnvironment {
-    fn init(mut self, cx: &mut Context<Self>) -> impl Future<Output = InitializedModel<Self>> + Send {
+    fn init(
+        mut self,
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            self.log(cx.time(), EventId::from_init(), self.state.clone()).await;
+            self.log(cx.time(), EventId::from_init(), self.state.clone())
+                .await;
             self.into()
         }
     }
@@ -59,7 +65,11 @@ impl BasicEnvironment {
         self
     }
 
-    pub fn set_state(&mut self, payload: (BasicEnvironmentState, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    pub fn set_state(
+        &mut self,
+        payload: (BasicEnvironmentState, EventId),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> {
         async move {
             let (state, mut event_id) = payload;
             if self.state != state {
@@ -70,15 +80,21 @@ impl BasicEnvironment {
         }
     }
 
-    pub fn get_state_async(&mut self) -> impl Future<Output = BasicEnvironmentState> + {
-        async move {
-            self.state.clone()
-        }
+    pub fn get_state_async(&mut self) -> impl Future<Output = BasicEnvironmentState> {
+        async move { self.state.clone() }
     }
 
-    fn log(&mut self, now: MonotonicTime, source_event_id: EventId, event: BasicEnvironmentState) -> impl Future<Output = EventId> + Send {
+    fn log(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        event: BasicEnvironmentState,
+    ) -> impl Future<Output = EventId> + Send {
         async move {
-            let new_event_id = EventId(format!("{}_{:06}", self.element_code, self.next_event_index));
+            let new_event_id = EventId(format!(
+                "{}_{:06}",
+                self.element_code, self.next_event_index
+            ));
             let log = BasicEnvironmentLog {
                 time: now.to_string(),
                 event_id: new_event_id.clone(),
