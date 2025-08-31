@@ -2,6 +2,7 @@
 
 pub mod prelude;
 pub mod common;
+pub mod distributions;
 pub mod core;
 pub mod components;
 pub mod delays;

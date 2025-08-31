@@ -1,7 +1,8 @@
 use std::time::Duration;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use crate::common::Distribution;
+
+use crate::distributions::Distribution;
 
 #[derive(Debug, Clone)]
 pub struct DelayMode {
