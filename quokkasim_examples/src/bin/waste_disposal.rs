@@ -26,9 +26,22 @@ fn create_bench() -> SimInit {
     let dp_mbox = Mailbox::new();
     let dp_addr = dp_mbox.address();
 
+    let mut material_sink: DefaultSink<f64, ContinuousProcessLog<DefaultProcessLogType<f64>, f64>> =
+        DefaultSink::new()
+            .with_name("MaterialSink")
+            .with_code("MS")
+            .with_sink_quantity_distr(
+                df.create(DistributionConfig::Constant(50.0))
+                    .unwrap(),
+            )
+            .with_sink_time_distr(df.create(DistributionConfig::Constant(1.0)).unwrap());
+    let ms_mbox = Mailbox::new();
+    let ms_addr = ms_mbox.address();
+
     let sim_init = SimInit::new()
         .add_model(dump_source, ds_mbox, "DumpSource")
-        .add_model(dump_point, dp_mbox, "DumpPoint");
+        .add_model(dump_point, dp_mbox, "DumpPoint")
+        .add_model(material_sink, ms_mbox, "MaterialSink");
     sim_init
 }
 

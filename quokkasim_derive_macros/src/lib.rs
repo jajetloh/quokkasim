@@ -85,6 +85,12 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                     "source_resource" => {
                         methods.push(generate_with_and_inplace_method("source_resource", field_name, field_type));
                     },
+                    "sink_quantity_distr" => {
+                        methods.push(generate_with_and_inplace_method("sink_quantity_distr", field_name, field_type));
+                    },
+                    "sink_time_distr" => {
+                        methods.push(generate_with_and_inplace_method("sink_time_distr", field_name, field_type));
+                    },
                     "process_quantity_ratio_distr" => {
                         methods.push(generate_with_and_inplace_method("process_quantity_ratio_distr", field_name, field_type));
                     },

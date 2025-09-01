@@ -726,3 +726,231 @@ where
 }
 
 /* #endregion DefaultSource */
+
+// ──────────────────────────── DefaultSink ────────────────────────────
+/* #region DefaultSink */
+
+#[derive(WithMethods)]
+pub struct DefaultSink<
+    ResourceType: Clone + Send + Debug + 'static,
+    ProcessLog: Clone + Send + Debug + 'static,
+> {
+    // Identification
+    pub element_name: String,
+    pub element_code: String,
+    pub element_type: String,
+
+    // Ports
+    pub req_upstream: Requestor<(), ContinuousStockState>,
+    pub req_environment: Requestor<(), BasicEnvironmentState>,
+    pub withdraw_upstream: Requestor<(f64, EventId), ResourceType>,
+    pub log_emitter: Output<ProcessLog>,
+
+    // Configuration
+    pub sink_quantity_distr: Distribution,
+    pub sink_time_distr: Distribution,
+    pub delay_modes: DelayModes,
+
+    // Runtime State
+    pub process_state: Option<(Duration, ResourceType)>,
+    pub env_state: BasicEnvironmentState,
+
+    // Internals
+    pub time_to_next_process_event: Option<Duration>,
+    pub time_to_next_delay_event: Option<Duration>,
+    pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
+    pub next_event_index: u64,
+    pub previous_check_time: MonotonicTime,
+}
+
+impl<
+    ResourceType: ContinuousResource + 'static,
+    ProcessLog: Clone + Send + Debug + Serialize + 'static,
+> Default for DefaultSink<ResourceType, ProcessLog>
+{
+    fn default() -> Self {
+        DefaultSink::<ResourceType, ProcessLog> {
+            element_name: "DefaultSink".into(),
+            element_code: "".into(),
+            element_type: "DefaultSink".into(),
+
+            req_upstream: Requestor::default(),
+            req_environment: Requestor::default(),
+            withdraw_upstream: Requestor::default(),
+            log_emitter: Output::default(),
+
+            process_state: None,
+            env_state: BasicEnvironmentState::Normal,
+
+            sink_quantity_distr: Distribution::default(),
+            sink_time_distr: Distribution::default(),
+            delay_modes: DelayModes::default(),
+
+            time_to_next_process_event: None,
+            time_to_next_delay_event: None,
+            scheduled_event: None,
+            next_event_index: 0,
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+}
+
+impl<ResourceType: ContinuousResource>
+    Model
+    for DefaultSink<
+        ResourceType,
+        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    >
+where
+    ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize,
+    Self: ToLogRecord<
+            DefaultProcessLogType<ResourceType>,
+            ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        >
+{
+    fn init(
+        mut self,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let source_event_id = EventId(format!(
+                "{}_{:06}",
+                self.element_code, self.next_event_index
+            ));
+            self.update_state(source_event_id, ctx).await;
+            self.into()
+        }
+    }
+}
+
+impl<ResourceType: ContinuousResource>
+    ToLogRecord<
+        DefaultProcessLogType<ResourceType>,
+        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    >
+    for DefaultSink<
+        ResourceType,
+        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+    >
+{
+    fn to_record(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        event_id: EventId,
+        details: DefaultProcessLogType<ResourceType>,
+    ) -> ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
+        ContinuousProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
+            time: now
+                .to_chrono_date_time(0)
+                .unwrap()
+                .to_string(),
+            event_id,
+            source_event_id,
+            element_name: self.element_name.clone(),
+            element_type: self.element_type.clone(),
+            details,
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T: ContinuousResource + 'static>
+    ProcessCore<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
+    for DefaultSink<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+where
+    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+{
+    fn element_name(&self) -> &str {
+        &self.element_name
+    }
+    fn element_code(&self) -> &str {
+        &self.element_code
+    }
+    fn element_type(&self) -> &str {
+        &self.element_type
+    }
+    fn get_next_event_id(&mut self) -> EventId {
+        let event_id = EventId(format!(
+            "{}_{:06}",
+            self.element_code, self.next_event_index
+        ));
+        self.next_event_index += 1;
+        event_id
+    }
+    fn log_emitter(&mut self) -> &mut Output<ContinuousProcessLog<DefaultProcessLogType<T>, T>> {
+        &mut self.log_emitter
+    }
+    fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
+        &mut self.scheduled_event
+    }
+    fn previous_check_time(&mut self) -> &mut MonotonicTime {
+        &mut self.previous_check_time
+    }
+    fn delay_modes(&mut self) -> &mut DelayModes {
+        &mut self.delay_modes
+    }
+    fn process_state(&mut self) -> &mut Option<(Duration, T)> {
+        &mut self.process_state
+    }
+    fn env_state(&mut self) -> &mut BasicEnvironmentState {
+        &mut self.env_state
+    }
+    fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState> {
+        &mut self.req_environment
+    }
+    fn time_to_next_process_event(&mut self) -> &mut Option<Duration> {
+        &mut self.time_to_next_process_event
+    }
+    fn time_to_next_delay_event(&mut self) -> &mut Option<Duration> {
+        &mut self.time_to_next_delay_event
+    }
+
+    fn log_type_withdraw_request(&self) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::WithdrawRequest
+    }
+    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessStart { quantity, resource }
+    }
+    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessSuccess { quantity, resource }
+    }
+    fn log_type_process_failure(&self, reason: &'static str) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessFailure { reason }
+    }
+    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessStopped { reason }
+    }
+    fn log_type_process_continue(&self, reason: &'static str) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::ProcessContinue { reason }
+    }
+    fn log_type_delay_start(&self, delay_name: String) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::DelayStart { delay_name }
+    }
+    fn log_type_delay_end(&self, delay_name: String) -> DefaultProcessLogType<T> {
+        DefaultProcessLogType::DelayEnd { delay_name }
+    }
+}
+
+
+impl<T: ContinuousResource + 'static>
+    Sink<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
+    for DefaultSink<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+where
+    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+{
+    fn req_upstream(&mut self) -> &mut Requestor<(), ContinuousStockState> {
+        &mut self.req_upstream
+    }
+    fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), T> {
+        &mut self.withdraw_upstream
+    }
+    fn sink_quantity_distr(&mut self) -> &mut Distribution {
+        &mut self.sink_quantity_distr
+    }
+    fn sink_time_distr(&mut self) -> &mut Distribution {
+        &mut self.sink_time_distr
+    }
+}
+
+/* #endregion DefaultSource */
