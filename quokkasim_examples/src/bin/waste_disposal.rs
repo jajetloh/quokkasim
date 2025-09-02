@@ -1,8 +1,7 @@
 use quokkasim::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{time::{Duration, SystemTime}};
 
-fn create_bench() -> SimInit {
+fn create_bench() {
     let mut df = DistributionFactory::new(55555);
 
     // Component declarations
@@ -46,20 +45,37 @@ fn create_bench() -> SimInit {
     c.connect((&mut dump_source, &ds_addr), (&mut dump_point, &dp_addr)).unwrap();
     c.connect((&mut dump_point, &dp_addr), (&mut material_sink, &ms_addr)).unwrap();
 
+    // Loggers
+
+    let process_logger = EventQueue::<ContinuousProcessLog<DefaultProcessLogType<f64>, f64>>::new();
+    let stock_logger = EventQueue::<ContinuousStockLog<f64>>::new();
+
+    dump_source.log_emitter.connect_sink(&process_logger);
+    dump_point.log_emitter.connect_sink(&stock_logger);
+    material_sink.log_emitter.connect_sink(&process_logger);
+
     // Registry
 
     // Simulation initialisation
-
 
     let sim_init = SimInit::new()
         .add_model(dump_source, ds_mbox, "DumpSource")
         .add_model(dump_point, dp_mbox, "DumpPoint")
         .add_model(material_sink, ms_mbox, "MaterialSink");
-    sim_init
-}
 
-fn run_bench_server(sim_init: SimInit) {
-    
+    let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
+    let duration = Duration::from_secs(24 * 3600);
+    let (mut sim, mut sched) = sim_init.init(start_time).unwrap();
+
+    let time_at_start = SystemTime::now();
+    sim.step_until(start_time + duration).unwrap();
+    let time_at_end = SystemTime::now();
+    println!("Execution time: {:?}", time_at_end.duration_since(time_at_start));
+
+    for log in process_logger.into_reader() {
+        println!("{:?}", log);
+    }
+
 }
 
 fn main() {
