@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     common::ToLogRecord, components::{continuous_traits::{ContinuousResource, Stock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::{
-        ContinuousStockLogType, ContinuousStockState, DefaultProcess, DefaultProcessLogType, DefaultStock, Process, Projectable
+        ContinuousProcessLog, ContinuousStockLogType, ContinuousStockState, DefaultProcess, DefaultProcessLogType, DefaultSink, DefaultSource, DefaultStock, Process, Projectable, Sink, Source
     }
 };
 
@@ -13,6 +13,9 @@ pub trait Connect<A: Model, B: Model> {
 }
 
 pub struct Connection;
+
+// ──────────────────────────── DefaultProcess ────────────────────────────
+/* #region DefaultProcess */
 
 impl<T: ContinuousResource + 'static, R: Clone + Send + Debug + Serialize + 'static, StockLogRecord: Clone + Send + Debug + Serialize + 'static>
     Connect<DefaultProcess<T, R>, DefaultStock<T, ContinuousStockState, StockLogRecord>> for Connection
@@ -84,3 +87,71 @@ where
         Ok(())
     }
 }
+
+/* #endregion DefaultProcess */
+
+// ──────────────────────────── DefaultSink ────────────────────────────
+/* #region DefaultSink */
+
+impl<
+    ResourceType: ContinuousResource + 'static,
+    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+    // ProcessLogRecord: Clone + Send + Debug + Serialize + 'static,
+    // TODO: Make more generic, ContinuousProcessLog<...> -> ProcessLogRecord
+>
+    Connect<
+        DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>,
+        DefaultSink<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>,
+    > for Connection
+where
+    DefaultSink<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>: Model,
+    DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>: ToLogRecord<ContinuousStockLogType<ResourceType>, StockLogRecord>,
+    DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>: Model,
+    StockLogRecord: Serialize,
+    ResourceType: Projectable<f64>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>, &Address<DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>>),
+        b: (&mut DefaultSink<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>, &Address<DefaultSink<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>>)
+    ) -> Result<(), String> {
+        a.0.state_emitter.connect(DefaultSink::update_state, b.1.clone());
+        b.0.req_upstream.connect(DefaultStock::get_state_async, a.1.clone());
+        b.0.withdraw_upstream.connect(DefaultStock::remove, a.1.clone());
+        Ok(())
+    }
+}
+
+/* #endregion DefaultSink */
+
+
+// ──────────────────────────── DefaultSource ────────────────────────────
+/* #region DefaultSource */
+
+impl<
+    ResourceType: ContinuousResource + 'static,
+    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+>
+    Connect<
+        DefaultSource<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>,
+        DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>,
+    > for Connection
+where
+    DefaultSource<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>: Model,
+    DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>: ToLogRecord<ContinuousStockLogType<ResourceType>, StockLogRecord>,
+    DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>: Model,
+    StockLogRecord: Serialize,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultSource<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>, &Address<DefaultSource<ResourceType, ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>>>),
+        b: (&mut DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>, &Address<DefaultStock<ResourceType, ContinuousStockState, StockLogRecord>>),
+    ) -> Result<(), String> {
+        b.0.state_emitter.connect(DefaultSource::update_state, a.1.clone());
+        a.0.req_downstream.connect(DefaultStock::get_state_async, b.1.clone());
+        a.0.push_downstream.connect(DefaultStock::add, b.1.clone());
+        Ok(())
+    }
+}
+
+/* #endregion DefaultSource */

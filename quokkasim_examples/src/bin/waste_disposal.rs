@@ -5,6 +5,8 @@ use std::fmt::Debug;
 fn create_bench() -> SimInit {
     let mut df = DistributionFactory::new(55555);
 
+    // Component declarations
+
     let mut dump_source: DefaultSource<f64, ContinuousProcessLog<DefaultProcessLogType<f64>, f64>> =
         DefaultSource::new()
             .with_name("DumpSource")
@@ -38,11 +40,26 @@ fn create_bench() -> SimInit {
     let ms_mbox = Mailbox::new();
     let ms_addr = ms_mbox.address();
 
+    // Connections
+
+    let mut c = Connection {};
+    c.connect((&mut dump_source, &ds_addr), (&mut dump_point, &dp_addr)).unwrap();
+    c.connect((&mut dump_point, &dp_addr), (&mut material_sink, &ms_addr)).unwrap();
+
+    // Registry
+
+    // Simulation initialisation
+
+
     let sim_init = SimInit::new()
         .add_model(dump_source, ds_mbox, "DumpSource")
         .add_model(dump_point, dp_mbox, "DumpPoint")
         .add_model(material_sink, ms_mbox, "MaterialSink");
     sim_init
+}
+
+fn run_bench_server(sim_init: SimInit) {
+    
 }
 
 fn main() {
