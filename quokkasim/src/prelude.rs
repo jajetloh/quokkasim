@@ -4,6 +4,8 @@ pub use crate::components::{
     environment::*,
     continuous_traits::*,
     connections::*,
+    discrete::*,
+    discrete_traits::*,
 };
 pub use crate::common::*;
 pub use crate::distributions::*;
