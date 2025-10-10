@@ -7,10 +7,10 @@ use crate::{
     delays::DelayModes,
     distributions::Distribution,
     nexosim::{ActionKey, Context, Model, MonotonicTime, Output, Requestor},
-    prelude::ContinuousStockState,
+    prelude::ContStockState,
 };
 
-pub trait ContinuousArithmetic {
+pub trait ContArithmetic {
     fn add(&mut self, arg: Self);
     fn remove<T>(&mut self, arg: T) -> Self
     where
@@ -37,7 +37,7 @@ impl<const N: usize> Projectable<f64> for [f64; N] {
     }
 }
 
-impl ContinuousArithmetic for f64 {
+impl ContArithmetic for f64 {
     fn add(&mut self, arg: Self) {
         *self += arg;
     }
@@ -66,7 +66,7 @@ impl ContinuousArithmetic for f64 {
     }
 }
 
-impl<const N: usize> ContinuousArithmetic for [f64; N] {
+impl<const N: usize> ContArithmetic for [f64; N] {
     fn add(&mut self, arg: Self) {
         for (a, b) in self.iter_mut().zip(arg.iter()) {
             *a += *b;
@@ -103,11 +103,11 @@ impl<const N: usize> ContinuousArithmetic for [f64; N] {
     }
 }
 
-pub trait ContinuousResource: ContinuousArithmetic + Clone + Send + Debug + Default + Serialize {}
-impl<T> ContinuousResource for T where T: ContinuousArithmetic + Clone + Send + Debug + Default + Serialize {}
+pub trait ContResource: ContArithmetic + Clone + Send + Debug + Default + Serialize {}
+impl<T> ContResource for T where T: ContArithmetic + Clone + Send + Debug + Default + Serialize {}
 
 pub trait ProcessCore<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
 >
@@ -157,15 +157,15 @@ where
 }
 
 pub trait Process<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
 > where
     Self: ProcessCore<ResourceType, LogRecordType, LogDetailsType>
 {
-    fn req_upstream(&mut self) -> &mut Requestor<(), ContinuousStockState>;
+    fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType>;
-    fn req_downstream(&mut self) -> &mut Requestor<(), ContinuousStockState>;
+    fn req_downstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn push_downstream(&mut self) -> &mut Output<(ResourceType, EventId)>;
     fn process_quantity_distr(&mut self) -> &mut Distribution;
     fn process_time_distr(&mut self) -> &mut Distribution;
@@ -307,10 +307,10 @@ pub trait Process<
 
                     match (&us_state, &ds_state) {
                         (
-                            Some(ContinuousStockState::Normal { .. })
-                            | Some(ContinuousStockState::Full { .. }),
-                            Some(ContinuousStockState::Empty { .. })
-                            | Some(ContinuousStockState::Normal { .. }),
+                            Some(ContStockState::Normal { .. })
+                            | Some(ContStockState::Full { .. }),
+                            Some(ContStockState::Empty { .. })
+                            | Some(ContStockState::Normal { .. }),
                         ) => {
                             let process_quantity = self.process_quantity_distr().sample();
                             *source_event_id = self
@@ -341,7 +341,7 @@ pub trait Process<
                             *self.time_to_next_process_event() =
                                 Some(Duration::from_secs_f64(process_duration_secs));
                         }
-                        (Some(ContinuousStockState::Empty { .. }), _) => {
+                        (Some(ContStockState::Empty { .. }), _) => {
                             *source_event_id = self
                                 .log(
                                     time,
@@ -371,7 +371,7 @@ pub trait Process<
                                 .await;
                             *self.time_to_next_process_event() = None;
                         }
-                        (_, Some(ContinuousStockState::Full { .. })) => {
+                        (_, Some(ContStockState::Full { .. })) => {
                             *source_event_id = self
                                 .log(
                                     time,
@@ -463,13 +463,13 @@ pub trait Process<
 }
 
 pub trait Source<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static
 > where
     Self: ProcessCore<ResourceType, LogRecordType, LogDetailsType>
 {
-    fn req_downstream(&mut self) -> &mut Requestor<(), ContinuousStockState>;
+    fn req_downstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn push_downstream(&mut self) -> &mut Output<(ResourceType, EventId)>;
     fn source_resource(&mut self) -> &mut ResourceType;
     fn source_quantity_distr(&mut self) -> &mut Distribution;
@@ -610,8 +610,8 @@ pub trait Source<
                     let ds_state = self.req_downstream().send(()).await.next();
 
                     match &ds_state {
-                        Some(ContinuousStockState::Empty { .. })
-                        | Some(ContinuousStockState::Normal { .. }) => {
+                        Some(ContStockState::Empty { .. })
+                        | Some(ContStockState::Normal { .. }) => {
                             let process_quantity = self.source_quantity_distr().sample();
                             let mut created_resource = self.source_resource().clone();
                             created_resource.multiply(process_quantity / self.source_resource().total());
@@ -648,7 +648,7 @@ pub trait Source<
                                 .await;
                             *self.time_to_next_process_event() = None;
                         }
-                        Some(ContinuousStockState::Full { .. }) => {
+                        Some(ContStockState::Full { .. }) => {
                             *source_event_id = self
                                 .log(
                                     time,
@@ -740,13 +740,13 @@ pub trait Source<
 }
 
 pub trait Sink<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
 > where
     Self: ProcessCore<ResourceType, LogRecordType, LogDetailsType>
 {
-    fn req_upstream(&mut self) -> &mut Requestor<(), ContinuousStockState>;
+    fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType>;
     fn sink_quantity_distr(&mut self) -> &mut Distribution;
     fn sink_time_distr(&mut self) -> &mut Distribution;
@@ -883,8 +883,8 @@ pub trait Sink<
                     let us_state = self.req_upstream().send(()).await.next();
 
                     match &us_state {
-                        Some(ContinuousStockState::Empty { .. })
-                        | Some(ContinuousStockState::Normal { .. }) => {
+                        Some(ContStockState::Empty { .. })
+                        | Some(ContStockState::Normal { .. }) => {
                             let process_quantity = self.sink_quantity_distr().sample();
                             let moved = self.withdraw_upstream()
                                 .send((process_quantity, source_event_id.clone()))
@@ -924,7 +924,7 @@ pub trait Sink<
                                 .await;
                             *self.time_to_next_process_event() = None;
                         }
-                        Some(ContinuousStockState::Full { .. }) => {
+                        Some(ContStockState::Full { .. }) => {
                             *source_event_id = self
                                 .log(
                                     time,
@@ -1016,8 +1016,8 @@ pub trait Sink<
 }
 
 
-pub trait Stock<
-    ResourceType: ContinuousResource + 'static,
+pub trait ContStock<
+    ResourceType: ContResource + 'static,
     StateType: StockState + Clone + Send + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,

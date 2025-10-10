@@ -9,32 +9,32 @@ use tai_time::MonotonicTime;
 use crate::{distributions::Distribution, prelude::*};
 
 #[derive(Debug, Clone, Serialize)]
-pub enum ContinuousStockState {
+pub enum ContStockState {
     Normal { occupied: f64, empty: f64 },
     Full { occupied: f64, empty: f64 },
     Empty { occupied: f64, empty: f64 },
 }
 
-impl StockState for ContinuousStockState {
+impl StockState for ContStockState {
     fn is_same_state(&self, other: &Self) -> bool {
         match (self, other) {
-            (ContinuousStockState::Empty { .. }, ContinuousStockState::Empty { .. }) => true,
-            (ContinuousStockState::Normal { .. }, ContinuousStockState::Normal { .. }) => true,
-            (ContinuousStockState::Full { .. }, ContinuousStockState::Full { .. }) => true,
+            (ContStockState::Empty { .. }, ContStockState::Empty { .. }) => true,
+            (ContStockState::Normal { .. }, ContStockState::Normal { .. }) => true,
+            (ContStockState::Full { .. }, ContStockState::Full { .. }) => true,
             _ => false,
         }
     }
 }
 
-impl<T: ContinuousResource> ToLogRecord<ContinuousStockLogType<T>, ContinuousStockLog<T>> for DefaultStock<T, ContinuousStockState, ContinuousStockLog<T>> {
+impl<T: ContResource> ToLogRecord<ContStockLogType<T>, ContStockLog<T>> for DefaultContStock<T, ContStockState, ContStockLog<T>> {
     fn to_record(
         &mut self,
         now: MonotonicTime,
         source_event_id: EventId,
         event_id: EventId,
-        details: ContinuousStockLogType<T>,
-    ) -> ContinuousStockLog<T> {
-        ContinuousStockLog::to_log(
+        details: ContStockLogType<T>,
+    ) -> ContStockLog<T> {
+        ContStockLog::to_log(
             now,
             event_id,
             source_event_id,
@@ -46,9 +46,9 @@ impl<T: ContinuousResource> ToLogRecord<ContinuousStockLogType<T>, ContinuousSto
 }
 
 #[derive(WithMethods)]
-pub struct DefaultStock<T, S: StockState, RecordLogType: Clone + Send + 'static>
+pub struct DefaultContStock<T, S: StockState, RecordLogType: Clone + Send + 'static>
 where
-    T: ContinuousArithmetic + Clone + Serialize + Send + 'static,
+    T: ContArithmetic + Clone + Serialize + Send + 'static,
 {
     // Identification
     pub element_name: String,
@@ -71,12 +71,12 @@ where
     next_event_index: u64,
 }
 
-impl<T: ContinuousResource + 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + 'static> Model for DefaultStock<T, S, RecordLogType> {}
+impl<T: ContResource + 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + 'static> Model for DefaultContStock<T, S, RecordLogType> {}
 
-impl<T: ContinuousResource + Default + 'static, S: StockState, RecordLogType: Clone + Send + 'static> Default for DefaultStock<T, S, RecordLogType> {
+impl<T: ContResource + Default + 'static, S: StockState, RecordLogType: Clone + Send + 'static> Default for DefaultContStock<T, S, RecordLogType> {
     fn default() -> Self {
         let (log_emitter, state_emitter) = (Output::new(), Output::new());
-        DefaultStock {
+        DefaultContStock {
             element_name: String::new(),
             element_code: String::new(),
             element_type: String::new(),
@@ -92,27 +92,27 @@ impl<T: ContinuousResource + Default + 'static, S: StockState, RecordLogType: Cl
 }
 
 impl<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
-> Stock<
+> ContStock<
     ResourceType,
-    ContinuousStockState,
+    ContStockState,
     LogRecordType,
-    ContinuousStockLogType<ResourceType>,
-> for DefaultStock<ResourceType, ContinuousStockState, LogRecordType>
+    ContStockLogType<ResourceType>,
+> for DefaultContStock<ResourceType, ContStockState, LogRecordType>
 where
     LogRecordType: Serialize,
-    Self: ToLogRecord<ContinuousStockLogType<ResourceType>, LogRecordType>,
+    Self: ToLogRecord<ContStockLogType<ResourceType>, LogRecordType>,
 {
-    fn get_state(&mut self) -> ContinuousStockState {
+    fn get_state(&mut self) -> ContStockState {
         let occupied = self.resource.total();
         let empty = self.max_capacity - occupied;
         if empty <= 0.0 {
-            ContinuousStockState::Full { occupied, empty }
+            ContStockState::Full { occupied, empty }
         } else if occupied < self.low_capacity {
-            ContinuousStockState::Empty { occupied, empty }
+            ContStockState::Empty { occupied, empty }
         } else {
-            ContinuousStockState::Normal { occupied, empty }
+            ContStockState::Normal { occupied, empty }
         }
     }
 
@@ -129,41 +129,41 @@ where
         event_id
     }
 
-    fn previous_state(&mut self) -> &mut Option<ContinuousStockState> { &mut self.prev_state }
+    fn previous_state(&mut self) -> &mut Option<ContStockState> { &mut self.prev_state }
     fn resource(&mut self) -> &mut ResourceType { &mut self.resource }
     fn state_emitter(&mut self) -> &mut Output<EventId> { &mut self.state_emitter }
 
-    fn log_type_add(&self, balance: f64, resource: ResourceType) -> ContinuousStockLogType<ResourceType> {
-        ContinuousStockLogType::Add { balance, resource }
+    fn log_type_add(&self, balance: f64, resource: ResourceType) -> ContStockLogType<ResourceType> {
+        ContStockLogType::Add { balance, resource }
     }
-    fn log_type_remove(&self, balance: f64, resource: ResourceType) -> ContinuousStockLogType<ResourceType> {
-        ContinuousStockLogType::Remove { balance, resource }
+    fn log_type_remove(&self, balance: f64, resource: ResourceType) -> ContStockLogType<ResourceType> {
+        ContStockLogType::Remove { balance, resource }
     }
-    fn log_type_state_change(&self, new_state: ContinuousStockState) -> ContinuousStockLogType<ResourceType> {
-        ContinuousStockLogType::StateChange { new_state }
+    fn log_type_state_change(&self, new_state: ContStockState) -> ContStockLogType<ResourceType> {
+        ContStockLogType::StateChange { new_state }
     }
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ContinuousStockLog<T: ContinuousArithmetic> {
+pub struct ContStockLog<T: ContArithmetic> {
     pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
     pub element_name: String,
     pub element_type: String,
-    pub details: ContinuousStockLogType<T>,
+    pub details: ContStockLogType<T>,
 }
 
-impl<T: ContinuousArithmetic + Debug + Serialize> ContinuousStockLog<T> {
+impl<T: ContArithmetic + Debug + Serialize> ContStockLog<T> {
     fn to_log(
         time: MonotonicTime,
         event_id: EventId,
         source_event_id: EventId,
         element_name: String,
         element_type: String,
-        details: ContinuousStockLogType<T>,
+        details: ContStockLogType<T>,
     ) -> Self {
-        ContinuousStockLog {
+        ContStockLog {
             time: time.to_chrono_date_time(0).unwrap().to_string(),
             event_id,
             source_event_id,
@@ -176,14 +176,14 @@ impl<T: ContinuousArithmetic + Debug + Serialize> ContinuousStockLog<T> {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "event_type")]
-pub enum ContinuousStockLogType<T: ContinuousArithmetic> {
+pub enum ContStockLogType<T: ContArithmetic> {
     Add { balance: f64, resource: T },
     Remove { balance: f64, resource: T },
-    StateChange { new_state: ContinuousStockState },
+    StateChange { new_state: ContStockState },
 }
 
 #[derive(Debug, Clone)]
-pub struct ContinuousProcessLog<LogDetailsType, ResourceType: ContinuousResource> {
+pub struct ContProcessLog<LogDetailsType, ResourceType: ContResource> {
     pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
@@ -194,9 +194,9 @@ pub struct ContinuousProcessLog<LogDetailsType, ResourceType: ContinuousResource
     pub phantom: std::marker::PhantomData<ResourceType>,
 }
 
-impl<D, T: ContinuousResource> Serialize for ContinuousProcessLog<D, T>
+impl<D, T: ContResource> Serialize for ContProcessLog<D, T>
 where
-    D: Clone + Into<DefaultProcessLogType<T>>,
+    D: Clone + Into<DefaultContProcessLogType<T>>,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -208,32 +208,32 @@ where
         state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let details: DefaultProcessLogType<T> = self.details.clone().into();
+        let details: DefaultContProcessLogType<T> = self.details.clone().into();
         let (event_type, total, resource, reason): (&str, Option<f64>, Option<T>, Option<String>) =
             match details {
-                DefaultProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
-                DefaultProcessLogType::ProcessStart { quantity, resource } => {
+                DefaultContProcessLogType::WithdrawRequest => ("WithdrawRequest", None, None, None),
+                DefaultContProcessLogType::ProcessStart { quantity, resource } => {
                     ("ProcessStart", Some(quantity), Some(resource.clone()), None)
                 }
-                DefaultProcessLogType::ProcessSuccess { quantity, resource } => {
+                DefaultContProcessLogType::ProcessSuccess { quantity, resource } => {
                     ("ProcessSuccess", Some(quantity), Some(resource.clone()), None)
                 }
-                DefaultProcessLogType::ProcessFailure { reason } => {
+                DefaultContProcessLogType::ProcessFailure { reason } => {
                     ("ProcessFailure", None, None, Some(reason.to_string()))
                 }
-                DefaultProcessLogType::ProcessStopped { reason } => {
+                DefaultContProcessLogType::ProcessStopped { reason } => {
                     ("ProcessStopped", None, None, Some(reason.to_string()))
                 }
-                DefaultProcessLogType::ProcessContinue { reason } => {
+                DefaultContProcessLogType::ProcessContinue { reason } => {
                     ("ProcessContinue", None, None, Some(reason.to_string()))
                 }
-                DefaultProcessLogType::DelayStart { delay_name } => {
+                DefaultContProcessLogType::DelayStart { delay_name } => {
                     ("DelayStart", None, None, Some(delay_name.clone()))
                 }
-                DefaultProcessLogType::DelayEnd { delay_name } => {
+                DefaultContProcessLogType::DelayEnd { delay_name } => {
                     ("DelayEnd", None, None, Some(delay_name.clone()))
                 }
-                DefaultProcessLogType::StateChange { new_state } => {
+                DefaultContProcessLogType::StateChange { new_state } => {
                     ("StateChange", None, None, Some(format!("{:?}", new_state)))
                 }
             };
@@ -246,7 +246,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum DefaultProcessLogType<T: ContinuousResource> {
+pub enum DefaultContProcessLogType<T: ContResource> {
     WithdrawRequest,
     ProcessStart { quantity: f64, resource: T },
     ProcessSuccess { quantity: f64, resource: T },
@@ -255,14 +255,14 @@ pub enum DefaultProcessLogType<T: ContinuousResource> {
     ProcessContinue { reason: &'static str },
     DelayStart { delay_name: String },
     DelayEnd { delay_name: String },
-    StateChange { new_state: ContinuousStockState },
+    StateChange { new_state: ContStockState },
 }
 
-// ──────────────────────────── DefaultProcess ────────────────────────────
-/* #region DefaultProcess */
+// ──────────────────────────── DefaultContProcess ────────────────────────────
+/* #region DefaultContProcess */
 
 #[derive(WithMethods)]
-pub struct DefaultProcess<
+pub struct DefaultContProcess<
     ResourceType: Clone + Send + Debug + 'static,
     ProcessLog: Clone + Send + Debug + 'static,
 > {
@@ -272,8 +272,8 @@ pub struct DefaultProcess<
     pub element_type: String,
 
     // Ports
-    pub req_upstream: Requestor<(), ContinuousStockState>,
-    pub req_downstream: Requestor<(), ContinuousStockState>,
+    pub req_upstream: Requestor<(), ContStockState>,
+    pub req_downstream: Requestor<(), ContStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(f64, EventId), ResourceType>,
     pub push_downstream: Output<(ResourceType, EventId)>,
@@ -297,15 +297,15 @@ pub struct DefaultProcess<
 }
 
 impl<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static,
-> Default for DefaultProcess<ResourceType, ProcessLog>
+> Default for DefaultContProcess<ResourceType, ProcessLog>
 {
     fn default() -> Self {
-        DefaultProcess::<ResourceType, ProcessLog> {
-            element_name: "DefaultProcess".into(),
+        DefaultContProcess::<ResourceType, ProcessLog> {
+            element_name: "DefaultContProcess".into(),
             element_code: "".into(),
-            element_type: "DefaultProcess".into(),
+            element_type: "DefaultContProcess".into(),
 
             req_upstream: Requestor::default(),
             req_downstream: Requestor::default(),
@@ -330,16 +330,16 @@ impl<
     }
 }
 
-impl<ResourceType: ContinuousResource> Model
-    for DefaultProcess<
+impl<ResourceType: ContResource> Model
+    for DefaultContProcess<
         ResourceType,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
 where
-    ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>: Serialize,
     Self: ToLogRecord<
-            DefaultProcessLogType<ResourceType>,
-            ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+            DefaultContProcessLogType<ResourceType>,
+            ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
         >,
 {
     fn init(
@@ -357,14 +357,14 @@ where
     }
 }
 
-impl<ResourceType: ContinuousResource>
+impl<ResourceType: ContResource>
     ToLogRecord<
-        DefaultProcessLogType<ResourceType>,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        DefaultContProcessLogType<ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
-    for DefaultProcess<
+    for DefaultContProcess<
         ResourceType,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
 {
     fn to_record(
@@ -372,9 +372,9 @@ impl<ResourceType: ContinuousResource>
         now: MonotonicTime,
         source_event_id: EventId,
         event_id: EventId,
-        details: DefaultProcessLogType<ResourceType>,
-    ) -> ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
-        ContinuousProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
+        details: DefaultContProcessLogType<ResourceType>,
+    ) -> ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType> {
+        ContProcessLog::<DefaultContProcessLogType<ResourceType>, ResourceType> {
             time: now
                 .to_chrono_date_time(0)
                 .unwrap()
@@ -389,11 +389,11 @@ impl<ResourceType: ContinuousResource>
     }
 }
 
-impl<T: ContinuousResource + 'static>
-    ProcessCore<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
-    for DefaultProcess<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+impl<T: ContResource + 'static>
+    ProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    for DefaultContProcess<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
-    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
 {
     fn element_name(&self) -> &str {
         &self.element_name
@@ -412,7 +412,7 @@ where
         self.next_event_index += 1;
         event_id
     }
-    fn log_emitter(&mut self) -> &mut Output<ContinuousProcessLog<DefaultProcessLogType<T>, T>> {
+    fn log_emitter(&mut self) -> &mut Output<ContProcessLog<DefaultContProcessLogType<T>, T>> {
         &mut self.log_emitter
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
@@ -440,45 +440,45 @@ where
         &mut self.time_to_next_delay_event
     }
 
-    fn log_type_withdraw_request(&self) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::WithdrawRequest
+    fn log_type_withdraw_request(&self) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::WithdrawRequest
     }
-    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessStart { quantity, resource }
+    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessStart { quantity, resource }
     }
-    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessSuccess { quantity, resource }
+    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessSuccess { quantity, resource }
     }
-    fn log_type_process_failure(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessFailure { reason }
+    fn log_type_process_failure(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessFailure { reason }
     }
-    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessStopped { reason }
+    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessStopped { reason }
     }
-    fn log_type_process_continue(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessContinue { reason }
+    fn log_type_process_continue(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessContinue { reason }
     }
-    fn log_type_delay_start(&self, delay_name: String) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::DelayStart { delay_name }
+    fn log_type_delay_start(&self, delay_name: String) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::DelayStart { delay_name }
     }
-    fn log_type_delay_end(&self, delay_name: String) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::DelayEnd { delay_name }
+    fn log_type_delay_end(&self, delay_name: String) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::DelayEnd { delay_name }
     }
 }
 
-impl<T: ContinuousResource + 'static>
-    Process<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
-    for DefaultProcess<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+impl<T: ContResource + 'static>
+    Process<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    for DefaultContProcess<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
-    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
 {
-    fn req_upstream(&mut self) -> &mut Requestor<(), ContinuousStockState> {
+    fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState> {
         &mut self.req_upstream
     }
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), T> {
         &mut self.withdraw_upstream
     }
-    fn req_downstream(&mut self) -> &mut Requestor<(), ContinuousStockState> {
+    fn req_downstream(&mut self) -> &mut Requestor<(), ContStockState> {
         &mut self.req_downstream
     }
     fn push_downstream(&mut self) -> &mut Output<(T, EventId)> {
@@ -492,13 +492,13 @@ where
     }
 }
 
-/* #endregion DefaultProcess */
+/* #endregion DefaultContProcess */
 
-// ──────────────────────────── DefaultSource ────────────────────────────
-/* #region DefaultSource */
+// ──────────────────────────── DefaultContSource ────────────────────────────
+/* #region DefaultContSource */
 
 #[derive(WithMethods)]
-pub struct DefaultSource<
+pub struct DefaultContSource<
     ResourceType: Clone + Send + Debug + 'static,
     ProcessLog: Clone + Send + Debug + 'static,
 > {
@@ -508,7 +508,7 @@ pub struct DefaultSource<
     pub element_type: String,
 
     // Ports
-    pub req_downstream: Requestor<(), ContinuousStockState>,
+    pub req_downstream: Requestor<(), ContStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub push_downstream: Output<(ResourceType, EventId)>,
     pub log_emitter: Output<ProcessLog>,
@@ -532,15 +532,15 @@ pub struct DefaultSource<
 }
 
 impl<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static,
-> Default for DefaultSource<ResourceType, ProcessLog>
+> Default for DefaultContSource<ResourceType, ProcessLog>
 {
     fn default() -> Self {
-        DefaultSource::<ResourceType, ProcessLog> {
-            element_name: "DefaultSource".into(),
+        DefaultContSource::<ResourceType, ProcessLog> {
+            element_name: "DefaultContSource".into(),
             element_code: "".into(),
-            element_type: "DefaultSource".into(),
+            element_type: "DefaultContSource".into(),
 
             req_downstream: Requestor::default(),
             req_environment: Requestor::default(),
@@ -564,17 +564,17 @@ impl<
     }
 }
 
-impl<ResourceType: ContinuousResource>
+impl<ResourceType: ContResource>
     Model
-    for DefaultSource<
+    for DefaultContSource<
         ResourceType,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
 where
-    ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>: Serialize,
     Self: ToLogRecord<
-            DefaultProcessLogType<ResourceType>,
-            ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+            DefaultContProcessLogType<ResourceType>,
+            ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
         >,
 {
     fn init(
@@ -592,14 +592,14 @@ where
     }
 }
 
-impl<ResourceType: ContinuousResource>
+impl<ResourceType: ContResource>
     ToLogRecord<
-        DefaultProcessLogType<ResourceType>,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        DefaultContProcessLogType<ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
-    for DefaultSource<
+    for DefaultContSource<
         ResourceType,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
 {
     fn to_record(
@@ -607,9 +607,9 @@ impl<ResourceType: ContinuousResource>
         now: MonotonicTime,
         source_event_id: EventId,
         event_id: EventId,
-        details: DefaultProcessLogType<ResourceType>,
-    ) -> ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
-        ContinuousProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
+        details: DefaultContProcessLogType<ResourceType>,
+    ) -> ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType> {
+        ContProcessLog::<DefaultContProcessLogType<ResourceType>, ResourceType> {
             time: now
                 .to_chrono_date_time(0)
                 .unwrap()
@@ -624,11 +624,11 @@ impl<ResourceType: ContinuousResource>
     }
 }
 
-impl<T: ContinuousResource + 'static>
-    ProcessCore<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
-    for DefaultSource<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+impl<T: ContResource + 'static>
+    ProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    for DefaultContSource<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
-    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
 {
     fn element_name(&self) -> &str {
         &self.element_name
@@ -647,7 +647,7 @@ where
         self.next_event_index += 1;
         event_id
     }
-    fn log_emitter(&mut self) -> &mut Output<ContinuousProcessLog<DefaultProcessLogType<T>, T>> {
+    fn log_emitter(&mut self) -> &mut Output<ContProcessLog<DefaultContProcessLogType<T>, T>> {
         &mut self.log_emitter
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
@@ -675,40 +675,40 @@ where
         &mut self.time_to_next_delay_event
     }
 
-    fn log_type_withdraw_request(&self) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::WithdrawRequest
+    fn log_type_withdraw_request(&self) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::WithdrawRequest
     }
-    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessStart { quantity, resource }
+    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessStart { quantity, resource }
     }
-    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessSuccess { quantity, resource }
+    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessSuccess { quantity, resource }
     }
-    fn log_type_process_failure(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessFailure { reason }
+    fn log_type_process_failure(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessFailure { reason }
     }
-    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessStopped { reason }
+    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessStopped { reason }
     }
-    fn log_type_process_continue(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessContinue { reason }
+    fn log_type_process_continue(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessContinue { reason }
     }
-    fn log_type_delay_start(&self, delay_name: String) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::DelayStart { delay_name }
+    fn log_type_delay_start(&self, delay_name: String) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::DelayStart { delay_name }
     }
-    fn log_type_delay_end(&self, delay_name: String) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::DelayEnd { delay_name }
+    fn log_type_delay_end(&self, delay_name: String) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::DelayEnd { delay_name }
     }
 }
 
 
-impl<T: ContinuousResource + 'static>
-    Source<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
-    for DefaultSource<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+impl<T: ContResource + 'static>
+    Source<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    for DefaultContSource<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
-    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
 {
-    fn req_downstream(&mut self) -> &mut Requestor<(), ContinuousStockState> {
+    fn req_downstream(&mut self) -> &mut Requestor<(), ContStockState> {
         &mut self.req_downstream
     }
     fn push_downstream(&mut self) -> &mut Output<(T, EventId)> {
@@ -725,13 +725,13 @@ where
     }
 }
 
-/* #endregion DefaultSource */
+/* #endregion DefaultContSource */
 
-// ──────────────────────────── DefaultSink ────────────────────────────
-/* #region DefaultSink */
+// ──────────────────────────── DefaultContSink ────────────────────────────
+/* #region DefaultContSink */
 
 #[derive(WithMethods)]
-pub struct DefaultSink<
+pub struct DefaultContSink<
     ResourceType: Clone + Send + Debug + 'static,
     ProcessLog: Clone + Send + Debug + 'static,
 > {
@@ -741,7 +741,7 @@ pub struct DefaultSink<
     pub element_type: String,
 
     // Ports
-    pub req_upstream: Requestor<(), ContinuousStockState>,
+    pub req_upstream: Requestor<(), ContStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(f64, EventId), ResourceType>,
     pub log_emitter: Output<ProcessLog>,
@@ -764,15 +764,15 @@ pub struct DefaultSink<
 }
 
 impl<
-    ResourceType: ContinuousResource + 'static,
+    ResourceType: ContResource + 'static,
     ProcessLog: Clone + Send + Debug + Serialize + 'static,
-> Default for DefaultSink<ResourceType, ProcessLog>
+> Default for DefaultContSink<ResourceType, ProcessLog>
 {
     fn default() -> Self {
-        DefaultSink::<ResourceType, ProcessLog> {
-            element_name: "DefaultSink".into(),
+        DefaultContSink::<ResourceType, ProcessLog> {
+            element_name: "DefaultContSink".into(),
             element_code: "".into(),
-            element_type: "DefaultSink".into(),
+            element_type: "DefaultContSink".into(),
 
             req_upstream: Requestor::default(),
             req_environment: Requestor::default(),
@@ -795,17 +795,17 @@ impl<
     }
 }
 
-impl<ResourceType: ContinuousResource>
+impl<ResourceType: ContResource>
     Model
-    for DefaultSink<
+    for DefaultContSink<
         ResourceType,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
 where
-    ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>: Serialize,
     Self: ToLogRecord<
-            DefaultProcessLogType<ResourceType>,
-            ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+            DefaultContProcessLogType<ResourceType>,
+            ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
         >
 {
     fn init(
@@ -823,14 +823,14 @@ where
     }
 }
 
-impl<ResourceType: ContinuousResource>
+impl<ResourceType: ContResource>
     ToLogRecord<
-        DefaultProcessLogType<ResourceType>,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        DefaultContProcessLogType<ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
-    for DefaultSink<
+    for DefaultContSink<
         ResourceType,
-        ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType>,
+        ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>,
     >
 {
     fn to_record(
@@ -838,9 +838,9 @@ impl<ResourceType: ContinuousResource>
         now: MonotonicTime,
         source_event_id: EventId,
         event_id: EventId,
-        details: DefaultProcessLogType<ResourceType>,
-    ) -> ContinuousProcessLog<DefaultProcessLogType<ResourceType>, ResourceType> {
-        ContinuousProcessLog::<DefaultProcessLogType<ResourceType>, ResourceType> {
+        details: DefaultContProcessLogType<ResourceType>,
+    ) -> ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType> {
+        ContProcessLog::<DefaultContProcessLogType<ResourceType>, ResourceType> {
             time: now
                 .to_chrono_date_time(0)
                 .unwrap()
@@ -855,11 +855,11 @@ impl<ResourceType: ContinuousResource>
     }
 }
 
-impl<T: ContinuousResource + 'static>
-    ProcessCore<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
-    for DefaultSink<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+impl<T: ContResource + 'static>
+    ProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    for DefaultContSink<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
-    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
 {
     fn element_name(&self) -> &str {
         &self.element_name
@@ -878,7 +878,7 @@ where
         self.next_event_index += 1;
         event_id
     }
-    fn log_emitter(&mut self) -> &mut Output<ContinuousProcessLog<DefaultProcessLogType<T>, T>> {
+    fn log_emitter(&mut self) -> &mut Output<ContProcessLog<DefaultContProcessLogType<T>, T>> {
         &mut self.log_emitter
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
@@ -906,40 +906,40 @@ where
         &mut self.time_to_next_delay_event
     }
 
-    fn log_type_withdraw_request(&self) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::WithdrawRequest
+    fn log_type_withdraw_request(&self) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::WithdrawRequest
     }
-    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessStart { quantity, resource }
+    fn log_type_process_start(&self, quantity: f64, resource: T) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessStart { quantity, resource }
     }
-    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessSuccess { quantity, resource }
+    fn log_type_process_success(&self, quantity: f64, resource: T) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessSuccess { quantity, resource }
     }
-    fn log_type_process_failure(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessFailure { reason }
+    fn log_type_process_failure(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessFailure { reason }
     }
-    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessStopped { reason }
+    fn log_type_process_stopped(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessStopped { reason }
     }
-    fn log_type_process_continue(&self, reason: &'static str) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::ProcessContinue { reason }
+    fn log_type_process_continue(&self, reason: &'static str) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::ProcessContinue { reason }
     }
-    fn log_type_delay_start(&self, delay_name: String) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::DelayStart { delay_name }
+    fn log_type_delay_start(&self, delay_name: String) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::DelayStart { delay_name }
     }
-    fn log_type_delay_end(&self, delay_name: String) -> DefaultProcessLogType<T> {
-        DefaultProcessLogType::DelayEnd { delay_name }
+    fn log_type_delay_end(&self, delay_name: String) -> DefaultContProcessLogType<T> {
+        DefaultContProcessLogType::DelayEnd { delay_name }
     }
 }
 
 
-impl<T: ContinuousResource + 'static>
-    Sink<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>, DefaultProcessLogType<T>>
-    for DefaultSink<T, ContinuousProcessLog<DefaultProcessLogType<T>, T>>
+impl<T: ContResource + 'static>
+    Sink<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    for DefaultContSink<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
-    ContinuousProcessLog<DefaultProcessLogType<T>, T>: Serialize,
+    ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
 {
-    fn req_upstream(&mut self) -> &mut Requestor<(), ContinuousStockState> {
+    fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState> {
         &mut self.req_upstream
     }
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), T> {
@@ -953,4 +953,4 @@ where
     }
 }
 
-/* #endregion DefaultSource */
+/* #endregion DefaultContSource */

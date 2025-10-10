@@ -89,3 +89,4 @@ impl<T, RecordLogType: Clone + Send + 'static> BasicDiscreteStock<T, DiscreteSto
         DiscreteStockLogType::StateChange { new_state }
     }
 }
+

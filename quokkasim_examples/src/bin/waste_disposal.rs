@@ -6,8 +6,8 @@ fn create_bench() {
 
     // Component declarations
 
-    let mut dump_source: DefaultSource<f64, ContinuousProcessLog<DefaultProcessLogType<f64>, f64>> =
-        DefaultSource::new()
+    let mut dump_source: DefaultContSource<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> =
+        DefaultContSource::new()
             .with_name("DumpSource")
             .with_code("DS")
             .with_source_resource(1.0)
@@ -18,7 +18,7 @@ fn create_bench() {
     let ds_mbox = Mailbox::new();
     let ds_addr = ds_mbox.address();
 
-    let mut dump_point: DefaultStock<f64, ContinuousStockState, ContinuousStockLog<f64>> = DefaultStock::new()
+    let mut dump_point: DefaultContStock<f64, ContStockState, ContStockLog<f64>> = DefaultContStock::new()
         .with_name("DumpPoint")
         .with_code("DP")
         .with_low_capacity(1.)
@@ -27,8 +27,8 @@ fn create_bench() {
     let dp_mbox = Mailbox::new();
     let dp_addr = dp_mbox.address();
 
-    let mut material_sink: DefaultSink<f64, ContinuousProcessLog<DefaultProcessLogType<f64>, f64>> =
-        DefaultSink::new()
+    let mut material_sink: DefaultContSink<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> =
+        DefaultContSink::new()
             .with_name("MaterialSink")
             .with_code("MS")
             .with_sink_quantity_distr(
@@ -47,8 +47,8 @@ fn create_bench() {
 
     // Loggers
 
-    let process_logger = EventQueue::<ContinuousProcessLog<DefaultProcessLogType<f64>, f64>>::new();
-    let stock_logger = EventQueue::<ContinuousStockLog<f64>>::new();
+    let process_logger = EventQueue::<ContProcessLog<DefaultContProcessLogType<f64>, f64>>::new();
+    let stock_logger = EventQueue::<ContStockLog<f64>>::new();
 
     dump_source.log_emitter.connect_sink(&process_logger);
     dump_point.log_emitter.connect_sink(&stock_logger);
