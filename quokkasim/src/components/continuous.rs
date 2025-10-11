@@ -467,7 +467,7 @@ where
 }
 
 impl<T: ContResource + 'static>
-    Process<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    ContProcess<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
     for DefaultContProcess<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
     ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,

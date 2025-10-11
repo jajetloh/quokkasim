@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     common::ToLogRecord, components::{continuous_traits::{ContResource, ContStock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::{
-        ContProcessLog, ContStockLogType, ContStockState, DefaultContProcess, DefaultContProcessLogType, DefaultContSink, DefaultContSource, DefaultContStock, Process, Projectable, Sink, Source
+        ContProcessLog, ContStockLogType, ContStockState, DefaultContProcess, DefaultContProcessLogType, DefaultContSink, DefaultContSource, DefaultContStock, ContProcess, Projectable, Sink, Source
     }
 };
 
@@ -23,7 +23,7 @@ where
     DefaultContStock<T, ContStockState, StockLogRecord>: Model,
     StockLogRecord: Serialize,
     DefaultContStock<T, ContStockState, StockLogRecord>: ToLogRecord<ContStockLogType<T>, StockLogRecord>,
-    DefaultContProcess<T, R>: Process<T, R, DefaultContProcessLogType<T>>,
+    DefaultContProcess<T, R>: ContProcess<T, R, DefaultContProcessLogType<T>>,
 {
     fn connect(
         &mut self,
@@ -50,7 +50,7 @@ where
     DefaultContStock<T, ContStockState, StockLogRecord>: Model,
     StockLogRecord: Serialize,
     DefaultContStock<T, ContStockState, StockLogRecord>: ToLogRecord<ContStockLogType<T>, StockLogRecord>,
-    DefaultContProcess<T, R>: Process<T, R, DefaultContProcessLogType<T>>,
+    DefaultContProcess<T, R>: ContProcess<T, R, DefaultContProcessLogType<T>>,
 {
     fn connect(
         &mut self,
@@ -72,7 +72,7 @@ where
 impl<T: ContResource + 'static, R: Clone + Send + Debug + Serialize + 'static>
     Connect<BasicEnvironment, DefaultContProcess<T, R>> for Connection
 where
-    DefaultContProcess<T, R>: Process<T, R, DefaultContProcessLogType<T>>,
+    DefaultContProcess<T, R>: ContProcess<T, R, DefaultContProcessLogType<T>>,
     BasicEnvironment: Model,
 {
     fn connect(

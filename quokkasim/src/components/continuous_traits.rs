@@ -156,7 +156,7 @@ where
     fn log_type_delay_end(&self, delay_name: String) -> LogDetailsType;
 }
 
-pub trait Process<
+pub trait ContProcess<
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
