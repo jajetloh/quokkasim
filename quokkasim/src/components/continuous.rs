@@ -390,7 +390,7 @@ impl<ResourceType: ContResource>
 }
 
 impl<T: ContResource + 'static>
-    ProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    ContProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
     for DefaultContProcess<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
     ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
@@ -625,7 +625,7 @@ impl<ResourceType: ContResource>
 }
 
 impl<T: ContResource + 'static>
-    ProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    ContProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
     for DefaultContSource<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
     ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,
@@ -856,7 +856,7 @@ impl<ResourceType: ContResource>
 }
 
 impl<T: ContResource + 'static>
-    ProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
+    ContProcessCore<T, ContProcessLog<DefaultContProcessLogType<T>, T>, DefaultContProcessLogType<T>>
     for DefaultContSink<T, ContProcessLog<DefaultContProcessLogType<T>, T>>
 where
     ContProcessLog<DefaultContProcessLogType<T>, T>: Serialize,

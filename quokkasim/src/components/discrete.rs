@@ -5,12 +5,14 @@ use nexosim::ports::Output;
 use serde::Serialize;
 use crate::prelude::*;
 
+#[derive(Serialize, Clone, Debug)]
 enum DiscreteStockLogType<T> {
     Add { balance: u32, added: Vec<T> },
     Remove { balance: u32, removed: Vec<T> },
     StateChange { new_state: DiscreteStockState },
 }
 
+#[derive(Serialize, Clone, Debug)]
 enum DiscreteStockState {
     Full { occupied: u32, empty: u32 },
     Normal { occupied: u32, empty: u32 },
@@ -28,7 +30,8 @@ impl StockState for DiscreteStockState {
     }
 }
 
-pub struct BasicDiscreteStock<T, S: StockState, RecordLogType: Clone + Send + 'static> {
+#[derive(WithMethods)]
+pub struct DefaultDiscStock<T, S: StockState, RecordLogType: Clone + Send + 'static> {
 
     // Identification
     pub element_name: String,
@@ -51,7 +54,88 @@ pub struct BasicDiscreteStock<T, S: StockState, RecordLogType: Clone + Send + 's
     next_event_index: u64,
 }
 
-impl<T, RecordLogType: Clone + Send + 'static> BasicDiscreteStock<T, DiscreteStockState, RecordLogType> {
+// impl<
+//     ItemType: Clone + Send + 'static,
+//     LogRecordType: Clone + Send + 'static,
+// > DiscStock<
+//     ItemType,
+//     DiscreteStockState,
+//     LogRecordType,
+//     DiscreteStockLogType<ItemType>,
+// > for DefaultDiscStock<ItemType, DiscreteStockState, LogRecordType> 
+// where 
+
+impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscStock<
+    ItemType,
+    DiscreteStockState,
+    DiscreteStockLogType<ItemType>,
+>
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    DiscreteStockLogType<ItemType>: Serialize + Clone,
+    Self: ToLogRecord<DiscreteStockLogType<ItemType>, DiscreteStockLogType<ItemType>>,
+{
+    fn init(
+        mut self,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            let source_event_id = self.get_next_event_id();
+            self.update_state(source_event_id, ctx).await;
+            self.into()
+        }
+    }
+}
+
+impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + 'static> Default for DefaultDiscStock<
+    T,
+    S, 
+    RecordLogType,
+> {
+    fn default() -> Self {
+        DefaultDiscStock {
+            element_name: "BasicDiscreteStock".into(),
+            element_code: "".into(),
+            element_type: "BasicDiscreteStock".into(),
+
+            log_emitter: Output::default(),
+            state_emitter: Output::default(),
+
+            low_capacity: 0,
+            max_capacity: u32::MAX,
+
+            resources: VecDequeStock::new(VecDequeAccess::FIFO),
+
+            prev_state: None,
+            next_event_index: 0,
+        }
+    }
+}
+
+// impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscProcess<
+//     ItemType, 
+//     DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>
+// >
+// where
+//     DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>: Serialize,
+//     Self: ToLogRecord<
+//         DefaultDiscProcessLogType<ItemType>,
+//         DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>
+//     > {
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    LogRecordType: Clone + Send + 'static,
+> DiscStock<
+    ItemType,
+    DiscreteStockState,
+    LogRecordType,
+    DiscreteStockLogType<ItemType>,
+> for DefaultDiscStock<ItemType, DiscreteStockState, LogRecordType> 
+where 
+    DiscreteStockLogType<ItemType>: Serialize,
+    Self: ToLogRecord<DiscreteStockLogType<ItemType>, DiscreteStockLogType<ItemType>>,
+{
     fn get_state(&mut self) -> DiscreteStockState {
         let occupied = self.resources.total();
         let empty = self.max_capacity.saturating_sub(occupied);
@@ -64,7 +148,11 @@ impl<T, RecordLogType: Clone + Send + 'static> BasicDiscreteStock<T, DiscreteSto
         }
     }
 
-    fn log_emitter(&mut self) -> &mut Output<RecordLogType> {
+    fn resources(&mut self) -> &mut VecDequeStock<ItemType> {
+        &mut self.resources
+    }
+
+    fn log_emitter(&mut self) -> &mut Output<LogRecordType> {
         &mut self.log_emitter
     }
 

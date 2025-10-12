@@ -106,10 +106,10 @@ impl<const N: usize> ContArithmetic for [f64; N] {
 pub trait ContResource: ContArithmetic + Clone + Send + Debug + Default + Serialize {}
 impl<T> ContResource for T where T: ContArithmetic + Clone + Send + Debug + Default + Serialize {}
 
-pub trait ProcessCore<
+pub trait ContProcessCore<
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
-    LogDetailsType: Clone + Send + 'static,
+    LogDetailsType: Send + 'static,
 >
 where
     Self: Model,
@@ -159,9 +159,9 @@ where
 pub trait ContProcess<
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
-    LogDetailsType: Clone + Send + 'static,
+    LogDetailsType: Send + 'static,
 > where
-    Self: ProcessCore<ResourceType, LogRecordType, LogDetailsType>
+    Self: ContProcessCore<ResourceType, LogRecordType, LogDetailsType>
 {
     fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType>;
@@ -467,7 +467,7 @@ pub trait Source<
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static
 > where
-    Self: ProcessCore<ResourceType, LogRecordType, LogDetailsType>
+    Self: ContProcessCore<ResourceType, LogRecordType, LogDetailsType>
 {
     fn req_downstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn push_downstream(&mut self) -> &mut Output<(ResourceType, EventId)>;
@@ -744,7 +744,7 @@ pub trait Sink<
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
 > where
-    Self: ProcessCore<ResourceType, LogRecordType, LogDetailsType>
+    Self: ContProcessCore<ResourceType, LogRecordType, LogDetailsType>
 {
     fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState>;
     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType>;
@@ -1020,7 +1020,7 @@ pub trait ContStock<
     ResourceType: ContResource + 'static,
     StateType: StockState + Clone + Send + 'static,
     LogRecordType: Clone + Send + 'static,
-    LogDetailsType: Clone + Send + 'static,
+    LogDetailsType: Send + 'static,
 > where
     Self: Model,
     Self: ToLogRecord<LogDetailsType, LogRecordType>,

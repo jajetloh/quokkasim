@@ -38,6 +38,15 @@ impl<T> DerefMut for VecDequeStock<T> {
     }
 }
 
+impl<T> VecDequeStock<T> {
+    pub fn new(access: VecDequeAccess) -> Self {
+        Self {
+            inner: VecDeque::new(),
+            access,
+        }
+    }
+}
+
 pub enum VecDequeAccess {
     FIFO,
     LIFO,
@@ -104,7 +113,7 @@ pub trait DiscreteArithmetic<T> {
 }
 
 /// A discrete “resource” is anything you can do those ops on + send/clone/debug/serialize…
-pub trait DiscreteResource<T>: 
+pub trait DiscResource<T>: 
     DiscreteArithmetic<T> +
     Clone +
     Send +
@@ -112,12 +121,13 @@ pub trait DiscreteResource<T>:
     Default +
     Serialize
 {}
-impl<T> DiscreteResource<T> for T 
+impl<T> DiscResource<T> for T 
 where T: DiscreteArithmetic<T> + Clone + Send + Debug + Default + Serialize
 {}
 
 pub trait DiscStock<
-    ResourceType: DiscreteResource<u32> + 'static,
+    // ResourceType: DiscResource<u32> + 'static,
+    ResourceType: Clone + Send + 'static,
     StateType: StockState + Clone + Send + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Clone + Send + 'static,
