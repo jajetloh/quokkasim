@@ -6,7 +6,7 @@ use serde::Serialize;
 use crate::prelude::*;
 
 #[derive(Serialize, Clone, Debug)]
-enum DiscStockLogType<T> {
+pub enum DiscStockLogType<T> {
     Add { balance: u32, added: Vec<T> },
     Remove { balance: u32, removed: Vec<T> },
     StateChange { new_state: DiscStockState },
@@ -101,9 +101,9 @@ impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + '
 > {
     fn default() -> Self {
         DefaultDiscStock {
-            element_name: "BasicDiscreteStock".into(),
+            element_name: "DefaultDiscStock".into(),
             element_code: "".into(),
-            element_type: "BasicDiscreteStock".into(),
+            element_type: "DefaultDiscStock".into(),
 
             log_emitter: Output::default(),
             state_emitter: Output::default(),

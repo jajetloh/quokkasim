@@ -2,9 +2,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 
 use crate::{
-    common::ToLogRecord, components::{continuous_traits::{ContResource, ContStock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::{
-        ContProcessLog, ContStockLogType, ContStockState, DefaultContProcess, DefaultContProcessLogType, DefaultContSink, DefaultContSource, DefaultContStock, ContProcess, Projectable, Sink, Source
-    }
+    common::ToLogRecord, components::{continuous_traits::{ContResource, ContStock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::*,
 };
 
 pub trait Connect<A: Model, B: Model> {
@@ -125,8 +123,8 @@ where
 /* #endregion DefaultContSink */
 
 
-// ──────────────────────────── DefaultSource ────────────────────────────
-/* #region DefaultSource */
+// ──────────────────────────── DefaultContSource ────────────────────────────
+/* #region DefaultContSource */
 
 impl<
     ResourceType: ContResource + 'static,
@@ -154,4 +152,35 @@ where
     }
 }
 
-/* #endregion DefaultSource */
+/* #endregion DefaultContSource */
+
+
+// ──────────────────────────── DefaultDiscProcess ────────────────────────────
+/* #region DefaultDiscProcess */
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+>
+    Connect<
+        DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>>,
+        DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>,
+    > for Connection
+where
+    DiscStockLogType<ItemType>: Serialize,
+    DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>: ToLogRecord<DiscStockLogType<ItemType>, StockLogRecord>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>>>),
+        b: (&mut DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>, &Address<DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>>),
+    ) -> Result<(), String> {
+        b.0.state_emitter.connect(DefaultDiscProcess::update_state, a.1.clone());
+        a.0.req_downstream.connect(DefaultDiscStock::get_state_async, b.1.clone());
+        // a.0.push_downstream.connect(DefaultDiscStock::add, b.1.clone());
+        Ok(())
+    }
+}
+
+/* #endregion DefaultDiscProcess */
+

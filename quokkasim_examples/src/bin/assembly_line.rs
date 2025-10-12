@@ -6,67 +6,50 @@ fn create_bench() {
 
     // Component declarations
 
-    let mut queue_1 = BasicDiscreteStock::new()
+    let mut queue_1: DefaultDiscStock<u32, DiscStockState, DiscStockLog<u32>> = DefaultDiscStock::new()
         .with_name("Queue 1")
         .with_code("Q1")
-        .with_capacity(10);
+        .with_max_capacity(10);
+    let q1_mbox = Mailbox::new();
+    let q1_addr = q1_mbox.address();
 
-    let mut dump_source: DefaultContSource<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> =
-        DefaultContSource::new()
-            .with_name("DumpSource")
-            .with_code("DS")
-            .with_source_resource(1.0)
-            .with_source_quantity_distr(
-                df.create(DistributionConfig::Constant(50.0))
-                    .unwrap(),
-            );
-    let ds_mbox = Mailbox::new();
-    let ds_addr = ds_mbox.address();
+    let mut process: DefaultDiscProcess<u32, DiscProcessLog<DefaultDiscProcessLogType<u32>, u32>> = DefaultDiscProcess::new()
+        .with_name("Process")
+        .with_code("P")
+        .with_process_time_distr(df.create(DistributionConfig::Constant(0.1)).unwrap());
+    let p_mbox = Mailbox::new();
+    let p_addr = p_mbox.address();
 
-    let mut dump_point: DefaultContStock<f64, ContStockState, ContStockLog<f64>> = DefaultContStock::new()
-        .with_name("DumpPoint")
-        .with_code("DP")
-        .with_low_capacity(1.)
-        .with_max_capacity(10_000.)
-        .with_initial_resource(0.);
-    let dp_mbox = Mailbox::new();
-    let dp_addr = dp_mbox.address();
-
-    let mut material_sink: DefaultContSink<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> =
-        DefaultContSink::new()
-            .with_name("MaterialSink")
-            .with_code("MS")
-            .with_sink_quantity_distr(
-                df.create(DistributionConfig::Constant(50.0))
-                    .unwrap(),
-            )
-            .with_sink_time_distr(df.create(DistributionConfig::Constant(1.0)).unwrap());
-    let ms_mbox = Mailbox::new();
-    let ms_addr = ms_mbox.address();
+    let mut queue_2: DefaultDiscStock<u32, DiscStockState, DiscStockLog<u32>> = DefaultDiscStock::new()
+        .with_name("Queue 2")
+        .with_code("Q2")
+        .with_max_capacity(10);
+    let q2_mbox = Mailbox::new();
+    let q2_addr = q2_mbox.address();
 
     // Connections
 
     let mut c = Connection {};
-    c.connect((&mut dump_source, &ds_addr), (&mut dump_point, &dp_addr)).unwrap();
-    c.connect((&mut dump_point, &dp_addr), (&mut material_sink, &ms_addr)).unwrap();
+    // // c.connect((&mut queue_1, &q1_addr), (&mut process, &p_addr)).unwrap();
+    // c.connect((&mut process, &p_addr), (&mut queue_2, &q2_addr)).unwrap();
 
     // Loggers
 
-    let process_logger = EventQueue::<ContProcessLog<DefaultContProcessLogType<f64>, f64>>::new();
-    let stock_logger = EventQueue::<ContStockLog<f64>>::new();
+    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<f64>, f64>>::new();
+    // let stock_logger = EventQueue::<<f64>>::new();
 
-    dump_source.log_emitter.connect_sink(&process_logger);
-    dump_point.log_emitter.connect_sink(&stock_logger);
-    material_sink.log_emitter.connect_sink(&process_logger);
+    // dump_source.log_emitter.connect_sink(&process_logger);
+    // dump_point.log_emitter.connect_sink(&stock_logger);
+    // material_sink.log_emitter.connect_sink(&process_logger);
 
     // Registry
 
     // Simulation initialisation
 
     let sim_init = SimInit::new()
-        .add_model(dump_source, ds_mbox, "DumpSource")
-        .add_model(dump_point, dp_mbox, "DumpPoint")
-        .add_model(material_sink, ms_mbox, "MaterialSink");
+        .add_model(queue_1, q1_mbox, "Queue 1")
+        .add_model(process, p_mbox, "Process")
+        .add_model(queue_2, q2_mbox, "Queue 2");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
     let duration = Duration::from_secs(24 * 3600);
