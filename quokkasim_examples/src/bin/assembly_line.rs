@@ -10,6 +10,8 @@ fn create_bench() {
         .with_name("Queue 1")
         .with_code("Q1")
         .with_max_capacity(10);
+    queue_1.resources().add_multi(vec![101, 102, 103, 104, 105]);
+    
     let q1_mbox = Mailbox::new();
     let q1_addr = q1_mbox.address();
 
@@ -35,12 +37,12 @@ fn create_bench() {
 
     // Loggers
 
-    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<f64>, f64>>::new();
-    // let stock_logger = EventQueue::<<f64>>::new();
-
-    // dump_source.log_emitter.connect_sink(&process_logger);
-    // dump_point.log_emitter.connect_sink(&stock_logger);
-    // material_sink.log_emitter.connect_sink(&process_logger);
+    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<u32>, u32>>::new();
+    process.log_emitter.connect_sink(&process_logger);
+    
+    let stock_logger = EventQueue::<DiscStockLog<u32>>::new();
+    queue_1.log_emitter.connect_sink(&stock_logger);
+    queue_2.log_emitter.connect_sink(&stock_logger);
 
     // Registry
 
