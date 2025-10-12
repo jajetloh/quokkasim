@@ -112,21 +112,7 @@ pub trait DiscreteArithmetic<T> {
     fn total(&self) -> u32;
 }
 
-/// A discrete “resource” is anything you can do those ops on + send/clone/debug/serialize…
-pub trait DiscResource<T>: 
-    DiscreteArithmetic<T> +
-    Clone +
-    Send +
-    Debug +
-    Default +
-    Serialize
-{}
-impl<T> DiscResource<T> for T 
-where T: DiscreteArithmetic<T> + Clone + Send + Debug + Default + Serialize
-{}
-
 pub trait DiscStock<
-    // ResourceType: DiscResource<u32> + 'static,
     ResourceType: Clone + Send + 'static,
     StateType: StockState + Clone + Send + 'static,
     LogRecordType: Clone + Send + 'static,

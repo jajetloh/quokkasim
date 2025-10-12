@@ -12,24 +12,6 @@ pub enum DiscStockLogType<T> {
     StateChange { new_state: DiscStockState },
 }
 
-// #[derive(Serialize, Clone, Debug)]
-// enum DiscStockState {
-//     Full { occupied: u32, empty: u32 },
-//     Normal { occupied: u32, empty: u32 },
-//     Empty { occupied: u32, empty: u32 },
-// }
-
-// impl StockState for DiscStockState {
-//     fn is_same_state(&self, other: &Self) -> bool {
-//         match (self, other) {
-//             (DiscStockState::Full { .. }, DiscStockState::Full { .. }) => true,
-//             (DiscStockState::Normal { .. }, DiscStockState::Normal { .. }) => true,
-//             (DiscStockState::Empty { .. }, DiscStockState::Empty { .. }) => true,
-//             _ => false,
-//         }
-//     }
-// }
-
 #[derive(WithMethods)]
 pub struct DefaultDiscStock<ItemType, S: StockState, RecordLogType: Clone + Send + 'static> {
 
@@ -54,17 +36,6 @@ pub struct DefaultDiscStock<ItemType, S: StockState, RecordLogType: Clone + Send
     next_event_index: u64,
 }
 
-// impl<
-//     ItemType: Clone + Send + 'static,
-//     LogRecordType: Clone + Send + 'static,
-// > DiscStock<
-//     ItemType,
-//     DiscreteStockState,
-//     LogRecordType,
-//     DiscreteStockLogType<ItemType>,
-// > for DefaultDiscStock<ItemType, DiscreteStockState, LogRecordType> 
-// where 
-
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
     LogRecordType: Clone + Send + 'static,
@@ -73,26 +44,6 @@ impl<
     DiscStockState,
     LogRecordType,
 > {}
-
-// where
-//     ItemType: Clone + Debug + Serialize + Send + 'static,
-//     DiscStockLogType<ItemType>: Serialize + Clone,
-//     Self: ToLogRecord<DiscStockLogType<ItemType>, DiscStockLogType<ItemType>>,
-// {
-//     fn init(
-//         mut self,
-//         ctx: &mut Context<Self>,
-//     ) -> impl Future<Output = InitializedModel<Self>> + Send {
-//         async move {
-//             let source_event_id = EventId(format!(
-//                 "{}_{:06}",
-//                 self.element_code, self.next_event_index
-//             ));
-//             self.update_state(source_event_id, ctx).await;
-//             self.into()
-//         }
-//     }
-// }
 
 impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + 'static> Default for DefaultDiscStock<
     T,
@@ -118,17 +69,6 @@ impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + '
         }
     }
 }
-
-// impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscProcess<
-//     ItemType, 
-//     DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>
-// >
-// where
-//     DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>: Serialize,
-//     Self: ToLogRecord<
-//         DefaultDiscProcessLogType<ItemType>,
-//         DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>
-//     > {
 
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
@@ -217,14 +157,11 @@ impl<ItemType> DiscStockLog<ItemType> {
             element_name,
             element_type,
             details,
-            // phantom: std::marker::PhantomData,
         }
     }
 }
 
 impl<ItemType> ToLogRecord<
-        // DefaultDiscProcessLogType<ItemType>,
-        // DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
         DiscStockLogType<ItemType>,
         DiscStockLog<ItemType>,
     > for DefaultDiscStock<

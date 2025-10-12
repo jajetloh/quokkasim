@@ -1017,7 +1017,7 @@ pub trait Sink<
 
 
 pub trait ContStock<
-    ResourceType: ContResource + 'static,
+    ResourceType: ContArithmetic + Clone + Send + 'static,
     StateType: StockState + Clone + Send + 'static,
     LogRecordType: Clone + Send + 'static,
     LogDetailsType: Send + 'static,
