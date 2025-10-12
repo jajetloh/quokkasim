@@ -2,6 +2,10 @@ use serde::Serialize;
 use std::{collections::VecDeque, fmt::Debug, ops::{Deref, DerefMut}, time::Duration};
 use crate::prelude::*;
 
+pub trait Generator<T> {
+    fn next(&mut self) -> T;
+}
+
 /// Public stock-state enum for discrete resources.
 #[derive(Debug, Clone, Serialize)]
 pub enum DiscStockState {

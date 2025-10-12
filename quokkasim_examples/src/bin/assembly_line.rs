@@ -6,12 +6,14 @@ fn create_bench() {
 
     // Component declarations
 
+
     let mut source: DefaultDiscSource<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscSource::new()
         .with_name("Source")
         .with_code("SRC")
         .with_source_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
     let src_mbox = Mailbox::new();
     let src_addr = src_mbox.address();
+    source.source_item_generator = Some(Box::new(SimpleStringGenerator::new("ITEM_{}".into())));
 
     let mut queue_1: DefaultDiscStock<String, DiscStockState, DiscStockLog<String>> = DefaultDiscStock::new()
         .with_name("Queue 1")
@@ -74,7 +76,7 @@ fn create_bench() {
         .add_model(sink, snk_mbox, "Sink");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
-    let duration = Duration::from_secs(24 * 3600);
+    let duration = Duration::from_secs(3);
     let (mut sim, mut sched) = sim_init.init(start_time).unwrap();
 
     let time_at_start = SystemTime::now();
@@ -83,6 +85,9 @@ fn create_bench() {
     println!("Execution time: {:?}", time_at_end.duration_since(time_at_start));
 
     for log in process_logger.into_reader() {
+        println!("{:?}", log);
+    }
+    for log in stock_logger.into_reader() {
         println!("{:?}", log);
     }
 

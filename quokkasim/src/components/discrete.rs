@@ -1,5 +1,5 @@
 use std::time::Duration;
-use std::fmt::Debug;
+use std::fmt::{format, Debug};
 
 use nexosim::ports::Output;
 use serde::Serialize;
@@ -509,6 +509,24 @@ where
     }
 }
 
+pub struct SimpleStringGenerator {
+    pub format: String,
+    pub counter: u64,
+}
+
+impl SimpleStringGenerator {
+    pub fn new(format: String) -> Self {
+        SimpleStringGenerator { format, counter: 0 }
+    }
+}
+
+impl Generator<String> for SimpleStringGenerator {
+    fn next(&mut self) -> String {
+        self.counter += 1;
+        self.format.replace("{}", &self.counter.to_string())
+    }
+}
+
 #[derive(WithMethods)]
 pub struct DefaultDiscSource<
     ItemType,
@@ -529,7 +547,7 @@ pub struct DefaultDiscSource<
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
-    pub source_item_template: Option<ItemType>,
+    pub source_item_generator: Option<Box<dyn Generator<ItemType> + Send>>,
     pub source_quantity_distr: Distribution,
     pub source_time_distr: Distribution,
     pub delay_modes: DelayModes,
@@ -562,7 +580,7 @@ impl<
             push_downstream: Output::default(),
             log_emitter: Output::default(),
 
-            source_item_template: None,
+            source_item_generator: None,
             source_quantity_distr: Distribution::default(),
             source_time_distr: Distribution::default(),
             delay_modes: DelayModes::default(),
@@ -730,15 +748,15 @@ where
                                 requested = 1;
                             }
 
-                            let template = match self.source_item_template.clone() {
-                                Some(template) => template,
+                            let generator = match self.source_item_generator.as_mut() {
+                                Some(generator) => generator.next(),
                                 None => {
                                     *source_event_id = self
                                         .log(
                                             time_now,
                                             source_event_id.clone(),
                                             self.log_type_process_failure(
-                                                "Source item template not configured",
+                                                "Source item generator not configured",
                                             ),
                                         )
                                         .await;
@@ -748,7 +766,7 @@ where
                             };
 
                             let mut batch = Vec::with_capacity(requested);
-                            batch.resize_with(requested, || template.clone());
+                            batch.resize_with(requested, || generator.clone());
                             if batch.is_empty() {
                                 *source_event_id = self
                                     .log(
@@ -867,6 +885,12 @@ where
             .into_iter()
             .flatten()
             .min();
+
+            println!(
+                "### [{}] Next event in: {:?}",
+                self.element_name,
+                next_event
+            );
 
             if let Some(time_until_next) = next_event {
                 if time_until_next.is_zero() {
