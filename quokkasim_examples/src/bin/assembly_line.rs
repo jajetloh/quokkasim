@@ -6,41 +6,59 @@ fn create_bench() {
 
     // Component declarations
 
-    let mut queue_1: DefaultDiscStock<u32, DiscStockState, DiscStockLog<u32>> = DefaultDiscStock::new()
+    let mut source: DefaultDiscSource<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscSource::new()
+        .with_name("Source")
+        .with_code("SRC")
+        .with_source_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
+    let src_mbox = Mailbox::new();
+    let src_addr = src_mbox.address();
+
+    let mut queue_1: DefaultDiscStock<String, DiscStockState, DiscStockLog<String>> = DefaultDiscStock::new()
         .with_name("Queue 1")
         .with_code("Q1")
         .with_max_capacity(10);
-    queue_1.resources().add_multi(vec![101, 102, 103, 104, 105]);
-    
+    queue_1.resources().add_multi(vec!["A1", "A2", "A3"].iter().map(|s| s.to_string()).collect());
+
     let q1_mbox = Mailbox::new();
     let q1_addr = q1_mbox.address();
 
-    let mut process: DefaultDiscProcess<u32, DiscProcessLog<DefaultDiscProcessLogType<u32>, u32>> = DefaultDiscProcess::new()
+    let mut process: DefaultDiscProcess<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscProcess::new()
         .with_name("Process")
         .with_code("P")
         .with_process_time_distr(df.create(DistributionConfig::Constant(0.1)).unwrap());
     let p_mbox = Mailbox::new();
     let p_addr = p_mbox.address();
 
-    let mut queue_2: DefaultDiscStock<u32, DiscStockState, DiscStockLog<u32>> = DefaultDiscStock::new()
+    let mut queue_2: DefaultDiscStock<String, DiscStockState, DiscStockLog<String>> = DefaultDiscStock::new()
         .with_name("Queue 2")
         .with_code("Q2")
         .with_max_capacity(10);
     let q2_mbox = Mailbox::new();
     let q2_addr = q2_mbox.address();
 
+    let mut sink : DefaultDiscSink<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscSink::new()
+        .with_name("Sink")
+        .with_code("SNK")
+        .with_sink_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
+    let snk_mbox = Mailbox::new();
+    let snk_addr = snk_mbox.address();
+
     // Connections
 
     let mut c = Connection {};
+    c.connect((&mut source, &src_addr), (&mut queue_1, &q1_addr)).unwrap();
     c.connect((&mut queue_1, &q1_addr), (&mut process, &p_addr)).unwrap();
     c.connect((&mut process, &p_addr), (&mut queue_2, &q2_addr)).unwrap();
+    c.connect((&mut queue_2, &q2_addr), (&mut sink, &snk_addr)).unwrap();
 
     // Loggers
 
-    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<u32>, u32>>::new();
+    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<String>, String>>::new();
+    source.log_emitter.connect_sink(&process_logger);
     process.log_emitter.connect_sink(&process_logger);
-    
-    let stock_logger = EventQueue::<DiscStockLog<u32>>::new();
+    sink.log_emitter.connect_sink(&process_logger);
+
+    let stock_logger = EventQueue::<DiscStockLog<String>>::new();
     queue_1.log_emitter.connect_sink(&stock_logger);
     queue_2.log_emitter.connect_sink(&stock_logger);
 
@@ -49,9 +67,11 @@ fn create_bench() {
     // Simulation initialisation
 
     let sim_init = SimInit::new()
+        .add_model(source, src_mbox, "Source")
         .add_model(queue_1, q1_mbox, "Queue 1")
         .add_model(process, p_mbox, "Process")
-        .add_model(queue_2, q2_mbox, "Queue 2");
+        .add_model(queue_2, q2_mbox, "Queue 2")
+        .add_model(sink, snk_mbox, "Sink");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
     let duration = Duration::from_secs(24 * 3600);
