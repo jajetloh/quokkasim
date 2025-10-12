@@ -182,5 +182,30 @@ where
     }
 }
 
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+>
+    Connect<
+        DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>,
+        DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>>,
+    > for Connection
+where
+    DiscStockLogType<ItemType>: Serialize,
+    DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>: ToLogRecord<DiscStockLogType<ItemType>, StockLogRecord>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>, &Address<DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>>),
+        b: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>>>),
+    ) -> Result<(), String> {
+        a.0.state_emitter.connect(DefaultDiscProcess::update_state, b.1.clone());
+        b.0.req_upstream.connect(DefaultDiscStock::get_state_async, a.1.clone());
+        b.0.withdraw_upstream.connect(DefaultDiscStock::remove_multi, a.1.clone());
+        Ok(())
+    }
+}
+
+
 /* #endregion DefaultDiscProcess */
 

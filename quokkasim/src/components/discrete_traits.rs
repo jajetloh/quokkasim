@@ -165,15 +165,22 @@ pub trait DiscStock<
         }
     }
 
-    fn remove<T>(&mut self, payload: (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = Option<ResourceType>> + Send 
+    fn remove_multi(&mut self, payload: (usize, EventId), cx: &mut Context<Self>) -> impl Future<Output = Vec<ResourceType>> + Send 
     where ResourceType:
     {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
-            let removed = self.resources().remove_one();
+            let mut removed_entries = Vec::new();
+            for _ in 0..payload.0 {
+                if let Some(removed) = self.resources().remove_one() {
+                    removed_entries.push(removed);
+                } else {
+                    break;
+                }
+            }
             let total = self.resources().total();
             let event_id = self
-                .log(cx.time(), payload.1.clone(), self.log_type_remove(total, removed.clone()))
+                .log(cx.time(), payload.1.clone(), self.log_type_remove_multi(total, removed_entries.clone()))
                 .await;
             let prev = self.previous_state().clone();
             let cur = self.get_state().clone();
@@ -182,7 +189,7 @@ pub trait DiscStock<
                 cx.schedule_event(t1ns, Self::emit_change, (cur.clone(), event_id)).unwrap();
             }
             *self.previous_state() = Some(cur);
-            removed
+            removed_entries
         }
     }
 
@@ -207,7 +214,7 @@ pub trait DiscStock<
     }
 
     fn log_type_add(&self, balance: u32, resource: ResourceType) -> LogDetailsType;
-    fn log_type_remove(&self, balance: u32, resource: Option<ResourceType>) -> LogDetailsType;
+    fn log_type_remove_multi(&self, balance: u32, resource: Vec<ResourceType>) -> LogDetailsType;
     fn log_type_state_change(&self, new_state: StateType) -> LogDetailsType;
 }
 
@@ -233,7 +240,7 @@ pub enum DefaultDiscProcessLogType<ItemType>
 where
     ItemType: Clone + Debug + Serialize,
 {
-    WithdrawRequest { quantity: u32 },
+    WithdrawRequest { quantity: usize },
     ProcessStart { quantity: u32, resources: Vec<ItemType> },
     ProcessSuccess { quantity: u32, resources: Vec<ItemType> },
     ProcessFailure { reason: &'static str },
@@ -288,7 +295,7 @@ where
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
     fn time_to_next_delay_event(&mut self) -> &mut Option<Duration>;
 
-    fn log_type_withdraw_request(&self, quantity: u32) -> LogDetailsType;
+    fn log_type_withdraw_request(&self, quantity: usize) -> LogDetailsType;
     fn log_type_process_start(
         &self,
         quantity: u32,
@@ -319,7 +326,7 @@ where
 {
     fn req_upstream(&mut self) -> &mut Requestor<(), DiscStockState>;
     fn withdraw_upstream(&mut self)
-        -> &mut Requestor<(u32, EventId), Vec<ItemType>>;
+        -> &mut Requestor<(usize, EventId), Vec<ItemType>>;
     fn req_downstream(&mut self) -> &mut Requestor<(), DiscStockState>;
     fn push_downstream(&mut self)
         -> &mut Output<(Vec<ItemType>, EventId)>;
@@ -472,7 +479,7 @@ where
                             if !requested.is_finite() {
                                 requested = 1.0;
                             }
-                            let requested = requested.clamp(1.0, u32::MAX as f64) as u32;
+                            let requested = requested.clamp(1.0, u32::MAX as f64) as usize;
 
                             *source_event_id = self
                                 .log(

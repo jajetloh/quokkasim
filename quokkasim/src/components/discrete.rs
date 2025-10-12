@@ -181,12 +181,8 @@ where
     fn log_type_add(&self, balance: u32, resource: ItemType) -> DiscStockLogType<ItemType> {
         DiscStockLogType::Add { balance, added: vec![resource] }
     }
-    fn log_type_remove(&self, balance: u32, resource: Option<ItemType>) -> DiscStockLogType<ItemType> {
-        if resource.is_none() {
-            return DiscStockLogType::Remove { balance, removed: vec![] };
-        } else {
-            return DiscStockLogType::Remove { balance, removed: vec![resource.unwrap()] };
-        }
+    fn log_type_remove_multi(&self, balance: u32, resource: Vec<ItemType>) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::Remove { balance, removed: resource.clone() }
     }
     fn log_type_state_change(&self, new_state: DiscStockState) -> DiscStockLogType<ItemType> {
         DiscStockLogType::StateChange { new_state }
@@ -276,7 +272,7 @@ pub struct DefaultDiscProcess<
     pub req_upstream: Requestor<(), DiscStockState>,
     pub req_downstream: Requestor<(), DiscStockState>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
-    pub withdraw_upstream: Requestor<(u32, EventId), Vec<ItemType>>,
+    pub withdraw_upstream: Requestor<(usize, EventId), Vec<ItemType>>,
     pub push_downstream: Output<(Vec<ItemType>, EventId)>,
     pub log_emitter: Output<ProcessLog>,
 
@@ -467,7 +463,7 @@ where
         &mut self.time_to_next_delay_event
     }
 
-    fn log_type_withdraw_request(&self, quantity: u32) -> DefaultDiscProcessLogType<ItemType> {
+    fn log_type_withdraw_request(&self, quantity: usize) -> DefaultDiscProcessLogType<ItemType> {
         DefaultDiscProcessLogType::WithdrawRequest { quantity }
     }
 
@@ -547,7 +543,7 @@ where
 
     fn withdraw_upstream(
         &mut self,
-    ) -> &mut Requestor<(u32, EventId), Vec<ItemType>> {
+    ) -> &mut Requestor<(usize, EventId), Vec<ItemType>> {
         &mut self.withdraw_upstream
     }
 

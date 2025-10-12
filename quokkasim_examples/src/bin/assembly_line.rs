@@ -30,8 +30,8 @@ fn create_bench() {
     // Connections
 
     let mut c = Connection {};
-    // // c.connect((&mut queue_1, &q1_addr), (&mut process, &p_addr)).unwrap();
-    // c.connect((&mut process, &p_addr), (&mut queue_2, &q2_addr)).unwrap();
+    c.connect((&mut queue_1, &q1_addr), (&mut process, &p_addr)).unwrap();
+    c.connect((&mut process, &p_addr), (&mut queue_2, &q2_addr)).unwrap();
 
     // Loggers
 
