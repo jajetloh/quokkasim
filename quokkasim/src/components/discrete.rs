@@ -6,32 +6,32 @@ use serde::Serialize;
 use crate::prelude::*;
 
 #[derive(Serialize, Clone, Debug)]
-enum DiscreteStockLogType<T> {
+enum DiscStockLogType<T> {
     Add { balance: u32, added: Vec<T> },
     Remove { balance: u32, removed: Vec<T> },
-    StateChange { new_state: DiscreteStockState },
+    StateChange { new_state: DiscStockState },
 }
 
-#[derive(Serialize, Clone, Debug)]
-enum DiscreteStockState {
-    Full { occupied: u32, empty: u32 },
-    Normal { occupied: u32, empty: u32 },
-    Empty { occupied: u32, empty: u32 },
-}
+// #[derive(Serialize, Clone, Debug)]
+// enum DiscStockState {
+//     Full { occupied: u32, empty: u32 },
+//     Normal { occupied: u32, empty: u32 },
+//     Empty { occupied: u32, empty: u32 },
+// }
 
-impl StockState for DiscreteStockState {
-    fn is_same_state(&self, other: &Self) -> bool {
-        match (self, other) {
-            (DiscreteStockState::Full { .. }, DiscreteStockState::Full { .. }) => true,
-            (DiscreteStockState::Normal { .. }, DiscreteStockState::Normal { .. }) => true,
-            (DiscreteStockState::Empty { .. }, DiscreteStockState::Empty { .. }) => true,
-            _ => false,
-        }
-    }
-}
+// impl StockState for DiscStockState {
+//     fn is_same_state(&self, other: &Self) -> bool {
+//         match (self, other) {
+//             (DiscStockState::Full { .. }, DiscStockState::Full { .. }) => true,
+//             (DiscStockState::Normal { .. }, DiscStockState::Normal { .. }) => true,
+//             (DiscStockState::Empty { .. }, DiscStockState::Empty { .. }) => true,
+//             _ => false,
+//         }
+//     }
+// }
 
 #[derive(WithMethods)]
-pub struct DefaultDiscStock<T, S: StockState, RecordLogType: Clone + Send + 'static> {
+pub struct DefaultDiscStock<ItemType, S: StockState, RecordLogType: Clone + Send + 'static> {
 
     // Identification
     pub element_name: String,
@@ -47,7 +47,7 @@ pub struct DefaultDiscStock<T, S: StockState, RecordLogType: Clone + Send + 'sta
     pub max_capacity: u32,
 
     // Runtime State
-    pub resources: VecDequeStock<T>,
+    pub resources: VecDequeStock<ItemType>,
 
     // Internals
     prev_state: Option<S>,
@@ -65,27 +65,34 @@ pub struct DefaultDiscStock<T, S: StockState, RecordLogType: Clone + Send + 'sta
 // > for DefaultDiscStock<ItemType, DiscreteStockState, LogRecordType> 
 // where 
 
-impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscStock<
-    ItemType,
-    DiscreteStockState,
-    DiscreteStockLogType<ItemType>,
->
-where
+impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    DiscreteStockLogType<ItemType>: Serialize + Clone,
-    Self: ToLogRecord<DiscreteStockLogType<ItemType>, DiscreteStockLogType<ItemType>>,
-{
-    fn init(
-        mut self,
-        ctx: &mut Context<Self>,
-    ) -> impl Future<Output = InitializedModel<Self>> + Send {
-        async move {
-            let source_event_id = self.get_next_event_id();
-            self.update_state(source_event_id, ctx).await;
-            self.into()
-        }
-    }
-}
+    LogRecordType: Clone + Send + 'static,
+> Model for DefaultDiscStock<
+    ItemType,
+    DiscStockState,
+    LogRecordType,
+> {}
+
+// where
+//     ItemType: Clone + Debug + Serialize + Send + 'static,
+//     DiscStockLogType<ItemType>: Serialize + Clone,
+//     Self: ToLogRecord<DiscStockLogType<ItemType>, DiscStockLogType<ItemType>>,
+// {
+//     fn init(
+//         mut self,
+//         ctx: &mut Context<Self>,
+//     ) -> impl Future<Output = InitializedModel<Self>> + Send {
+//         async move {
+//             let source_event_id = EventId(format!(
+//                 "{}_{:06}",
+//                 self.element_code, self.next_event_index
+//             ));
+//             self.update_state(source_event_id, ctx).await;
+//             self.into()
+//         }
+//     }
+// }
 
 impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + 'static> Default for DefaultDiscStock<
     T,
@@ -128,23 +135,23 @@ impl<
     LogRecordType: Clone + Send + 'static,
 > DiscStock<
     ItemType,
-    DiscreteStockState,
+    DiscStockState,
     LogRecordType,
-    DiscreteStockLogType<ItemType>,
-> for DefaultDiscStock<ItemType, DiscreteStockState, LogRecordType> 
+    DiscStockLogType<ItemType>,
+> for DefaultDiscStock<ItemType, DiscStockState, LogRecordType> 
 where 
-    DiscreteStockLogType<ItemType>: Serialize,
-    Self: ToLogRecord<DiscreteStockLogType<ItemType>, DiscreteStockLogType<ItemType>>,
+    DiscStockLogType<ItemType>: Serialize,
+    Self: ToLogRecord<DiscStockLogType<ItemType>, LogRecordType>,
 {
-    fn get_state(&mut self) -> DiscreteStockState {
+    fn get_state(&mut self) -> DiscStockState {
         let occupied = self.resources.total();
         let empty = self.max_capacity.saturating_sub(occupied);
         if occupied == 0 {
-            DiscreteStockState::Empty { occupied, empty }
+            DiscStockState::Empty { occupied, empty }
         } else if empty == 0 {
-            DiscreteStockState::Full { occupied, empty }
+            DiscStockState::Full { occupied, empty }
         } else {
-            DiscreteStockState::Normal { occupied, empty }
+            DiscStockState::Normal { occupied, empty }
         }
     }
 
@@ -165,22 +172,92 @@ where
         event_id
     }
 
-    fn previous_state(&mut self) -> &mut Option<DiscreteStockState> {
+    fn previous_state(&mut self) -> &mut Option<DiscStockState> {
         &mut self.prev_state
     }
     fn state_emitter(&mut self) -> &mut Output<EventId> {
         &mut self.state_emitter
     }
-    fn log_type_add(&self, balance: u32, resource: Vec<T>) -> DiscreteStockLogType<T> {
-        DiscreteStockLogType::Add { balance, added: resource }
+    fn log_type_add(&self, balance: u32, resource: ItemType) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::Add { balance, added: vec![resource] }
     }
-    fn log_type_remove(&self, balance: u32, resource: Vec<T>) -> DiscreteStockLogType<T> {
-        DiscreteStockLogType::Remove { balance, removed: resource }
+    fn log_type_remove(&self, balance: u32, resource: Option<ItemType>) -> DiscStockLogType<ItemType> {
+        if resource.is_none() {
+            return DiscStockLogType::Remove { balance, removed: vec![] };
+        } else {
+            return DiscStockLogType::Remove { balance, removed: vec![resource.unwrap()] };
+        }
     }
-    fn log_type_state_change(&self, new_state: DiscreteStockState) -> DiscreteStockLogType<T> {
-        DiscreteStockLogType::StateChange { new_state }
+    fn log_type_state_change(&self, new_state: DiscStockState) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::StateChange { new_state }
     }
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DiscStockLog<ItemType> {
+    pub time: String,
+    pub event_id: EventId,
+    pub source_event_id: EventId,
+    pub element_name: String,
+    pub element_type: String,
+    pub details: DiscStockLogType<ItemType>,
+
+    // pub phantom: std::marker::PhantomData<ItemType>,
+}
+
+impl<ItemType> DiscStockLog<ItemType> {
+    fn to_log(
+        time: MonotonicTime,
+        event_id: EventId,
+        source_event_id: EventId,
+        element_name: String,
+        element_type: String,
+        details: DiscStockLogType<ItemType>,
+    ) -> Self {
+        DiscStockLog {
+            time: time.to_chrono_date_time(0).unwrap().to_string(),
+            event_id,
+            source_event_id,
+            element_name,
+            element_type,
+            details,
+            // phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<ItemType> ToLogRecord<
+        // DefaultDiscProcessLogType<ItemType>,
+        // DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+        DiscStockLogType<ItemType>,
+        DiscStockLog<ItemType>,
+    > for DefaultDiscStock<
+        ItemType,
+        DiscStockState,
+        DiscStockLog<ItemType>,
+    >
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+{
+    fn to_record(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        event_id: EventId,
+        details: DiscStockLogType<ItemType>,
+    ) -> DiscStockLog<ItemType> {
+        DiscStockLog {
+            time: now.to_chrono_date_time(0).unwrap().to_string(),
+            event_id,
+            source_event_id,
+            element_name: self.element_name.clone(),
+            element_type: self.element_type.clone(),
+            details,
+            // phantom: std::marker::PhantomData,
+        }
+    }
+}
+
 
 #[derive(WithMethods)]
 pub struct DefaultDiscProcess<
