@@ -249,8 +249,8 @@ where
     ItemType: Clone + Debug + Serialize,
 {
     WithdrawRequest { quantity: usize },
-    ProcessStart { quantity: u32, resources: Vec<ItemType> },
-    ProcessSuccess { quantity: u32, resources: Vec<ItemType> },
+    ProcessStart { quantity: usize, resources: Vec<ItemType> },
+    ProcessSuccess { quantity: usize, resources: Vec<ItemType> },
     ProcessFailure { reason: &'static str },
     ProcessStopped { reason: &'static str },
     ProcessContinue { reason: &'static str },
@@ -306,12 +306,12 @@ where
     fn log_type_withdraw_request(&self, quantity: usize) -> LogDetailsType;
     fn log_type_process_start(
         &self,
-        quantity: u32,
+        quantity: usize,
         resources: Vec<ItemType>,
     ) -> LogDetailsType;
     fn log_type_process_success(
         &self,
-        quantity: u32,
+        quantity: usize,
         resources: Vec<ItemType>,
     ) -> LogDetailsType;
     fn log_type_process_failure(&self, reason: &'static str) -> LogDetailsType;
@@ -381,7 +381,7 @@ where
                 if let Some((mut time_left, resources)) = self.process_state().take() {
                     time_left = time_left.saturating_sub(duration_since_prev);
                     if time_left.is_zero() {
-                        let quantity = resources.len() as u32;
+                        let quantity = resources.len();
                         let log_payload = resources.clone();
                         *source_event_id = self
                             .log(
@@ -531,7 +531,7 @@ where
                                         process_duration = Duration::from_nanos(1);
                                     }
 
-                                    let quantity = batch.len() as u32;
+                                    let quantity = batch.len();
                                     let log_payload = batch.clone();
 
                                     *self.process_state() =
