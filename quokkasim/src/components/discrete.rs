@@ -1,5 +1,5 @@
 use std::time::Duration;
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 
 use nexosim::ports::Output;
 use serde::Serialize;
@@ -606,14 +606,14 @@ where
     pub fn update_state(
         &mut self,
         mut source_event_id: EventId,
-        mut cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, &mut cx)
+            self.update_state_since_last_update(&mut source_event_id, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, &mut cx)
+            self.update_state_decision_logic(&mut source_event_id, cx)
                 .await;
-            self.update_state_next_event(&mut source_event_id, &mut cx)
+            self.update_state_next_event(&mut source_event_id, cx)
                 .await;
         }
     }
@@ -879,8 +879,8 @@ where
             }
 
             let next_event = [
-                self.time_to_next_delay_event().clone(),
-                self.time_to_next_process_event().clone(),
+                *self.time_to_next_delay_event(),
+                *self.time_to_next_process_event(),
             ]
             .into_iter()
             .flatten()
@@ -1209,14 +1209,14 @@ where
     pub fn update_state(
         &mut self,
         mut source_event_id: EventId,
-        mut cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, &mut cx)
+            self.update_state_since_last_update(&mut source_event_id, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, &mut cx)
+            self.update_state_decision_logic(&mut source_event_id, cx)
                 .await;
-            self.update_state_next_event(&mut source_event_id, &mut cx)
+            self.update_state_next_event(&mut source_event_id, cx)
                 .await;
         }
     }
@@ -1364,7 +1364,7 @@ where
                                 .next();
 
                             match pulled {
-                                Some(mut batch) => {
+                                Some(batch) => {
                                     if batch.is_empty() {
                                         *source_event_id = self
                                             .log(
@@ -1484,8 +1484,8 @@ where
             }
 
             let next_event = [
-                self.time_to_next_delay_event().clone(),
-                self.time_to_next_process_event().clone(),
+                *self.time_to_next_delay_event(),
+                *self.time_to_next_process_event(),
             ]
             .into_iter()
             .flatten()

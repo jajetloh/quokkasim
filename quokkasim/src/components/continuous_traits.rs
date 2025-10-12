@@ -173,14 +173,14 @@ pub trait ContProcess<
     fn update_state(
         &mut self,
         mut source_event_id: EventId,
-        mut cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, &mut cx)
+            self.update_state_since_last_update(&mut source_event_id, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, &mut cx)
+            self.update_state_decision_logic(&mut source_event_id, cx)
                 .await;
-            self.update_state_next_event(&mut source_event_id, &mut cx)
+            self.update_state_next_event(&mut source_event_id, cx)
                 .await;
         }
     }
@@ -414,8 +414,8 @@ pub trait ContProcess<
                 *self.time_to_next_delay_event() = None;
             }
             let time_to_next_event = [
-                self.time_to_next_delay_event().clone(),
-                self.time_to_next_process_event().clone(),
+                *self.time_to_next_delay_event(),
+                *self.time_to_next_process_event(),
             ]
             .into_iter()
             .flatten()
@@ -478,14 +478,14 @@ pub trait Source<
     fn update_state(
         &mut self,
         mut source_event_id: EventId,
-        mut cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, &mut cx)
+            self.update_state_since_last_update(&mut source_event_id, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, &mut cx)
+            self.update_state_decision_logic(&mut source_event_id, cx)
                 .await;
-            self.update_state_next_event(&mut source_event_id, &mut cx)
+            self.update_state_next_event(&mut source_event_id, cx)
                 .await;
         }
     }
@@ -691,8 +691,8 @@ pub trait Source<
                 *self.time_to_next_delay_event() = None;
             }
             let time_to_next_event = [
-                self.time_to_next_delay_event().clone(),
-                self.time_to_next_process_event().clone(),
+                *self.time_to_next_delay_event(),
+                *self.time_to_next_process_event(),
             ]
             .into_iter()
             .flatten()
@@ -754,14 +754,14 @@ pub trait Sink<
     fn update_state(
         &mut self,
         mut source_event_id: EventId,
-        mut cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, &mut cx)
+            self.update_state_since_last_update(&mut source_event_id, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, &mut cx)
+            self.update_state_decision_logic(&mut source_event_id, cx)
                 .await;
-            self.update_state_next_event(&mut source_event_id, &mut cx)
+            self.update_state_next_event(&mut source_event_id, cx)
                 .await;
         }
     }
@@ -967,8 +967,8 @@ pub trait Sink<
                 *self.time_to_next_delay_event() = None;
             }
             let time_to_next_event = [
-                self.time_to_next_delay_event().clone(),
-                self.time_to_next_process_event().clone(),
+                *self.time_to_next_delay_event(),
+                *self.time_to_next_process_event(),
             ]
             .into_iter()
             .flatten()

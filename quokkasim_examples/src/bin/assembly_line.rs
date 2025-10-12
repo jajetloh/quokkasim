@@ -19,7 +19,7 @@ fn create_bench() {
         .with_name("Queue 1")
         .with_code("Q1")
         .with_max_capacity(10);
-    queue_1.resources().add_multi(vec!["A1", "A2", "A3"].iter().map(|s| s.to_string()).collect());
+    queue_1.resources().add_multi(["A1", "A2", "A3"].iter().map(|s| s.to_string()).collect());
 
     let q1_mbox = Mailbox::new();
     let q1_addr = q1_mbox.address();
@@ -77,7 +77,7 @@ fn create_bench() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
     let duration = Duration::from_secs(3);
-    let (mut sim, mut sched) = sim_init.init(start_time).unwrap();
+    let (mut sim, sched) = sim_init.init(start_time).unwrap();
 
     let time_at_start = SystemTime::now();
     sim.step_until(start_time + duration).unwrap();

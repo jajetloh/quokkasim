@@ -51,7 +51,7 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
     input_add_to_s2.connect(DefaultContStock::add, &s2_addr);
     registry.add_event_source(input_add_to_s2, "remove_from_s2").unwrap();
 
-    let mut output = EventQueue::new();
+    let output = EventQueue::new();
     p1.log_emitter.connect_sink(&output);
     registry.add_event_sink(output.into_reader(), "process_log").unwrap();
 
@@ -61,7 +61,7 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
     sim_init = sim_init.add_model(s1, s1_mbox, "TestStock1");
     sim_init = sim_init.add_model(s2, s2_mbox, "TestStock2");
     sim_init = sim_init.add_model(p1, p1_mbox, "TestProcess1");
-    let (mut simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
+    let (simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
 
     process_logger.into_iter().for_each(|log| {
         println!("Process Log: {:?}", log);
@@ -121,7 +121,7 @@ fn bench_array_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Simulatio
     input_add_to_s2.connect(DefaultContStock::add, &s2_addr);
     registry.add_event_source(input_add_to_s2, "remove_from_s2").unwrap();
 
-    let mut output = EventQueue::new();
+    let output = EventQueue::new();
     p1.log_emitter.connect_sink(&output);
     registry.add_event_sink(output.into_reader(), "process_log").unwrap();
 
@@ -131,7 +131,7 @@ fn bench_array_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Simulatio
     sim_init = sim_init.add_model(s1, s1_mbox, "TestStock1");
     sim_init = sim_init.add_model(s2, s2_mbox, "TestStock2");
     sim_init = sim_init.add_model(p1, p1_mbox, "TestProcess1");
-    let (mut simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
+    let (simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
 
     process_logger.into_iter().for_each(|log| {
         println!("Process Log: {:?}", log);
@@ -384,7 +384,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     sim_init = sim_init.add_model(p3, p3_mbox, "TestProcess3");
     sim_init = sim_init.add_model(p4, p4_mbox, "TestProcess4");
 
-    let (mut simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
+    let (simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
 
     Ok((simu, registry))
 }
@@ -531,7 +531,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     sim_init = sim_init.add_model(p3, p3_mbox, "TestProcess3");
     sim_init = sim_init.add_model(p4, p4_mbox, "TestProcess4");
 
-    let (mut simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
+    let (simu, scheduler) = sim_init.init(MonotonicTime::EPOCH).unwrap();
 
     Ok((simu, registry))
 }
