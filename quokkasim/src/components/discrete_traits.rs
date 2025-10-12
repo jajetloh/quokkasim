@@ -5,9 +5,9 @@ use crate::prelude::*;
 /// Public stock-state enum for discrete resources.
 #[derive(Debug, Clone, Serialize)]
 pub enum DiscStockState {
-    Normal { occupied: u32, empty: u32 },
-    Full { occupied: u32, empty: u32 },
-    Empty { occupied: u32, empty: u32 },
+    Normal { occupied: usize, empty: usize },
+    Full { occupied: usize, empty: usize },
+    Empty { occupied: usize, empty: usize },
 }
 
 impl StockState for DiscStockState {
@@ -73,7 +73,7 @@ impl<T> DiscreteArithmetic<T> for VecDequeStock<T> {
             VecDequeAccess::LIFO => self.pop_back(),
         }
     }
-    fn remove_multi(&mut self, count: u32) -> Vec<T> {
+    fn remove_multi(&mut self, count: usize) -> Vec<T> {
         let mut removed = Vec::new();
         for _ in 0..count {
             if let Some(item) = match self.access {
@@ -97,8 +97,8 @@ impl<T> DiscreteArithmetic<T> for VecDequeStock<T> {
         }
         removed
     }
-    fn total(&self) -> u32 {
-        self.len() as u32
+    fn total(&self) -> usize {
+        self.len()
     }
 }
 
@@ -107,9 +107,9 @@ pub trait DiscreteArithmetic<T> {
     fn add_one(&mut self, arg: T);
     fn add_multi(&mut self, arg: Vec<T>);
     fn remove_one(&mut self) -> Option<T>;
-    fn remove_multi(&mut self, count: u32) -> Vec<T>;
+    fn remove_multi(&mut self, count: usize) -> Vec<T>;
     fn remove_all(&mut self) -> Vec<T>;
-    fn total(&self) -> u32;
+    fn total(&self) -> usize;
 }
 
 pub trait DiscStock<
@@ -133,13 +133,33 @@ pub trait DiscStock<
     fn resources(&mut self) -> &mut VecDequeStock<ResourceType>;
     fn state_emitter(&mut self) -> &mut Output<EventId>;
 
-    fn add_one(&mut self, payload: (ResourceType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn add_one(&mut self, payload: (Option<ResourceType>, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
-            self.resources().add_one(payload.0.clone());
+            if let (Some(resource), _) = payload.clone() {
+                self.resources().add_one(resource);
+            }
             let total = self.resources().total();
             let event_id = self
-                .log(cx.time(), payload.1.clone(), self.log_type_add(total, payload.0.clone()))
+                .log(cx.time(), payload.1.clone(), self.log_type_add_one(total, payload.0.clone()))
+                .await;
+            let prev = self.previous_state().clone();
+            let cur = self.get_state().clone();
+            if prev.is_none() || !prev.as_ref().unwrap().is_same_state(&cur) {
+                let t1ns = cx.time() + Duration::from_nanos(1);
+                cx.schedule_event(t1ns, Self::emit_change, (cur.clone(), event_id)).unwrap();
+            }
+            *self.previous_state() = Some(cur);
+        }
+    }
+
+    fn add_multi(&mut self, payload: (Vec<ResourceType>, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+        async move {
+            *self.previous_state() = Some(self.get_state().clone());
+            self.resources().add_multi(payload.0.clone());
+            let total = self.resources().total();
+            let event_id = self
+                .log(cx.time(), payload.1.clone(), self.log_type_add_multi(total, payload.0.clone()))
                 .await;
             let prev = self.previous_state().clone();
             let cur = self.get_state().clone();
@@ -199,8 +219,10 @@ pub trait DiscStock<
         }
     }
 
-    fn log_type_add(&self, balance: u32, resource: ResourceType) -> LogDetailsType;
-    fn log_type_remove_multi(&self, balance: u32, resource: Vec<ResourceType>) -> LogDetailsType;
+    fn log_type_add_one(&self, balance: usize, resource: Option<ResourceType>) -> LogDetailsType;
+    fn log_type_add_multi(&self, balance: usize, resource: Vec<ResourceType>) -> LogDetailsType;
+    fn log_type_remove_one(&self, balance: usize, resource: Option<ResourceType>) -> LogDetailsType;
+    fn log_type_remove_multi(&self, balance: usize, resource: Vec<ResourceType>) -> LogDetailsType;
     fn log_type_state_change(&self, new_state: StateType) -> LogDetailsType;
 }
 

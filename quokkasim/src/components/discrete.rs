@@ -7,8 +7,10 @@ use crate::prelude::*;
 
 #[derive(Serialize, Clone, Debug)]
 pub enum DiscStockLogType<T> {
-    Add { balance: u32, added: Vec<T> },
-    Remove { balance: u32, removed: Vec<T> },
+    AddOne { balance: usize, added: Option<T> },
+    AddMulti { balance: usize, added: Vec<T> },
+    RemoveOne { balance: usize, removed: Option<T> },
+    RemoveMulti { balance: usize, removed: Vec<T> },
     StateChange { new_state: DiscStockState },
 }
 
@@ -25,15 +27,15 @@ pub struct DefaultDiscStock<ItemType, S: StockState, RecordLogType: Clone + Send
     pub state_emitter: Output<EventId>,
 
     // Configuration
-    pub low_capacity: u32,
-    pub max_capacity: u32,
+    pub low_capacity: usize,
+    pub max_capacity: usize,
 
     // Runtime State
     pub resources: VecDequeStock<ItemType>,
 
     // Internals
     prev_state: Option<S>,
-    next_event_index: u64,
+    next_event_index: usize,
 }
 
 impl<
@@ -60,7 +62,7 @@ impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + '
             state_emitter: Output::default(),
 
             low_capacity: 0,
-            max_capacity: u32::MAX,
+            max_capacity: usize::MAX,
 
             resources: VecDequeStock::new(VecDequeAccess::FIFO),
 
@@ -118,11 +120,17 @@ where
     fn state_emitter(&mut self) -> &mut Output<EventId> {
         &mut self.state_emitter
     }
-    fn log_type_add(&self, balance: u32, resource: ItemType) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::Add { balance, added: vec![resource] }
+    fn log_type_add_one(&self, balance: usize, resource: Option<ItemType>) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::AddOne { balance, added: resource }
     }
-    fn log_type_remove_multi(&self, balance: u32, resource: Vec<ItemType>) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::Remove { balance, removed: resource.clone() }
+    fn log_type_add_multi(&self, balance: usize, resource: Vec<ItemType>) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::AddMulti { balance, added: resource }
+    }
+    fn log_type_remove_one(&self, balance: usize, resource: Option<ItemType>) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::RemoveOne { balance, removed: resource }
+    }
+    fn log_type_remove_multi(&self, balance: usize, resource: Vec<ItemType>) -> DiscStockLogType<ItemType> {
+        DiscStockLogType::RemoveMulti { balance, removed: resource.clone() }
     }
     fn log_type_state_change(&self, new_state: DiscStockState) -> DiscStockLogType<ItemType> {
         DiscStockLogType::StateChange { new_state }
@@ -137,8 +145,6 @@ pub struct DiscStockLog<ItemType> {
     pub element_name: String,
     pub element_type: String,
     pub details: DiscStockLogType<ItemType>,
-
-    // pub phantom: std::marker::PhantomData<ItemType>,
 }
 
 impl<ItemType> DiscStockLog<ItemType> {
