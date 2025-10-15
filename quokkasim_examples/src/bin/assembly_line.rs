@@ -6,7 +6,7 @@ fn create_bench() {
 
     // Component declarations
 
-    let mut source: DefaultDiscSource<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscSource::new()
+    let mut source: DefaultDiscSource<String, DiscProcessLog<DefaultDiscProcessLogType<String>>> = DefaultDiscSource::new()
         .with_name("Source")
         .with_code("SRC")
         .with_source_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
@@ -23,7 +23,7 @@ fn create_bench() {
     let q1_mbox = Mailbox::new();
     let q1_addr = q1_mbox.address();
 
-    let mut process: DefaultDiscProcess<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscProcess::new()
+    let mut process: DefaultDiscProcess<String, DiscProcessLog<DefaultDiscProcessLogType<String>>> = DefaultDiscProcess::new()
         .with_name("Process")
         .with_code("P")
         .with_process_time_distr(df.create(DistributionConfig::Constant(0.1)).unwrap());
@@ -37,7 +37,7 @@ fn create_bench() {
     let q2_mbox = Mailbox::new();
     let q2_addr = q2_mbox.address();
 
-    let mut sink : DefaultDiscSink<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscSink::new()
+    let mut sink : DefaultDiscSink<String, DiscProcessLog<DefaultDiscProcessLogType<String>>> = DefaultDiscSink::new()
         .with_name("Sink")
         .with_code("SNK")
         .with_sink_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
@@ -54,7 +54,7 @@ fn create_bench() {
 
     // Loggers
 
-    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<String>, String>>::new();
+    let process_logger = EventQueue::<DiscProcessLog<DefaultDiscProcessLogType<String>>>::new();
     source.log_emitter.connect_sink(&process_logger);
     process.log_emitter.connect_sink(&process_logger);
     sink.log_emitter.connect_sink(&process_logger);
