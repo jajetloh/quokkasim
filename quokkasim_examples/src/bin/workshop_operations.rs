@@ -42,6 +42,15 @@ struct WorkerShiftManager {
 }
 
 impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>, Worker>, DefaultDiscProcessLogType<Worker>> for WorkerShiftManager {
+    fn update_state(
+            &mut self,
+            source_event_id: EventId,
+            cx: &mut Context<Self>,
+        ) -> impl Future<Output = ()> + Send {
+        async move {
+            // self.up
+        }
+    }
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }

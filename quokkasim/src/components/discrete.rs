@@ -324,6 +324,7 @@ where
     }
 }
 
+
 impl<ItemType> DiscProcessCore<
         ItemType,
         DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
@@ -467,47 +468,305 @@ where
     ) -> DefaultDiscProcessLogType<ItemType> {
         DefaultDiscProcessLogType::StateChange { new_state }
     }
+
+    fn update_state(
+            &mut self,
+            source_event_id: EventId,
+            cx: &mut Context<Self>,
+        ) -> impl Future<Output = ()> + Send {
+        async move {
+            self.update_state_since_last_update(&mut source_event_id.clone(), cx)
+                .await;
+            self.update_state_decision_logic(&mut source_event_id.clone(), cx)
+                .await;
+            self.update_state_for_next_event(&mut source_event_id.clone(), cx)
+                .await;
+        }
+    }
 }
 
-impl<ItemType> DiscProcess<
-        ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
-        DefaultDiscProcessLogType<ItemType>,
-    > for DefaultDiscProcess<
+impl<
+    ItemType,
+> DiscProcessUpdateDecisionLogic<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscProcess<
         ItemType,
         DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
     >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+        DefaultDiscProcessLogType<ItemType>
+    >
 {
-    fn req_upstream(&mut self) -> &mut Requestor<(), DiscStockState> {
-        &mut self.req_upstream
-    }
-
-    fn withdraw_upstream(
+    fn update_state_decision_logic(
         &mut self,
-    ) -> &mut Requestor<(usize, EventId), Vec<ItemType>> {
-        &mut self.withdraw_upstream
-    }
+        source_event_id: &mut EventId,
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> + Send {
+        async move {
+            let time_now = cx.time();
 
-    fn req_downstream(&mut self) -> &mut Requestor<(), DiscStockState> {
-        &mut self.req_downstream
-    }
+            let new_env_state = match self.req_environment().send(()).await.next() {
+                Some(env) => env,
+                None => BasicEnvironmentState::Normal,
+            };
 
-    fn push_downstream(
-        &mut self,
-    ) -> &mut Output<(Vec<ItemType>, EventId)> {
-        &mut self.push_downstream
-    }
+            match (&self.env_state(), &new_env_state) {
+                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+                    *source_event_id = self
+                        .log(
+                            time_now,
+                            source_event_id.clone(),
+                            self.log_type_process_stopped("Stopped by environment"),
+                        )
+                        .await;
+                    *self.env_state() = BasicEnvironmentState::Stopped;
+                }
+                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+                    *source_event_id = self
+                        .log(
+                            time_now,
+                            source_event_id.clone(),
+                            self.log_type_process_continue("Resumed by environment"),
+                        )
+                        .await;
+                    *self.env_state() = BasicEnvironmentState::Normal;
+                }
+                _ => {}
+            }
 
-    fn process_quantity_distr(&mut self) -> &mut Distribution {
-        &mut self.process_quantity_distr
-    }
+            let is_env_stopped =
+                matches!(self.env_state(), BasicEnvironmentState::Stopped);
+            let has_active_delay =
+                self.delay_modes().active_delay().is_some() || is_env_stopped;
 
-    fn process_time_distr(&mut self) -> &mut Distribution {
-        &mut self.process_time_distr
+            
+
+            match (self.process_state(), has_active_delay) {
+                (None, false) => {
+                    let upstream_state = self.req_upstream.send(()).await.next();
+                    let downstream_state =
+                        self.req_downstream.send(()).await.next();
+
+                    match (&upstream_state, &downstream_state) {
+                        (
+                            Some(DiscStockState::Normal { .. })
+                            | Some(DiscStockState::Full { .. }),
+                            Some(DiscStockState::Empty { .. })
+                            | Some(DiscStockState::Normal { .. }),
+                        ) => {
+                            let mut requested =
+                                self.process_quantity_distr.sample().round();
+                            if !requested.is_finite() {
+                                requested = 1.0;
+                            }
+                            let requested = requested.clamp(1.0, u32::MAX as f64) as usize;
+
+                            *source_event_id = self
+                                .log(
+                                    time_now,
+                                    source_event_id.clone(),
+                                    self.log_type_withdraw_request(requested),
+                                )
+                                .await;
+
+                            let pulled = self
+                                .withdraw_upstream
+                                .send((requested, source_event_id.clone()))
+                                .await
+                                .next();
+
+                            match pulled {
+                                Some(batch) => {
+                                    if batch.is_empty() {
+                                        *source_event_id = self
+                                            .log(
+                                                time_now,
+                                                source_event_id.clone(),
+                                                self.log_type_process_failure(
+                                                    "Upstream returned no items",
+                                                ),
+                                            )
+                                            .await;
+                                        *self.time_to_next_process_event() = None;
+                                        return;
+                                    }
+
+                                    let mut process_secs =
+                                        self.process_time_distr.sample();
+                                    if !process_secs.is_finite() {
+                                        process_secs = 0.0;
+                                    }
+                                    process_secs = process_secs.max(0.0);
+                                    let mut process_duration =
+                                        Duration::from_secs_f64(process_secs);
+                                    if process_duration.is_zero() {
+                                        process_duration = Duration::from_nanos(1);
+                                    }
+
+                                    let quantity = batch.len();
+                                    let log_payload = batch.clone();
+
+                                    *self.process_state() =
+                                        Some((process_duration, batch));
+                                    *source_event_id = self
+                                        .log(
+                                            time_now,
+                                            source_event_id.clone(),
+                                            self.log_type_process_start(
+                                                quantity,
+                                                log_payload,
+                                            ),
+                                        )
+                                        .await;
+                                    *self.time_to_next_process_event() =
+                                        Some(process_duration);
+                                }
+                                None => {
+                                    *source_event_id = self
+                                        .log(
+                                            time_now,
+                                            source_event_id.clone(),
+                                            self.log_type_process_failure(
+                                                "Upstream requestor closed",
+                                            ),
+                                        )
+                                        .await;
+                                    *self.time_to_next_process_event() = None;
+                                }
+                            }
+                        }
+                        (Some(DiscStockState::Empty { .. }), _) => {
+                            *source_event_id = self
+                                .log(
+                                    time_now,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure("Upstream is empty"),
+                                )
+                                .await;
+                            *self.time_to_next_process_event() = None;
+                        }
+                        (None, _) => {
+                            *source_event_id = self
+                                .log(
+                                    time_now,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure(
+                                        "Upstream is not connected",
+                                    ),
+                                )
+                                .await;
+                            *self.time_to_next_process_event() = None;
+                        }
+                        (_, None) => {
+                            *source_event_id = self
+                                .log(
+                                    time_now,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure(
+                                        "Downstream is not connected",
+                                    ),
+                                )
+                                .await;
+                            *self.time_to_next_process_event() = None;
+                        }
+                        (_, Some(DiscStockState::Full { .. })) => {
+                            *source_event_id = self
+                                .log(
+                                    time_now,
+                                    source_event_id.clone(),
+                                    self.log_type_process_failure("Downstream is full"),
+                                )
+                                .await;
+                            *self.time_to_next_process_event() = None;
+                        }
+                    }
+                }
+                (Some((time_left, _)), false) => {
+                    *self.time_to_next_process_event() = Some(*time_left);
+                }
+                (_, true) => {
+                    *self.time_to_next_process_event() = self
+                        .delay_modes()
+                        .active_delay()
+                        .map(|(_, delay_state)| *delay_state);
+                }
+            }
+        }
     }
 }
+
+impl<
+    ItemType,
+> DiscProcessUpdateSinceLast<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscProcess<
+        ItemType,
+        DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    >
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+        DefaultDiscProcessLogType<ItemType>
+    >
+{
+    fn update_process_state_since_prev_event(
+        &mut self,
+        source_event_id: &mut EventId,
+        cx: &mut Context<Self>,
+        duration_since_prev: Duration
+    ) -> impl Future<Output = ()> + Send {
+        async move {
+            if let Some((mut time_left, resources)) = self.process_state().take() {
+                time_left = time_left.saturating_sub(duration_since_prev);
+                if time_left.is_zero() {
+                    let log_payload = resources.clone();
+                    *source_event_id = self
+                        .log(
+                            cx.time(),
+                            source_event_id.clone(),
+                            self.log_type_process_success(1, log_payload),
+                        )
+                        .await;
+                    self.push_downstream
+                        .send((resources, source_event_id.clone()))
+                        .await;
+                    *self.time_to_next_process_event() = None;
+                } else {
+                    *self.process_state() = Some((time_left, resources));
+                    *self.time_to_next_process_event() = Some(time_left);
+                }
+            }
+        }
+    }
+}
+
+impl<
+    ItemType,
+> DiscProcessUpdateForNextEvent<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscProcess<
+        ItemType,
+        DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    >
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+        DefaultDiscProcessLogType<ItemType>
+    > {}
 
 pub struct SimpleStringGenerator {
     pub format: String,
@@ -597,103 +856,68 @@ impl<
     }
 }
 
-impl<ItemType, ProcessLog> DefaultDiscSource<ItemType, ProcessLog>
-where
+impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    ProcessLog: Clone + Debug + Serialize + Send + 'static,
-    Self: DiscProcessCore<ItemType, ProcessLog, DefaultDiscProcessLogType<ItemType>>,
+> DiscProcessUpdateSinceLast<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscSource<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+>
+where   
+    ItemType: Clone + Debug + Serialize + Send + 'static,
 {
-    pub fn update_state(
-        &mut self,
-        mut source_event_id: EventId,
+    fn update_process_state_since_prev_event(
+        &mut self, source_event_id: &mut EventId,
         cx: &mut Context<Self>,
+        duration_since_prev: Duration
     ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, cx)
-                .await;
-            self.update_state_decision_logic(&mut source_event_id, cx)
-                .await;
-            self.update_state_next_event(&mut source_event_id, cx)
-                .await;
-        }
-    }
-
-    fn update_state_since_last_update(
-        &mut self,
-        source_event_id: &mut EventId,
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
-        async move {
-            if let Some((scheduled_time, _)) = self.scheduled_event() {
-                if *scheduled_time <= cx.time() {
-                    *self.scheduled_event() = None;
-                }
-            }
-
-            let duration_since_prev =
-                cx.time().duration_since(*self.previous_check_time());
-
-            let is_in_delay = self.delay_modes().active_delay().is_some();
-            let is_env_blocked =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let is_in_process =
-                self.process_state().is_some() && !is_in_delay && !is_env_blocked;
-
-            if !is_in_delay && !is_env_blocked {
-                if let Some((mut time_left, resources)) = self.process_state().take() {
-                    time_left = time_left.saturating_sub(duration_since_prev);
-                    if time_left.is_zero() {
-                        let quantity = resources.len();
-                        let log_payload = resources.clone();
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_process_success(quantity, log_payload),
-                            )
-                            .await;
-                        self.push_downstream
-                            .send((resources, source_event_id.clone()))
-                            .await;
-                        *self.time_to_next_process_event() = None;
-                    } else {
-                        *self.process_state() = Some((time_left, resources));
-                        *self.time_to_next_process_event() = Some(time_left);
-                    }
-                }
-            }
-
-            if !is_env_blocked && (is_in_delay || is_in_process) {
-                let transition = self.delay_modes().update_state(duration_since_prev);
-                if transition.has_changed() {
-                    if let Some(delay_name) = &transition.from {
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_delay_end(delay_name.clone()),
-                            )
-                            .await;
-                    }
-                    if let Some(delay_name) = &transition.to {
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_delay_start(delay_name.clone()),
-                            )
-                            .await;
-                    }
+            if let Some((mut time_left, resources)) = self.process_state().take() {
+                time_left = time_left.saturating_sub(duration_since_prev);
+                if time_left.is_zero() {
+                    let quantity = resources.len();
+                    let log_payload = resources.clone();
+                    *source_event_id = self
+                        .log(
+                            cx.time(),
+                            source_event_id.clone(),
+                            self.log_type_process_success(quantity, log_payload),
+                        )
+                        .await;
+                    self.push_downstream
+                        .send((resources, source_event_id.clone()))
+                        .await;
+                    *self.time_to_next_process_event() = None;
+                } else {
+                    *self.process_state() = Some((time_left, resources));
+                    *self.time_to_next_process_event() = Some(time_left);
                 }
             }
         }
     }
+}
 
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> DiscProcessUpdateDecisionLogic<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscSource<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+> 
+where 
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+{
     fn update_state_decision_logic(
-        &mut self,
-        source_event_id: &mut EventId,
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
+            &mut self,
+            source_event_id: &mut EventId,
+            cx: &mut Context<Self>,
+        ) -> impl Future<Output = ()> + Send {
         async move {
             let time_now = cx.time();
 
@@ -854,84 +1078,21 @@ where
             }
         }
     }
-
-    fn update_state_next_event(
-        &mut self,
-        source_event_id: &mut EventId,
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
-        async move {
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
-
-            if self.process_state().is_some()
-                || has_active_delay
-                || !is_env_stopped
-            {
-                *self.time_to_next_delay_event() = self
-                    .delay_modes()
-                    .get_next_event()
-                    .map(|(_, delay_state)| delay_state.as_duration());
-            } else {
-                *self.time_to_next_delay_event() = None;
-            }
-
-            let next_event = [
-                *self.time_to_next_delay_event(),
-                *self.time_to_next_process_event(),
-            ]
-            .into_iter()
-            .flatten()
-            .min();
-
-            println!(
-                "### [{}] Next event in: {:?}",
-                self.element_name,
-                next_event
-            );
-
-            if let Some(time_until_next) = next_event {
-                if time_until_next.is_zero() {
-                    panic!("Time until next event is zero!");
-                }
-
-                let next_time = cx.time() + time_until_next;
-
-                if let Some((scheduled_time, action_key)) =
-                    self.scheduled_event().take()
-                {
-                    if next_time < scheduled_time {
-                        action_key.cancel();
-                        let new_key = cx
-                            .schedule_keyed_event(
-                                next_time,
-                                Self::update_state,
-                                source_event_id.clone(),
-                            )
-                            .unwrap();
-                        *self.scheduled_event() = Some((next_time, new_key));
-                    } else {
-                        *self.scheduled_event() =
-                            Some((scheduled_time, action_key));
-                    }
-                } else {
-                    let new_key = cx
-                        .schedule_keyed_event(
-                            next_time,
-                            Self::update_state,
-                            source_event_id.clone(),
-                        )
-                        .unwrap();
-                    *self.scheduled_event() = Some((next_time, new_key));
-                }
-            }
-
-            *self.previous_check_time() = cx.time();
-        }
-    }
 }
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> DiscProcessUpdateForNextEvent<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscSource<
+    ItemType,
+    DiscProcessLog<DefaultDiscProcessLogType<ItemType>, ItemType>,
+> 
+where 
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+{}
 
 impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscSource<
     ItemType, 
@@ -998,6 +1159,22 @@ impl<ItemType> DiscProcessCore<
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
 {
+
+    fn update_state(
+            &mut self,
+            mut source_event_id: EventId,
+            cx: &mut Context<Self>,
+        ) -> impl Future<Output = ()> + Send {
+        async move {
+            self.update_state_since_last_update(&mut source_event_id, cx)
+                .await;
+            self.update_state_decision_logic(&mut source_event_id, cx)
+                .await;
+            self.update_state_for_next_event(&mut source_event_id, cx)
+                .await;
+        }
+    }
+
     fn element_name(&self) -> &str {
         &self.element_name
     }
@@ -1200,102 +1377,67 @@ impl<
     }
 }
 
-impl<ItemType, ProcessLog> DefaultDiscSink<ItemType, ProcessLog>
-where
+impl<ItemType, ProcessLog> DiscProcessUpdateSinceLast<
+    ItemType,
+    ProcessLog,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscSink<
+    ItemType, ProcessLog
+> where
     ItemType: Clone + Debug + Serialize + Send + 'static,
     ProcessLog: Clone + Debug + Serialize + Send + 'static,
     Self: DiscProcessCore<ItemType, ProcessLog, DefaultDiscProcessLogType<ItemType>>,
 {
-    pub fn update_state(
-        &mut self,
-        mut source_event_id: EventId,
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
+    fn update_process_state_since_prev_event(
+            &mut self, source_event_id: &mut EventId,
+            cx: &mut Context<Self>,
+            duration_since_prev: Duration
+        ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, cx)
-                .await;
-            self.update_state_decision_logic(&mut source_event_id, cx)
-                .await;
-            self.update_state_next_event(&mut source_event_id, cx)
-                .await;
-        }
-    }
-
-    fn update_state_since_last_update(
-        &mut self,
-        source_event_id: &mut EventId,
-        cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
-        async move {
-            if let Some((scheduled_time, _)) = self.scheduled_event() {
-                if *scheduled_time <= cx.time() {
-                    *self.scheduled_event() = None;
-                }
-            }
-
-            let duration_since_prev =
-                cx.time().duration_since(*self.previous_check_time());
-
-            let is_in_delay = self.delay_modes().active_delay().is_some();
-            let is_env_blocked =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let is_in_process =
-                self.process_state().is_some() && !is_in_delay && !is_env_blocked;
-
-            if !is_in_delay && !is_env_blocked {
-                if let Some((mut time_left, mut resources)) = self.process_state().take() {
-                    time_left = time_left.saturating_sub(duration_since_prev);
-                    if time_left.is_zero() {
-                        let quantity = resources.len();
-                        let log_payload = resources.clone();
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_process_success(quantity, log_payload),
-                            )
-                            .await;
-                        resources.clear();
-                        *self.time_to_next_process_event() = None;
-                    } else {
-                        *self.process_state() = Some((time_left, resources));
-                        *self.time_to_next_process_event() = Some(time_left);
-                    }
-                }
-            }
-
-            if !is_env_blocked && (is_in_delay || is_in_process) {
-                let transition = self.delay_modes().update_state(duration_since_prev);
-                if transition.has_changed() {
-                    if let Some(delay_name) = &transition.from {
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_delay_end(delay_name.clone()),
-                            )
-                            .await;
-                    }
-                    if let Some(delay_name) = &transition.to {
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_delay_start(delay_name.clone()),
-                            )
-                            .await;
-                    }
+            if let Some((mut time_left, mut resources)) = self.process_state().take() {
+                time_left = time_left.saturating_sub(duration_since_prev);
+                if time_left.is_zero() {
+                    let quantity = resources.len();
+                    let log_payload = resources.clone();
+                    *source_event_id = self
+                        .log(
+                            cx.time(),
+                            source_event_id.clone(),
+                            self.log_type_process_success(quantity, log_payload),
+                        )
+                        .await;
+                    resources.clear();
+                    self.time_to_next_process_event = None;
+                } else {
+                    *self.process_state() = Some((time_left, resources));
+                    self.time_to_next_process_event = Some(time_left);
                 }
             }
         }
     }
+}
 
+impl<
+    ItemType,
+    ProcessLog,
+    > DiscProcessUpdateDecisionLogic<
+    ItemType,
+    ProcessLog,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscSink<
+    ItemType,
+    ProcessLog,
+> where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLog: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<ItemType, ProcessLog, DefaultDiscProcessLogType<ItemType>>,
+{
     fn update_state_decision_logic(
         &mut self,
         source_event_id: &mut EventId,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
-        async move {
+        async move {  
             let time_now = cx.time();
 
             let new_env_state = match self.req_environment().send(()).await.next() {
@@ -1456,78 +1598,45 @@ where
                         .active_delay()
                         .map(|(_, delay_state)| *delay_state);
                 }
-            }
+            }  
         }
     }
+}
 
-    fn update_state_next_event(
+impl<
+    ItemType,
+    ProcessLog,
+> DiscProcessUpdateForNextEvent<
+    ItemType,
+    ProcessLog,
+    DefaultDiscProcessLogType<ItemType>,
+> for DefaultDiscSink<
+    ItemType,
+    ProcessLog,
+> where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLog: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<ItemType, ProcessLog, DefaultDiscProcessLogType<ItemType>>,
+{}
+
+impl<ItemType, ProcessLog> DefaultDiscSink<ItemType, ProcessLog>
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLog: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<ItemType, ProcessLog, DefaultDiscProcessLogType<ItemType>>,
+{
+    pub fn update_state(
         &mut self,
-        source_event_id: &mut EventId,
+        mut source_event_id: EventId,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
-
-            if self.process_state().is_some()
-                || has_active_delay
-                || !is_env_stopped
-            {
-                *self.time_to_next_delay_event() = self
-                    .delay_modes()
-                    .get_next_event()
-                    .map(|(_, delay_state)| delay_state.as_duration());
-            } else {
-                *self.time_to_next_delay_event() = None;
-            }
-
-            let next_event = [
-                *self.time_to_next_delay_event(),
-                *self.time_to_next_process_event(),
-            ]
-            .into_iter()
-            .flatten()
-            .min();
-
-            if let Some(time_until_next) = next_event {
-                if time_until_next.is_zero() {
-                    panic!("Time until next event is zero!");
-                }
-
-                let next_time = cx.time() + time_until_next;
-
-                if let Some((scheduled_time, action_key)) =
-                    self.scheduled_event().take()
-                {
-                    if next_time < scheduled_time {
-                        action_key.cancel();
-                        let new_key = cx
-                            .schedule_keyed_event(
-                                next_time,
-                                Self::update_state,
-                                source_event_id.clone(),
-                            )
-                            .unwrap();
-                        *self.scheduled_event() = Some((next_time, new_key));
-                    } else {
-                        *self.scheduled_event() =
-                            Some((scheduled_time, action_key));
-                    }
-                } else {
-                    let new_key = cx
-                        .schedule_keyed_event(
-                            next_time,
-                            Self::update_state,
-                            source_event_id.clone(),
-                        )
-                        .unwrap();
-                    *self.scheduled_event() = Some((next_time, new_key));
-                }
-            }
-
-            *self.previous_check_time() = cx.time();
+            self.update_state_since_last_update(&mut source_event_id, cx)
+                .await;
+            self.update_state_decision_logic(&mut source_event_id, cx)
+                .await;
+            self.update_state_for_next_event(&mut source_event_id, cx)
+                .await;
         }
     }
 }
@@ -1597,6 +1706,21 @@ impl<ItemType> DiscProcessCore<
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
 {
+    fn update_state(
+            &mut self,
+            mut source_event_id: EventId,
+            cx: &mut Context<Self>,
+        ) -> impl Future<Output = ()> + Send {
+        async move {
+            self.update_state_since_last_update(&mut source_event_id, cx)
+                .await;
+            self.update_state_decision_logic(&mut source_event_id, cx)
+                .await;
+            self.update_state_for_next_event(&mut source_event_id, cx)
+                .await;
+        }
+    }
+
     fn element_name(&self) -> &str {
         &self.element_name
     }

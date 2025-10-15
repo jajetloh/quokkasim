@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::{collections::VecDeque, fmt::Debug, ops::{Deref, DerefMut}, time::Duration};
+use std::{collections::{HashMap, HashSet, VecDeque}, fmt::Debug, ops::{Deref, DerefMut}, time::Duration};
 use crate::prelude::*;
 
 pub trait Generator<T> {
@@ -263,102 +263,54 @@ where
     StateChange { new_state: DiscStockState },
 }
 
-
-pub trait DiscProcessCore<
-    ItemType,
-    LogRecordType,
-    LogDetailsType,
->: Model + ToLogRecord<LogDetailsType, LogRecordType>
-where
-    ItemType: Clone + Debug + Serialize + Send + 'static,
-    LogRecordType: Clone + Send + 'static,
-    LogDetailsType: Clone + Send + 'static,
-{
-    fn log<D: Into<LogDetailsType> + Send>(
-        &mut self,
-        now: MonotonicTime,
-        source_event_id: EventId,
-        details: D,
-    ) -> impl Future<Output = EventId> + Send {
-        async move {
-            let event_id = self.get_next_event_id();
-            let record = self.to_record(
-                now,
-                source_event_id.clone(),
-                event_id.clone(),
-                details.into(),
-            );
-            self.log_emitter().send(record).await;
-            event_id
-        }
+pub trait Emptyable {
+    fn is_empty(&self) -> bool;
+}
+impl<T> Emptyable for Option<T> {
+    fn is_empty(&self) -> bool {
+        self.is_none()
     }
-
-    fn element_name(&self) -> &str;
-    fn element_code(&self) -> &str;
-    fn element_type(&self) -> &str;
-    fn get_next_event_id(&mut self) -> EventId;
-    fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
-    fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
-    fn previous_check_time(&mut self) -> &mut MonotonicTime;
-    fn delay_modes(&mut self) -> &mut DelayModes;
-    fn process_state(&mut self) -> &mut Option<(Duration, Vec<ItemType>)>;
-    fn env_state(&mut self) -> &mut BasicEnvironmentState;
-    fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState>;
-    fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
-    fn time_to_next_delay_event(&mut self) -> &mut Option<Duration>;
-
-    fn log_type_withdraw_request(&self, quantity: usize) -> LogDetailsType;
-    fn log_type_process_start(
-        &self,
-        quantity: usize,
-        resources: Vec<ItemType>,
-    ) -> LogDetailsType;
-    fn log_type_process_success(
-        &self,
-        quantity: usize,
-        resources: Vec<ItemType>,
-    ) -> LogDetailsType;
-    fn log_type_process_failure(&self, reason: &'static str) -> LogDetailsType;
-    fn log_type_process_stopped(&self, reason: &'static str) -> LogDetailsType;
-    fn log_type_process_continue(&self, reason: &'static str) -> LogDetailsType;
-    fn log_type_delay_start(&self, delay_name: String) -> LogDetailsType;
-    fn log_type_delay_end(&self, delay_name: String) -> LogDetailsType;
-    fn log_type_state_change(&self, new_state: DiscStockState) -> LogDetailsType;
+}
+impl<T> Emptyable for Vec<T> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+impl<T> Emptyable for VecDeque<T> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+impl<T, U> Emptyable for HashMap<T, U> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+}
+impl<T> Emptyable for HashSet<T> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
 }
 
-pub trait DiscProcess<
+pub trait DiscProcessUpdateSinceLast<
     ItemType,
-    LogRecordType,
-    LogDetailsType,
->: DiscProcessCore<ItemType, LogRecordType, LogDetailsType>
+    ProcessLogType,
+    ProcessLogDetailsType,
+>: DiscProcessCore<
+    ItemType,
+    ProcessLogType,
+    ProcessLogDetailsType,
+>
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    LogRecordType: Clone + Send + 'static,
-    LogDetailsType: Clone + Send + 'static,
+    ProcessLogType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLogDetailsType: Clone + Debug + Serialize + Send + 'static,
 {
-    fn req_upstream(&mut self) -> &mut Requestor<(), DiscStockState>;
-    fn withdraw_upstream(&mut self)
-        -> &mut Requestor<(usize, EventId), Vec<ItemType>>;
-    fn req_downstream(&mut self) -> &mut Requestor<(), DiscStockState>;
-    fn push_downstream(&mut self)
-        -> &mut Output<(Vec<ItemType>, EventId)>;
-    fn process_quantity_distr(&mut self) -> &mut Distribution;
-    fn process_time_distr(&mut self) -> &mut Distribution;
-
-    fn update_state(
-        &mut self,
-        mut source_event_id: EventId,
+    fn update_process_state_since_prev_event(
+        &mut self, source_event_id: &mut EventId,
         cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
-        async move {
-            self.update_state_since_last_update(&mut source_event_id, cx)
-                .await;
-            self.update_state_decision_logic(&mut source_event_id, cx)
-                .await;
-            self.update_state_next_event(&mut source_event_id, cx)
-                .await;
-        }
-    }
+        duration_since_prev: Duration
+    ) -> impl Future<Output = ()> + Send;
 
     fn update_state_since_last_update(
         &mut self,
@@ -379,30 +331,10 @@ where
             let is_env_blocked =
                 matches!(self.env_state(), BasicEnvironmentState::Stopped);
             let is_in_process =
-                self.process_state().is_some() && !is_in_delay && !is_env_blocked;
+                self.process_state().is_empty() && !is_in_delay && !is_env_blocked;
 
             if !is_in_delay && !is_env_blocked {
-                if let Some((mut time_left, resources)) = self.process_state().take() {
-                    time_left = time_left.saturating_sub(duration_since_prev);
-                    if time_left.is_zero() {
-                        let quantity = resources.len();
-                        let log_payload = resources.clone();
-                        *source_event_id = self
-                            .log(
-                                cx.time(),
-                                source_event_id.clone(),
-                                self.log_type_process_success(quantity, log_payload),
-                            )
-                            .await;
-                        self.push_downstream()
-                            .send((resources, source_event_id.clone()))
-                            .await;
-                        *self.time_to_next_process_event() = None;
-                    } else {
-                        *self.process_state() = Some((time_left, resources));
-                        *self.time_to_next_process_event() = Some(time_left);
-                    }
-                }
+                self.update_process_state_since_prev_event(source_event_id, cx, duration_since_prev).await;
             }
 
             if !is_env_blocked && (is_in_delay || is_in_process) {
@@ -430,203 +362,42 @@ where
             }
         }
     }
+}
 
+pub trait DiscProcessUpdateDecisionLogic<
+    ItemType,
+    ProcessLogType,
+    ProcessLogDetailsType,
+>: DiscProcessCore<
+    ItemType,
+    ProcessLogType,
+    ProcessLogDetailsType,
+> where 
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLogType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLogDetailsType: Clone + Debug + Serialize + Send + 'static,
+{
     fn update_state_decision_logic(
         &mut self,
         source_event_id: &mut EventId,
         cx: &mut Context<Self>,
-    ) -> impl Future<Output = ()> + Send {
-        async move {
-            let time_now = cx.time();
+    ) -> impl Future<Output = ()> + Send;
+}
 
-            let new_env_state = match self.req_environment().send(()).await.next() {
-                Some(env) => env,
-                None => BasicEnvironmentState::Normal,
-            };
-
-            match (&self.env_state(), &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self
-                        .log(
-                            time_now,
-                            source_event_id.clone(),
-                            self.log_type_process_stopped("Stopped by environment"),
-                        )
-                        .await;
-                    *self.env_state() = BasicEnvironmentState::Stopped;
-                }
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self
-                        .log(
-                            time_now,
-                            source_event_id.clone(),
-                            self.log_type_process_continue("Resumed by environment"),
-                        )
-                        .await;
-                    *self.env_state() = BasicEnvironmentState::Normal;
-                }
-                _ => {}
-            }
-
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
-
-            match (self.process_state(), has_active_delay) {
-                (None, false) => {
-                    let upstream_state = self.req_upstream().send(()).await.next();
-                    let downstream_state =
-                        self.req_downstream().send(()).await.next();
-
-                    match (&upstream_state, &downstream_state) {
-                        (
-                            Some(DiscStockState::Normal { .. })
-                            | Some(DiscStockState::Full { .. }),
-                            Some(DiscStockState::Empty { .. })
-                            | Some(DiscStockState::Normal { .. }),
-                        ) => {
-                            let mut requested =
-                                self.process_quantity_distr().sample().round();
-                            if !requested.is_finite() {
-                                requested = 1.0;
-                            }
-                            let requested = requested.clamp(1.0, u32::MAX as f64) as usize;
-
-                            *source_event_id = self
-                                .log(
-                                    time_now,
-                                    source_event_id.clone(),
-                                    self.log_type_withdraw_request(requested),
-                                )
-                                .await;
-
-                            let pulled = self
-                                .withdraw_upstream()
-                                .send((requested, source_event_id.clone()))
-                                .await
-                                .next();
-
-                            match pulled {
-                                Some(batch) => {
-                                    if batch.is_empty() {
-                                        *source_event_id = self
-                                            .log(
-                                                time_now,
-                                                source_event_id.clone(),
-                                                self.log_type_process_failure(
-                                                    "Upstream returned no items",
-                                                ),
-                                            )
-                                            .await;
-                                        *self.time_to_next_process_event() = None;
-                                        return;
-                                    }
-
-                                    let mut process_secs =
-                                        self.process_time_distr().sample();
-                                    if !process_secs.is_finite() {
-                                        process_secs = 0.0;
-                                    }
-                                    process_secs = process_secs.max(0.0);
-                                    let mut process_duration =
-                                        Duration::from_secs_f64(process_secs);
-                                    if process_duration.is_zero() {
-                                        process_duration = Duration::from_nanos(1);
-                                    }
-
-                                    let quantity = batch.len();
-                                    let log_payload = batch.clone();
-
-                                    *self.process_state() =
-                                        Some((process_duration, batch));
-                                    *source_event_id = self
-                                        .log(
-                                            time_now,
-                                            source_event_id.clone(),
-                                            self.log_type_process_start(
-                                                quantity,
-                                                log_payload,
-                                            ),
-                                        )
-                                        .await;
-                                    *self.time_to_next_process_event() =
-                                        Some(process_duration);
-                                }
-                                None => {
-                                    *source_event_id = self
-                                        .log(
-                                            time_now,
-                                            source_event_id.clone(),
-                                            self.log_type_process_failure(
-                                                "Upstream requestor closed",
-                                            ),
-                                        )
-                                        .await;
-                                    *self.time_to_next_process_event() = None;
-                                }
-                            }
-                        }
-                        (Some(DiscStockState::Empty { .. }), _) => {
-                            *source_event_id = self
-                                .log(
-                                    time_now,
-                                    source_event_id.clone(),
-                                    self.log_type_process_failure("Upstream is empty"),
-                                )
-                                .await;
-                            *self.time_to_next_process_event() = None;
-                        }
-                        (None, _) => {
-                            *source_event_id = self
-                                .log(
-                                    time_now,
-                                    source_event_id.clone(),
-                                    self.log_type_process_failure(
-                                        "Upstream is not connected",
-                                    ),
-                                )
-                                .await;
-                            *self.time_to_next_process_event() = None;
-                        }
-                        (_, None) => {
-                            *source_event_id = self
-                                .log(
-                                    time_now,
-                                    source_event_id.clone(),
-                                    self.log_type_process_failure(
-                                        "Downstream is not connected",
-                                    ),
-                                )
-                                .await;
-                            *self.time_to_next_process_event() = None;
-                        }
-                        (_, Some(DiscStockState::Full { .. })) => {
-                            *source_event_id = self
-                                .log(
-                                    time_now,
-                                    source_event_id.clone(),
-                                    self.log_type_process_failure("Downstream is full"),
-                                )
-                                .await;
-                            *self.time_to_next_process_event() = None;
-                        }
-                    }
-                }
-                (Some((time_left, _)), false) => {
-                    *self.time_to_next_process_event() = Some(*time_left);
-                }
-                (_, true) => {
-                    *self.time_to_next_process_event() = self
-                        .delay_modes()
-                        .active_delay()
-                        .map(|(_, delay_state)| *delay_state);
-                }
-            }
-        }
-    }
-
-    fn update_state_next_event(
+pub trait DiscProcessUpdateForNextEvent<
+    ItemType,
+    ProcessLogType,
+    ProcessLogDetailsType,
+>: DiscProcessCore<
+    ItemType,
+    ProcessLogType,
+    ProcessLogDetailsType,
+> where 
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLogType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLogDetailsType: Clone + Debug + Serialize + Send + 'static,
+{
+    fn update_state_for_next_event(
         &mut self,
         source_event_id: &mut EventId,
         cx: &mut Context<Self>,
@@ -696,4 +467,72 @@ where
             *self.previous_check_time() = cx.time();
         }
     }
+}
+
+pub trait DiscProcessCore<
+    ItemType,
+    LogRecordType,
+    LogDetailsType,
+>: Model + ToLogRecord<LogDetailsType, LogRecordType>
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    LogRecordType: Clone + Send + 'static,
+    LogDetailsType: Clone + Send + 'static,
+{
+    fn log<D: Into<LogDetailsType> + Send>(
+        &mut self,
+        now: MonotonicTime,
+        source_event_id: EventId,
+        details: D,
+    ) -> impl Future<Output = EventId> + Send {
+        async move {
+            let event_id = self.get_next_event_id();
+            let record = self.to_record(
+                now,
+                source_event_id.clone(),
+                event_id.clone(),
+                details.into(),
+            );
+            self.log_emitter().send(record).await;
+            event_id
+        }
+    }
+
+    fn element_name(&self) -> &str;
+    fn element_code(&self) -> &str;
+    fn element_type(&self) -> &str;
+    fn get_next_event_id(&mut self) -> EventId;
+    fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
+    fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
+    fn previous_check_time(&mut self) -> &mut MonotonicTime;
+    fn delay_modes(&mut self) -> &mut DelayModes;
+    fn process_state(&mut self) -> &mut Option<(Duration, Vec<ItemType>)>;
+    fn env_state(&mut self) -> &mut BasicEnvironmentState;
+    fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState>;
+    fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
+    fn time_to_next_delay_event(&mut self) -> &mut Option<Duration>;
+
+    fn log_type_withdraw_request(&self, quantity: usize) -> LogDetailsType;
+    fn log_type_process_start(
+        &self,
+        quantity: usize,
+        resources: Vec<ItemType>,
+    ) -> LogDetailsType;
+    fn log_type_process_success(
+        &self,
+        quantity: usize,
+        resources: Vec<ItemType>,
+    ) -> LogDetailsType;
+    fn log_type_process_failure(&self, reason: &'static str) -> LogDetailsType;
+    fn log_type_process_stopped(&self, reason: &'static str) -> LogDetailsType;
+    fn log_type_process_continue(&self, reason: &'static str) -> LogDetailsType;
+    fn log_type_delay_start(&self, delay_name: String) -> LogDetailsType;
+    fn log_type_delay_end(&self, delay_name: String) -> LogDetailsType;
+    fn log_type_state_change(&self, new_state: DiscStockState) -> LogDetailsType;
+
+    fn update_state(
+        &mut self,
+        source_event_id: EventId,
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> + Send;
 }

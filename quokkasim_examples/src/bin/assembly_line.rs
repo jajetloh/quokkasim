@@ -6,7 +6,6 @@ fn create_bench() {
 
     // Component declarations
 
-
     let mut source: DefaultDiscSource<String, DiscProcessLog<DefaultDiscProcessLogType<String>, String>> = DefaultDiscSource::new()
         .with_name("Source")
         .with_code("SRC")
