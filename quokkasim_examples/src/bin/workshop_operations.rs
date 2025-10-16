@@ -22,7 +22,7 @@ struct WorkerShiftManager {
     // Ports
     pub add_worker: Output<Worker>,
     pub remove_worker: Requestor<(), Worker>,
-    pub log_emitter: Output<DiscProcessLog<DefaultDiscProcessLogType<String>, String>>,
+    pub log_emitter: Output<DiscProcessLog<DefaultDiscProcessLogType<String>>>,
     pub req_environment: Requestor<(), BasicEnvironmentState>,
 
     // Configuration
@@ -41,7 +41,23 @@ struct WorkerShiftManager {
     pub previous_check_time: MonotonicTime,
 }
 
-impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>, Worker>, DefaultDiscProcessLogType<Worker>> for WorkerShiftManager {
+impl Model for WorkerShiftManager {
+    fn init(
+        mut self,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = InitializedModel<Self>> {
+        async move {
+            let source_event_id = EventId(format!(
+                "{}_{:06}",
+                self.element_code, self.next_event_index
+            ));
+            self.update_state(source_event_id, ctx).await;
+            self.into()
+        }
+    }
+}
+
+impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> for WorkerShiftManager {
     fn update_state(
             &mut self,
             source_event_id: EventId,
@@ -62,7 +78,7 @@ impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>, W
         self.next_event_index += 1;
         id
     }
-    fn log_emitter(&mut self) -> &mut Output<DiscProcessLog<DefaultDiscProcessLogType<Worker>, Worker>> { &mut self.log_emitter }
+    fn log_emitter(&mut self) -> &mut Output<DiscProcessLog<DefaultDiscProcessLogType<Worker>>> { &mut self.log_emitter }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
         &mut self.scheduled_event
     }

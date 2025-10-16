@@ -147,26 +147,6 @@ pub struct DiscStockLog<ItemType> {
     pub details: DiscStockLogType<ItemType>,
 }
 
-impl<ItemType> DiscStockLog<ItemType> {
-    fn to_log(
-        time: MonotonicTime,
-        event_id: EventId,
-        source_event_id: EventId,
-        element_name: String,
-        element_type: String,
-        details: DiscStockLogType<ItemType>,
-    ) -> Self {
-        DiscStockLog {
-            time: time.to_chrono_date_time(0).unwrap().to_string(),
-            event_id,
-            source_event_id,
-            element_name,
-            element_type,
-            details,
-        }
-    }
-}
-
 impl<ItemType> ToLogRecord<
         DiscStockLogType<ItemType>,
         DiscStockLog<ItemType>,
@@ -1026,7 +1006,7 @@ where
     fn init(
         mut self,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = InitializedModel<Self>> + Send {
+    ) -> impl Future<Output = InitializedModel<Self>> {
         async move {
             let source_event_id = EventId(format!(
                 "{}_{:06}",
