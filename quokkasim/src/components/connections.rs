@@ -160,20 +160,19 @@ where
 
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
 >
     Connect<
-        DefaultDiscSource<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>,
-        DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>,
+        DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>,
+        DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>,
     > for Connection
 where
     DiscStockLogType<ItemType>: Serialize,
-    DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>: ToLogRecord<DiscStockLogType<ItemType>, StockLogRecord>,
+    // DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>: DiscProcessCore<ItemType, DiscProcessLog<ItemType>>,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscSource<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>, &Address<DefaultDiscSource<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>>),
-        b: (&mut DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>, &Address<DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>>),
+        a: (&mut DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>>),
+        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
     ) -> Result<(), String> {
         b.0.state_emitter.connect(DefaultDiscSource::update_state, a.1.clone());
         a.0.req_downstream.connect(DefaultDiscStock::get_state_async, b.1.clone());
@@ -190,20 +189,18 @@ where
 
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
 >
     Connect<
-        DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>,
-        DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>,
+        DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>,
+        DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>,
     > for Connection
 where
     DiscStockLogType<ItemType>: Serialize,
-    DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>: ToLogRecord<DiscStockLogType<ItemType>, StockLogRecord>,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>>),
-        b: (&mut DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>, &Address<DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>>),
+        a: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>>),
+        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
     ) -> Result<(), String> {
         b.0.state_emitter.connect(DefaultDiscProcess::update_state, a.1.clone());
         a.0.req_downstream.connect(DefaultDiscStock::get_state_async, b.1.clone());
@@ -214,20 +211,19 @@ where
 
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
 >
     Connect<
-        DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>,
-        DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>,
+        DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>,
+        DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>,
     > for Connection
 where
     DiscStockLogType<ItemType>: Serialize,
-    DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>: ToLogRecord<DiscStockLogType<ItemType>, StockLogRecord>,
+    DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>: ToLogRecord<DiscStockLogType<ItemType>, DiscStockLog<ItemType>>,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>, &Address<DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>>),
-        b: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>>),
+        a: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
+        b: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>>),
     ) -> Result<(), String> {
         a.0.state_emitter.connect(DefaultDiscProcess::update_state, b.1.clone());
         b.0.req_upstream.connect(DefaultDiscStock::get_state_async, a.1.clone());
@@ -245,20 +241,19 @@ where
 
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
 >
     Connect<
-        DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>,
-        DefaultDiscSink<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>,
+        DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>,
+        DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>,
     > for Connection
 where
     DiscStockLogType<ItemType>: Serialize,
-    DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>: ToLogRecord<DiscStockLogType<ItemType>, StockLogRecord>,
+    DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>: ToLogRecord<DiscStockLogType<ItemType>, DiscStockLog<ItemType>>,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>, &Address<DefaultDiscStock<ItemType, DiscStockState, StockLogRecord>>),
-        b: (&mut DefaultDiscSink<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>, &Address<DefaultDiscSink<ItemType, DiscProcessLog<DefaultDiscProcessLogType<ItemType>>>>),
+        a: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
+        b: (&mut DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>>),
     ) -> Result<(), String> {
         a.0.state_emitter.connect(DefaultDiscSink::update_state, b.1.clone());
         b.0.req_upstream.connect(DefaultDiscStock::get_state_async, a.1.clone());

@@ -119,19 +119,14 @@ pub trait DiscreteArithmetic<T> {
 pub trait DiscStock<
     ResourceType: Clone + Send + 'static,
     StateType: StockState + Clone + Send + 'static,
-    LogRecordType: Clone + Send + 'static,
-    LogDetailsType: Clone + Send + 'static,
 > where
     Self: Model,
-    Self: ToLogRecord<LogDetailsType, LogRecordType>,
 {
     fn get_state(&mut self) -> StateType;
 
     fn get_state_async(&mut self, _: (), _: &mut Context<Self>) -> impl Future<Output = StateType> + Send {
         async move { self.get_state() }
     }
-
-    fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
     fn get_next_event_id(&mut self) -> EventId;
     fn previous_state(&mut self) -> &mut Option<StateType>;
     fn resources(&mut self) -> &mut VecDequeStock<ResourceType>;
@@ -144,9 +139,7 @@ pub trait DiscStock<
                 self.resources().add_one(resource);
             }
             let total = self.resources().total();
-            let event_id = self
-                .log(cx.time(), payload.1.clone(), self.log_type_add_one(total, payload.0.clone()))
-                .await;
+            let event_id = self.log_type_add_one(&mut payload.1.clone(), total, payload.0.clone(), cx).await;
             let prev = self.previous_state().clone();
             let cur = self.get_state().clone();
             if prev.is_none() || !prev.as_ref().unwrap().is_same_state(&cur) {
@@ -162,9 +155,7 @@ pub trait DiscStock<
             *self.previous_state() = Some(self.get_state().clone());
             self.resources().add_multi(payload.0.clone());
             let total = self.resources().total();
-            let event_id = self
-                .log(cx.time(), payload.1.clone(), self.log_type_add_multi(total, payload.0.clone()))
-                .await;
+            let event_id = self.log_type_add_multi(&mut payload.1.clone(), total, payload.0.clone(), cx).await;
             let prev = self.previous_state().clone();
             let cur = self.get_state().clone();
             if prev.is_none() || !prev.as_ref().unwrap().is_same_state(&cur) {
@@ -189,9 +180,7 @@ pub trait DiscStock<
                 }
             }
             let total = self.resources().total();
-            let event_id = self
-                .log(cx.time(), payload.1.clone(), self.log_type_remove_multi(total, removed_entries.clone()))
-                .await;
+            let event_id = self.log_type_remove_multi(&mut payload.1.clone(), total, removed_entries.clone(), cx).await;
             let prev = self.previous_state().clone();
             let cur = self.get_state().clone();
             if prev.is_none() || !prev.as_ref().unwrap().is_same_state(&cur) {
@@ -205,42 +194,28 @@ pub trait DiscStock<
 
     fn emit_change(&mut self, payload: (StateType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
-            let nm = self
-                .log(cx.time(), payload.1, self.log_type_state_change(payload.0.clone()))
-                .await;
-            self.state_emitter().send(nm).await;
+            let event_id = self.log_type_state_change(&mut payload.1.clone(), payload.0.clone(), cx).await;
+            self.state_emitter().send(event_id).await;
         }
     }
-
-    fn log<D: Into<LogDetailsType> + Send>(
-        &mut self, now: MonotonicTime, source_event: EventId, details: D
-    ) -> impl Future<Output = EventId> + Send {
-        async move {
-            let eid = self.get_next_event_id();
-            let record = self.to_record(now, source_event.clone(), eid.clone(), details.into());
-            self.log_emitter().send(record.clone()).await;
-            eid
-        }
-    }
-
-    fn log_type_add_one(&self, balance: usize, resource: Option<ResourceType>) -> LogDetailsType;
-    fn log_type_add_multi(&self, balance: usize, resource: Vec<ResourceType>) -> LogDetailsType;
-    fn log_type_remove_one(&self, balance: usize, resource: Option<ResourceType>) -> LogDetailsType;
-    fn log_type_remove_multi(&self, balance: usize, resource: Vec<ResourceType>) -> LogDetailsType;
-    fn log_type_state_change(&self, new_state: StateType) -> LogDetailsType;
+    fn log_type_add_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_add_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_remove_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_remove_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: StateType, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct DiscProcessLog<DetailsType>
+pub struct DiscProcessLog<ItemType>
 where
-    DetailsType: Clone + Serialize,
+    ItemType: Clone + Serialize + Debug,
 {
     pub time: String,
     pub event_id: EventId,
     pub source_event_id: EventId,
     pub element_name: String,
     pub element_type: String,
-    pub details: DetailsType,
+    pub details: DefaultDiscProcessLogType<ItemType>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -255,8 +230,6 @@ where
     ProcessFailure { reason: &'static str },
     ProcessStopped { reason: &'static str },
     ProcessContinue { reason: &'static str },
-    DelayStart { delay_name: String },
-    DelayEnd { delay_name: String },
     StateChange { new_state: DiscStockState },
 }
 
@@ -309,7 +282,7 @@ where
     fn update_state_since_last_update(
         &mut self,
         source_event_id: &mut EventId,
-        mut cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
             if let Some((scheduled_time, _)) = self.scheduled_event() {
@@ -318,30 +291,9 @@ where
                 }
             }
 
-            let duration_since_prev =
-                cx.time().duration_since(*self.previous_check_time());
+            let duration_since_prev = cx.time().duration_since(*self.previous_check_time());
 
-            let is_in_delay = self.delay_modes().active_delay().is_some();
-            let is_env_blocked =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let is_in_process =
-                self.process_state().is_empty() && !is_in_delay && !is_env_blocked;
-
-            if !is_in_delay && !is_env_blocked {
-                self.update_process_state_since_prev_event(source_event_id, cx, duration_since_prev).await;
-            }
-
-            if !is_env_blocked && (is_in_delay || is_in_process) {
-                let transition = self.delay_modes().update_state(duration_since_prev);
-                if transition.has_changed() {
-                    if let Some(delay_name) = &transition.from {
-                        *source_event_id = self.log_type_delay_end(source_event_id, delay_name.clone(), &mut cx).await;
-                    }
-                    if let Some(delay_name) = &transition.to {
-                        *source_event_id = self.log_type_delay_start(source_event_id, delay_name.clone(), &mut cx).await;
-                    }
-                }
-            }
+            self.update_process_state_since_prev_event(source_event_id, cx, duration_since_prev).await;
         }
     }
 }
@@ -366,12 +318,14 @@ pub trait DiscProcessUpdateDecisionLogic<
 pub trait DiscProcessUpdateForNextEvent<
     ItemType,
     ProcessLogType,
->: DiscProcessCore<
+>
+where 
+Self: DiscProcessCore<
     ItemType,
     ProcessLogType,
-> where 
-    ItemType: Clone + Debug + Serialize + Send + 'static,
-    ProcessLogType: Clone + Debug + Serialize + Send + 'static,
+>,
+ItemType: Clone + Debug + Serialize + Send + 'static,
+ProcessLogType: Clone + Debug + Serialize + Send + 'static,
 {
     fn update_state_for_next_event(
         &mut self,
@@ -379,37 +333,14 @@ pub trait DiscProcessUpdateForNextEvent<
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
-
-            if self.process_state().is_some()
-                || has_active_delay
-                || !is_env_stopped
-            {
-                *self.time_to_next_delay_event() = self
-                    .delay_modes()
-                    .get_next_event()
-                    .map(|(_, delay_state)| delay_state.as_duration());
-            } else {
-                *self.time_to_next_delay_event() = None;
-            }
-
-            let next_event = [
-                *self.time_to_next_delay_event(),
-                *self.time_to_next_process_event(),
-            ]
-            .into_iter()
-            .flatten()
-            .min();
+            let next_event = self.time_to_next_process_event();
 
             if let Some(time_until_next) = next_event {
                 if time_until_next.is_zero() {
                     panic!("Time until next event is zero!");
                 }
 
-                let next_time = cx.time() + time_until_next;
+                let next_time = cx.time() + *time_until_next;
 
                 if let Some((scheduled_time, action_key)) =
                     self.scheduled_event().take()
@@ -457,15 +388,10 @@ where
     fn element_code(&self) -> &str;
     fn element_type(&self) -> &str;
     fn get_next_event_id(&mut self) -> EventId;
-    fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
+    // fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
     fn previous_check_time(&mut self) -> &mut MonotonicTime;
-    fn delay_modes(&mut self) -> &mut DelayModes;
-    fn process_state(&mut self) -> &mut Option<(Duration, Vec<ItemType>)>;
-    fn env_state(&mut self) -> &mut BasicEnvironmentState;
-    fn req_environment(&mut self) -> &mut Requestor<(), BasicEnvironmentState>;
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
-    fn time_to_next_delay_event(&mut self) -> &mut Option<Duration>;
 
     fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
     fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
@@ -473,9 +399,7 @@ where
     fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
     fn log_type_process_stopped(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
     fn log_type_process_continue(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
 
     fn update_state(
         &mut self,

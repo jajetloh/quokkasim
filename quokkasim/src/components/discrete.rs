@@ -74,16 +74,12 @@ impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + '
 
 impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    LogRecordType: Clone + Send + 'static,
 > DiscStock<
     ItemType,
     DiscStockState,
-    LogRecordType,
-    DiscStockLogType<ItemType>,
-> for DefaultDiscStock<ItemType, DiscStockState, LogRecordType> 
+> for DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>> 
 where 
     DiscStockLogType<ItemType>: Serialize,
-    Self: ToLogRecord<DiscStockLogType<ItemType>, LogRecordType>,
 {
     fn get_state(&mut self) -> DiscStockState {
         let occupied = self.resources.total();
@@ -101,10 +97,6 @@ where
         &mut self.resources
     }
 
-    fn log_emitter(&mut self) -> &mut Output<LogRecordType> {
-        &mut self.log_emitter
-    }
-
     fn get_next_event_id(&mut self) -> EventId {
         let event_id = EventId(format!(
             "{}_{:06}",
@@ -120,20 +112,75 @@ where
     fn state_emitter(&mut self) -> &mut Output<EventId> {
         &mut self.state_emitter
     }
-    fn log_type_add_one(&self, balance: usize, resource: Option<ItemType>) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::AddOne { balance, added: resource }
+    fn log_type_add_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscStockLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DiscStockLogType::AddOne { balance, added: resource.clone() },
+            }).await;
+            current_event_id
+        }
     }
-    fn log_type_add_multi(&self, balance: usize, resource: Vec<ItemType>) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::AddMulti { balance, added: resource }
+    fn log_type_add_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscStockLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DiscStockLogType::AddMulti { balance, added: resource.clone() },
+            }).await;
+            current_event_id
+        }
     }
-    fn log_type_remove_one(&self, balance: usize, resource: Option<ItemType>) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::RemoveOne { balance, removed: resource }
+    fn log_type_remove_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscStockLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DiscStockLogType::RemoveOne { balance, removed: resource.clone() },
+            }).await;
+            current_event_id
+        }
     }
-    fn log_type_remove_multi(&self, balance: usize, resource: Vec<ItemType>) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::RemoveMulti { balance, removed: resource.clone() }
+    fn log_type_remove_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscStockLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DiscStockLogType::RemoveMulti { balance, removed: resource.clone() },
+            }).await;
+            current_event_id
+        }
     }
-    fn log_type_state_change(&self, new_state: DiscStockState) -> DiscStockLogType<ItemType> {
-        DiscStockLogType::StateChange { new_state }
+    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscStockLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DiscStockLogType::StateChange { new_state: new_state.clone() },
+            }).await;
+            current_event_id
+        }
     }
 }
 
@@ -193,7 +240,7 @@ pub struct DefaultDiscProcess<
     // Ports
     pub req_upstream: Requestor<(), DiscStockState>,
     pub req_downstream: Requestor<(), DiscStockState>,
-    pub req_environment: Requestor<(), BasicEnvironmentState>,
+    // pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(usize, EventId), Vec<ItemType>>,
     pub push_downstream: Output<(Vec<ItemType>, EventId)>,
     pub log_emitter: Output<ProcessLog>,
@@ -201,15 +248,15 @@ pub struct DefaultDiscProcess<
     // Configuration
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub delay_modes: DelayModes,
+    // pub delay_modes: DelayModes,
 
     // Runtime state
     pub process_state: Option<(Duration, Vec<ItemType>)>,
-    pub env_state: BasicEnvironmentState,
+    // pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    pub time_to_next_delay_event: Option<Duration>,
+    // pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: u64,
     pub previous_check_time: MonotonicTime,
@@ -228,20 +275,20 @@ impl<
 
             req_upstream: Requestor::default(),
             req_downstream: Requestor::default(),
-            req_environment: Requestor::default(),
+            // req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             push_downstream: Output::default(),
             log_emitter: Output::default(),
 
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
-            delay_modes: DelayModes::default(),
+            // delay_modes: DelayModes::default(),
 
             process_state: None,
-            env_state: BasicEnvironmentState::Normal,
+            // env_state: BasicEnvironmentState::Normal,
 
             time_to_next_process_event: None,
-            time_to_next_delay_event: None,
+            // time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -251,14 +298,11 @@ impl<
 
 impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscProcess<
     ItemType, 
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>
+    DiscProcessLog<ItemType>
 >
 where
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>: Serialize,
-    Self: ToLogRecord<
-        DefaultDiscProcessLogType<ItemType>,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>
-    > {
+    DiscProcessLog<ItemType>: Serialize
+{
     fn init(
         mut self,
         ctx: &mut Context<Self>,
@@ -274,41 +318,41 @@ where
     }
 }
 
-impl<ItemType> ToLogRecord<
-        DefaultDiscProcessLogType<ItemType>,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > for DefaultDiscProcess<
-        ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    >
-where
-    ItemType: Clone + Debug + Serialize + Send + 'static,
-{
-    fn to_record(
-        &mut self,
-        now: MonotonicTime,
-        source_event_id: EventId,
-        event_id: EventId,
-        details: DefaultDiscProcessLogType<ItemType>,
-    ) -> DiscProcessLog<DefaultDiscProcessLogType<ItemType>> {
-        DiscProcessLog {
-            time: now.to_chrono_date_time(0).unwrap().to_string(),
-            event_id,
-            source_event_id,
-            element_name: self.element_name.clone(),
-            element_type: self.element_type.clone(),
-            details,
-        }
-    }
-}
+// impl<ItemType> ToLogRecord<
+//         DefaultDiscProcessLogType<ItemType>,
+//         DiscProcessLog<ItemType>,
+//     > for DefaultDiscProcess<
+//         ItemType,
+//         DiscProcessLog<ItemType>,
+//     >
+// where
+//     ItemType: Clone + Debug + Serialize + Send + 'static,
+// {
+//     fn to_record(
+//         &mut self,
+//         now: MonotonicTime,
+//         source_event_id: EventId,
+//         event_id: EventId,
+//         details: DefaultDiscProcessLogType<ItemType>,
+//     ) -> DiscProcessLog<ItemType> {
+//         DiscProcessLog {
+//             time: now.to_chrono_date_time(0).unwrap().to_string(),
+//             event_id,
+//             source_event_id,
+//             element_name: self.element_name.clone(),
+//             element_type: self.element_type.clone(),
+//             details,
+//         }
+//     }
+// }
 
 
 impl<ItemType> DiscProcessCore<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     > for DefaultDiscProcess<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
@@ -334,13 +378,13 @@ where
         id
     }
 
-    fn log_emitter(
-        &mut self,
-    ) -> &mut Output<
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > {
-        &mut self.log_emitter
-    }
+    // fn log_emitter(
+    //     &mut self,
+    // ) -> &mut Output<
+    //     DiscProcessLog<ItemType>,
+    // > {
+    //     &mut self.log_emitter
+    // }
 
     fn scheduled_event(
         &mut self,
@@ -352,25 +396,25 @@ where
         &mut self.previous_check_time
     }
 
-    fn delay_modes(&mut self) -> &mut DelayModes {
-        &mut self.delay_modes
-    }
+    // fn delay_modes(&mut self) -> &mut DelayModes {
+    //     &mut self.delay_modes
+    // }
 
-    fn process_state(
-        &mut self,
-    ) -> &mut Option<(Duration, Vec<ItemType>)> {
-        &mut self.process_state
-    }
+    // fn process_state(
+    //     &mut self,
+    // ) -> &mut Option<(Duration, Vec<ItemType>)> {
+    //     &mut self.process_state
+    // }
 
-    fn env_state(&mut self) -> &mut BasicEnvironmentState {
-        &mut self.env_state
-    }
+    // fn env_state(&mut self) -> &mut BasicEnvironmentState {
+    //     &mut self.env_state
+    // }
 
-    fn req_environment(
-        &mut self,
-    ) -> &mut Requestor<(), BasicEnvironmentState> {
-        &mut self.req_environment
-    }
+    // fn req_environment(
+    //     &mut self,
+    // ) -> &mut Requestor<(), BasicEnvironmentState> {
+    //     &mut self.req_environment
+    // }
 
     fn time_to_next_process_event(
         &mut self,
@@ -378,11 +422,11 @@ where
         &mut self.time_to_next_process_event
     }
 
-    fn time_to_next_delay_event(
-        &mut self,
-    ) -> &mut Option<Duration> {
-        &mut self.time_to_next_delay_event
-    }
+    // fn time_to_next_delay_event(
+    //     &mut self,
+    // ) -> &mut Option<Duration> {
+    //     &mut self.time_to_next_delay_event
+    // }
 
     fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
         async move {
@@ -474,35 +518,35 @@ where
         }
     }
 
-    fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::DelayStart { delay_name },
-            }).await;
-            current_event_id
-        }
-    }
+    // fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
+    //     async move {
+    //         let current_event_id = self.get_next_event_id();
+    //         self.log_emitter.send(DiscProcessLog {
+    //             time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+    //             event_id: current_event_id.clone(),
+    //             source_event_id: source_event_id.clone(),
+    //             element_name: self.element_name.clone(),
+    //             element_type: self.element_type.clone(),
+    //             details: DefaultDiscProcessLogType::DelayStart { delay_name },
+    //         }).await;
+    //         current_event_id
+    //     }
+    // }
 
-    fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::DelayEnd { delay_name },
-            }).await;
-            current_event_id
-        }
-    }
+    // fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
+    //     async move {
+    //         let current_event_id = self.get_next_event_id();
+    //         self.log_emitter.send(DiscProcessLog {
+    //             time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+    //             event_id: current_event_id.clone(),
+    //             source_event_id: source_event_id.clone(),
+    //             element_name: self.element_name.clone(),
+    //             element_type: self.element_type.clone(),
+    //             details: DefaultDiscProcessLogType::DelayEnd { delay_name },
+    //         }).await;
+    //         current_event_id
+    //     }
+    // }
     
     fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
         async move {
@@ -539,16 +583,16 @@ impl<
     ItemType,
 > DiscProcessUpdateDecisionLogic<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 > for DefaultDiscProcess<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
     Self: DiscProcessCore<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     >
 {
     fn update_state_decision_logic(
@@ -559,30 +603,13 @@ where
         async move {
             let time_now = cx.time();
 
-            let new_env_state = match self.req_environment().send(()).await.next() {
-                Some(env) => env,
-                None => BasicEnvironmentState::Normal,
-            };
+            // let is_env_stopped =
+            //     matches!(self.env_state(), BasicEnvironmentState::Stopped);
+            // let has_active_delay =
+            //     self.delay_modes().active_delay().is_some() || is_env_stopped;
 
-            match (&self.env_state(), &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log_type_process_stopped(source_event_id, "Stopped by environment", cx).await;
-                    *self.env_state() = BasicEnvironmentState::Stopped;
-                }
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log_type_process_continue(source_event_id, "Resumed by environment", cx).await;
-                    *self.env_state() = BasicEnvironmentState::Normal;
-                }
-                _ => {}
-            }
-
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
-
-            match (self.process_state(), has_active_delay) {
-                (None, false) => {
+            match self.process_state {
+                None => {
                     let upstream_state = self.req_upstream.send(()).await.next();
                     let downstream_state =
                         self.req_downstream.send(()).await.next();
@@ -613,7 +640,7 @@ where
                                 Some(batch) => {
                                     if batch.is_empty() {
                                         *source_event_id = self.log_type_process_failure(source_event_id, "Upstream returned no items", cx).await;
-                                        *self.time_to_next_process_event() = None;
+                                        self.time_to_next_process_event = None;
                                         return;
                                     }
 
@@ -632,45 +659,45 @@ where
                                     let quantity = batch.len();
                                     let log_payload = batch.clone();
 
-                                    *self.process_state() =
+                                    self.process_state =
                                         Some((process_duration, batch));
                                     *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
-                                    *self.time_to_next_process_event() =
+                                    self.time_to_next_process_event =
                                         Some(process_duration);
                                 }
                                 None => {
                                     *source_event_id = self.log_type_process_failure(source_event_id, "Upstream requestor closed", cx).await;
-                                    *self.time_to_next_process_event() = None;
+                                    self.time_to_next_process_event = None;
                                 }
                             }
                         }
                         (Some(DiscStockState::Empty { .. }), _) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         (None, _) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         (_, None) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         (_, Some(DiscStockState::Full { .. })) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 }
-                (Some((time_left, _)), false) => {
-                    *self.time_to_next_process_event() = Some(*time_left);
+                Some((time_left, _)) => {
+                    self.time_to_next_process_event = Some(time_left);
                 }
-                (_, true) => {
-                    *self.time_to_next_process_event() = self
-                        .delay_modes()
-                        .active_delay()
-                        .map(|(_, delay_state)| *delay_state);
-                }
+                // (_, true) => {
+                //     self.time_to_next_process_event = self
+                //         .delay_modes()
+                //         .active_delay()
+                //         .map(|(_, delay_state)| *delay_state);
+                // }
             }
         }
     }
@@ -680,16 +707,16 @@ impl<
     ItemType,
 > DiscProcessUpdateSinceLast<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
     > for DefaultDiscProcess<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
     Self: DiscProcessCore<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     >
 {
     fn update_process_state_since_prev_event(
@@ -699,7 +726,7 @@ where
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
         async move {
-            if let Some((mut time_left, resources)) = self.process_state().take() {
+            if let Some((mut time_left, resources)) = self.process_state.take() {
                 time_left = time_left.saturating_sub(duration_since_prev);
                 if time_left.is_zero() {
                     let log_payload = resources.clone();
@@ -707,10 +734,10 @@ where
                     self.push_downstream
                         .send((resources, source_event_id.clone()))
                         .await;
-                    *self.time_to_next_process_event() = None;
+                    self.time_to_next_process_event = None;
                 } else {
-                    *self.process_state() = Some((time_left, resources));
-                    *self.time_to_next_process_event() = Some(time_left);
+                    self.process_state = Some((time_left, resources));
+                    self.time_to_next_process_event = Some(time_left);
                 }
             }
         }
@@ -721,16 +748,16 @@ impl<
     ItemType,
 > DiscProcessUpdateForNextEvent<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 > for DefaultDiscProcess<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
 Self: DiscProcessCore<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 > {}
 
 pub struct SimpleStringGenerator {
@@ -825,13 +852,17 @@ impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
 > DiscProcessUpdateSinceLast<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > for DefaultDiscSource<
+    DiscProcessLog<ItemType>,
+> for DefaultDiscSource<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 >
 where   
     ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<ItemType>,
+    >,
 {
     fn update_process_state_since_prev_event(
         &mut self, source_event_id: &mut EventId,
@@ -839,7 +870,7 @@ where
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
         async move {
-            if let Some((mut time_left, resources)) = self.process_state().take() {
+            if let Some((mut time_left, resources)) = self.process_state.take() {
                 time_left = time_left.saturating_sub(duration_since_prev);
                 if time_left.is_zero() {
                     let quantity = resources.len();
@@ -848,10 +879,10 @@ where
                     self.push_downstream
                         .send((resources, source_event_id.clone()))
                         .await;
-                    *self.time_to_next_process_event() = None;
+                    self.time_to_next_process_event = None;
                 } else {
-                    *self.process_state() = Some((time_left, resources));
-                    *self.time_to_next_process_event() = Some(time_left);
+                    self.process_state = Some((time_left, resources));
+                    self.time_to_next_process_event = Some(time_left);
                 }
             }
         }
@@ -862,13 +893,17 @@ impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
 > DiscProcessUpdateDecisionLogic<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > for DefaultDiscSource<
+    DiscProcessLog<ItemType>,
+> for DefaultDiscSource<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 > 
 where 
     ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<ItemType>,
+>
 {
     fn update_state_decision_logic(
             &mut self,
@@ -878,30 +913,30 @@ where
         async move {
             let time_now = cx.time();
 
-            let new_env_state = match self.req_environment().send(()).await.next() {
-                Some(env) => env,
-                None => BasicEnvironmentState::Normal,
-            };
+            // let new_env_state = match self.req_environment().send(()).await.next() {
+            //     Some(env) => env,
+            //     None => BasicEnvironmentState::Normal,
+            // };
 
-            match (&self.env_state(), &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log_type_process_stopped(source_event_id, "Stopped by environment", cx).await;
-                    *self.env_state() = BasicEnvironmentState::Stopped;
-                }
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log_type_process_continue(source_event_id, "Resumed by environment", cx).await;
-                    *self.env_state() = BasicEnvironmentState::Normal;
-                }
-                _ => {}
-            }
+            // match (&self.env_state(), &new_env_state) {
+            //     (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+            //         *source_event_id = self.log_type_process_stopped(source_event_id, "Stopped by environment", cx).await;
+            //         *self.env_state() = BasicEnvironmentState::Stopped;
+            //     }
+            //     (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+            //         *source_event_id = self.log_type_process_continue(source_event_id, "Resumed by environment", cx).await;
+            //         *self.env_state() = BasicEnvironmentState::Normal;
+            //     }
+            //     _ => {}
+            // }
 
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
+            // let is_env_stopped =
+            //     matches!(self.env_state(), BasicEnvironmentState::Stopped);
+            // let has_active_delay =
+            //     self.delay_modes().active_delay().is_some() || is_env_stopped;
 
-            match (self.process_state(), has_active_delay) {
-                (None, false) => {
+            match self.process_state {
+                None => {
                     let downstream_state = self.req_downstream.send(()).await.next();
 
                     match &downstream_state {
@@ -921,7 +956,7 @@ where
                                 Some(generator) => generator.next(),
                                 None => {
                                     *source_event_id = self.log_type_process_failure(source_event_id, "Source item generator not configured", cx).await;
-                                    *self.time_to_next_process_event() = None;
+                                    self.time_to_next_process_event = None;
                                     return;
                                 }
                             };
@@ -930,7 +965,7 @@ where
                             batch.resize_with(requested, || generator.clone());
                             if batch.is_empty() {
                                 *source_event_id = self.log_type_process_failure(source_event_id, "Source produced an empty batch", cx).await;
-                                *self.time_to_next_process_event() = None;
+                                self.time_to_next_process_event = None;
                                 return;
                             }
 
@@ -951,29 +986,23 @@ where
                             let log_payload = batch.clone();
 
                             *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
-                            *self.process_state() =
+                            self.process_state =
                                 Some((process_duration, batch));
-                            *self.time_to_next_process_event() =
+                            self.time_to_next_process_event =
                                 Some(process_duration);
                         }
                         None => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         Some(DiscStockState::Full { .. }) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 }
-                (Some((time_left, _)), false) => {
-                    *self.time_to_next_process_event() = Some(*time_left);
-                }
-                (_, true) => {
-                    *self.time_to_next_process_event() = self
-                        .delay_modes()
-                        .active_delay()
-                        .map(|(_, delay_state)| *delay_state);
+                Some((time_left, _)) => {
+                    self.time_to_next_process_event = Some(time_left);
                 }
             }
         }
@@ -984,29 +1013,30 @@ impl<
     ItemType: Clone + Debug + Serialize + Send + 'static,
 > DiscProcessUpdateForNextEvent<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > for DefaultDiscSource<
+    DiscProcessLog<ItemType>,
+> for DefaultDiscSource<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 > 
 where 
     ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<ItemType>,
+    >
 {}
 
 impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscSource<
     ItemType, 
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>
+    DiscProcessLog<ItemType>
 >
 where
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>: Serialize,
-    Self: ToLogRecord<
-        DefaultDiscProcessLogType<ItemType>,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>
-    > {
+    DiscProcessLog<DiscProcessLog<ItemType>>: Serialize,
+{
     fn init(
         mut self,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = InitializedModel<Self>> {
+    ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
             let source_event_id = EventId(format!(
                 "{}_{:06}",
@@ -1018,40 +1048,40 @@ where
     }
 }
 
-impl<ItemType> ToLogRecord<
-        DefaultDiscProcessLogType<ItemType>,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > for DefaultDiscSource<
-        ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    >
-where
-    ItemType: Clone + Debug + Serialize + Send + 'static,
-{
-    fn to_record(
-        &mut self,
-        now: MonotonicTime,
-        source_event_id: EventId,
-        event_id: EventId,
-        details: DefaultDiscProcessLogType<ItemType>,
-    ) -> DiscProcessLog<DefaultDiscProcessLogType<ItemType>> {
-        DiscProcessLog {
-            time: now.to_chrono_date_time(0).unwrap().to_string(),
-            event_id,
-            source_event_id,
-            element_name: self.element_name.clone(),
-            element_type: self.element_type.clone(),
-            details,
-        }
-    }
-}
+// impl<ItemType> ToLogRecord<
+//         DefaultDiscProcessLogType<ItemType>,
+//         DiscProcessLog<ItemType>,
+//     > for DefaultDiscSource<
+//         ItemType,
+//         DiscProcessLog<ItemType>,
+//     >
+// where
+//     ItemType: Clone + Debug + Serialize + Send + 'static,
+// {
+//     fn to_record(
+//         &mut self,
+//         now: MonotonicTime,
+//         source_event_id: EventId,
+//         event_id: EventId,
+//         details: DefaultDiscProcessLogType<ItemType>,
+//     ) -> DiscProcessLog<ItemType> {
+//         DiscProcessLog {
+//             time: now.to_chrono_date_time(0).unwrap().to_string(),
+//             event_id,
+//             source_event_id,
+//             element_name: self.element_name.clone(),
+//             element_type: self.element_type.clone(),
+//             details,
+//         }
+//     }
+// }
 
 impl<ItemType> DiscProcessCore<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 > for DefaultDiscSource<
     ItemType,
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+    DiscProcessLog<ItemType>,
 >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
@@ -1093,13 +1123,13 @@ where
         id
     }
 
-    fn log_emitter(
-        &mut self,
-    ) -> &mut Output<
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > {
-        &mut self.log_emitter
-    }
+    // fn log_emitter(
+    //     &mut self,
+    // ) -> &mut Output<
+    //     DiscProcessLog<ItemType>,
+    // > {
+    //     &mut self.log_emitter
+    // }
 
     fn scheduled_event(
         &mut self,
@@ -1111,25 +1141,25 @@ where
         &mut self.previous_check_time
     }
 
-    fn delay_modes(&mut self) -> &mut DelayModes {
-        &mut self.delay_modes
-    }
+    // fn delay_modes(&mut self) -> &mut DelayModes {
+    //     &mut self.delay_modes
+    // }
 
-    fn process_state(
-        &mut self,
-    ) -> &mut Option<(Duration, Vec<ItemType>)> {
-        &mut self.process_state
-    }
+    // fn process_state(
+    //     &mut self,
+    // ) -> &mut Option<(Duration, Vec<ItemType>)> {
+    //     &mut self.process_state
+    // }
 
-    fn env_state(&mut self) -> &mut BasicEnvironmentState {
-        &mut self.env_state
-    }
+    // fn env_state(&mut self) -> &mut BasicEnvironmentState {
+    //     &mut self.env_state
+    // }
 
-    fn req_environment(
-        &mut self,
-    ) -> &mut Requestor<(), BasicEnvironmentState> {
-        &mut self.req_environment
-    }
+    // fn req_environment(
+    //     &mut self,
+    // ) -> &mut Requestor<(), BasicEnvironmentState> {
+    //     &mut self.req_environment
+    // }
 
     fn time_to_next_process_event(
         &mut self,
@@ -1137,11 +1167,11 @@ where
         &mut self.time_to_next_process_event
     }
 
-    fn time_to_next_delay_event(
-        &mut self,
-    ) -> &mut Option<Duration> {
-        &mut self.time_to_next_delay_event
-    }
+    // fn time_to_next_delay_event(
+    //     &mut self,
+    // ) -> &mut Option<Duration> {
+    //     &mut self.time_to_next_delay_event
+    // }
 
     fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
         async move {
@@ -1233,35 +1263,35 @@ where
         }
     }
 
-    fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::DelayStart { delay_name },
-            }).await;
-            current_event_id
-        }
-    }
+    // fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
+    //     async move {
+    //         let current_event_id = self.get_next_event_id();
+    //         self.log_emitter.send(DiscProcessLog {
+    //             time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+    //             event_id: current_event_id.clone(),
+    //             source_event_id: source_event_id.clone(),
+    //             element_name: self.element_name.clone(),
+    //             element_type: self.element_type.clone(),
+    //             details: DefaultDiscProcessLogType::DelayStart { delay_name },
+    //         }).await;
+    //         current_event_id
+    //     }
+    // }
 
-    fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::DelayEnd { delay_name },
-            }).await;
-            current_event_id
-        }
-    }
+    // fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
+    //     async move {
+    //         let current_event_id = self.get_next_event_id();
+    //         self.log_emitter.send(DiscProcessLog {
+    //             time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+    //             event_id: current_event_id.clone(),
+    //             source_event_id: source_event_id.clone(),
+    //             element_name: self.element_name.clone(),
+    //             element_type: self.element_type.clone(),
+    //             details: DefaultDiscProcessLogType::DelayEnd { delay_name },
+    //         }).await;
+    //         current_event_id
+    //     }
+    // }
 
     fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
         async move {
@@ -1294,22 +1324,22 @@ pub struct DefaultDiscSink<
 
     // Ports
     pub req_upstream: Requestor<(), DiscStockState>,
-    pub req_environment: Requestor<(), BasicEnvironmentState>,
+    // pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(usize, EventId), Vec<ItemType>>,
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
     pub sink_quantity_distr: Distribution,
     pub sink_time_distr: Distribution,
-    pub delay_modes: DelayModes,
+    // pub delay_modes: DelayModes,
 
     // Runtime state
     pub process_state: Option<(Duration, Vec<ItemType>)>,
-    pub env_state: BasicEnvironmentState,
+    // pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    pub time_to_next_delay_event: Option<Duration>,
+    // pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: usize,
     pub previous_check_time: MonotonicTime,
@@ -1327,19 +1357,19 @@ impl<
             element_type: "DefaultDiscSink".into(),
 
             req_upstream: Requestor::default(),
-            req_environment: Requestor::default(),
+            // req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             log_emitter: Output::default(),
 
             sink_quantity_distr: Distribution::default(),
             sink_time_distr: Distribution::default(),
-            delay_modes: DelayModes::default(),
+            // delay_modes: DelayModes::default(),
 
             process_state: None,
-            env_state: BasicEnvironmentState::Normal,
+            // env_state: BasicEnvironmentState::Normal,
 
             time_to_next_process_event: None,
-            time_to_next_delay_event: None,
+            // time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -1363,7 +1393,7 @@ impl<ItemType, ProcessLog> DiscProcessUpdateSinceLast<
             duration_since_prev: Duration
         ) -> impl Future<Output = ()> {
         async move {
-            if let Some((mut time_left, mut resources)) = self.process_state().take() {
+            if let Some((mut time_left, mut resources)) = self.process_state.take() {
                 time_left = time_left.saturating_sub(duration_since_prev);
                 if time_left.is_zero() {
                     let quantity = resources.len();
@@ -1372,7 +1402,7 @@ impl<ItemType, ProcessLog> DiscProcessUpdateSinceLast<
                     resources.clear();
                     self.time_to_next_process_event = None;
                 } else {
-                    *self.process_state() = Some((time_left, resources));
+                    self.process_state = Some((time_left, resources));
                     self.time_to_next_process_event = Some(time_left);
                 }
             }
@@ -1402,30 +1432,30 @@ impl<
         async move {  
             let time_now = cx.time();
 
-            let new_env_state = match self.req_environment().send(()).await.next() {
-                Some(env) => env,
-                None => BasicEnvironmentState::Normal,
-            };
+            // let new_env_state = match self.req_environment().send(()).await.next() {
+            //     Some(env) => env,
+            //     None => BasicEnvironmentState::Normal,
+            // };
 
-            match (&self.env_state(), &new_env_state) {
-                (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-                    *source_event_id = self.log_type_process_stopped(source_event_id, "Stopped by environment", cx).await;
-                    *self.env_state() = BasicEnvironmentState::Stopped;
-                }
-                (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-                    *source_event_id = self.log_type_process_continue(source_event_id, "Resumed by environment", cx).await;
-                    *self.env_state() = BasicEnvironmentState::Normal;
-                }
-                _ => {}
-            }
+            // match (&self.env_state(), &new_env_state) {
+            //     (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
+            //         *source_event_id = self.log_type_process_stopped(source_event_id, "Stopped by environment", cx).await;
+            //         *self.env_state() = BasicEnvironmentState::Stopped;
+            //     }
+            //     (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
+            //         *source_event_id = self.log_type_process_continue(source_event_id, "Resumed by environment", cx).await;
+            //         *self.env_state() = BasicEnvironmentState::Normal;
+            //     }
+            //     _ => {}
+            // }
 
-            let is_env_stopped =
-                matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            let has_active_delay =
-                self.delay_modes().active_delay().is_some() || is_env_stopped;
+            // let is_env_stopped =
+            //     matches!(self.env_state(), BasicEnvironmentState::Stopped);
+            // let has_active_delay =
+            //     self.delay_modes().active_delay().is_some() || is_env_stopped;
 
-            match (self.process_state(), has_active_delay) {
-                (None, false) => {
+            match self.process_state {
+                None => {
                     let upstream_state = self.req_upstream.send(()).await.next();
 
                     match &upstream_state {
@@ -1453,7 +1483,7 @@ impl<
                                 Some(batch) => {
                                     if batch.is_empty() {
                                         *source_event_id = self.log_type_process_failure(source_event_id, "Upstream returned an empty batch", cx).await;
-                                        *self.time_to_next_process_event() = None;
+                                        self.time_to_next_process_event = None;
                                         return;
                                     }
 
@@ -1473,36 +1503,36 @@ impl<
                                     let log_payload = batch.clone();
 
                                     *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
-                                    *self.process_state() =
+                                    self.process_state =
                                         Some((process_duration, batch));
-                                    *self.time_to_next_process_event() =
+                                    self.time_to_next_process_event =
                                         Some(process_duration);
                                 }
                                 None => {
                                     *source_event_id = self.log_type_process_failure(source_event_id, "Upstream requestor closed", cx).await;
-                                    *self.time_to_next_process_event() = None;
+                                    self.time_to_next_process_event = None;
                                 }
                             }
                         }
                         Some(DiscStockState::Empty { .. }) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         None => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 }
-                (Some((time_left, _)), false) => {
-                    *self.time_to_next_process_event() = Some(*time_left);
+                Some((time_left, _)) => {
+                    self.time_to_next_process_event = Some(time_left);
                 }
-                (_, true) => {
-                    *self.time_to_next_process_event() = self
-                        .delay_modes()
-                        .active_delay()
-                        .map(|(_, delay_state)| *delay_state);
-                }
+                // (_, true) => {
+                //     self.time_to_next_process_event = self
+                //         .delay_modes()
+                //         .active_delay()
+                //         .map(|(_, delay_state)| *delay_state);
+                // }
             }  
         }
     }
@@ -1547,14 +1577,9 @@ where
 
 impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDiscSink<
     ItemType, 
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>
+    DiscProcessLog<ItemType>
 >
-where
-    DiscProcessLog<DefaultDiscProcessLogType<ItemType>>: Serialize,
-    Self: ToLogRecord<
-        DefaultDiscProcessLogType<ItemType>,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>
-    > {
+{
     fn init(
         mut self,
         ctx: &mut Context<Self>,
@@ -1570,40 +1595,40 @@ where
     }
 }
 
-impl<ItemType> ToLogRecord<
-        DefaultDiscProcessLogType<ItemType>,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > for DefaultDiscSink<
-        ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    >
-where
-    ItemType: Clone + Debug + Serialize + Send + 'static,
-{
-    fn to_record(
-        &mut self,
-        now: MonotonicTime,
-        source_event_id: EventId,
-        event_id: EventId,
-        details: DefaultDiscProcessLogType<ItemType>,
-    ) -> DiscProcessLog<DefaultDiscProcessLogType<ItemType>> {
-        DiscProcessLog {
-            time: now.to_chrono_date_time(0).unwrap().to_string(),
-            event_id,
-            source_event_id,
-            element_name: self.element_name.clone(),
-            element_type: self.element_type.clone(),
-            details,
-        }
-    }
-}
+// impl<ItemType> ToLogRecord<
+//         DefaultDiscProcessLogType<ItemType>,
+//         DiscProcessLog<ItemType>,
+//     > for DefaultDiscSink<
+//         ItemType,
+//         DiscProcessLog<ItemType>,
+//     >
+// where
+//     ItemType: Clone + Debug + Serialize + Send + 'static,
+// {
+//     fn to_record(
+//         &mut self,
+//         now: MonotonicTime,
+//         source_event_id: EventId,
+//         event_id: EventId,
+//         details: DefaultDiscProcessLogType<ItemType>,
+//     ) -> DiscProcessLog<ItemType> {
+//         DiscProcessLog {
+//             time: now.to_chrono_date_time(0).unwrap().to_string(),
+//             event_id,
+//             source_event_id,
+//             element_name: self.element_name.clone(),
+//             element_type: self.element_type.clone(),
+//             details,
+//         }
+//     }
+// }
 
 impl<ItemType> DiscProcessCore<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     > for DefaultDiscSink<
         ItemType,
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
+        DiscProcessLog<ItemType>,
     >
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
@@ -1612,7 +1637,7 @@ where
             &mut self,
             mut source_event_id: EventId,
             cx: &mut Context<Self>,
-        ) -> impl Future<Output = ()> + Send {
+        ) -> impl Future<Output = ()> {
         async move {
             self.update_state_since_last_update(&mut source_event_id, cx)
                 .await;
@@ -1644,14 +1669,6 @@ where
         id
     }
 
-    fn log_emitter(
-        &mut self,
-    ) -> &mut Output<
-        DiscProcessLog<DefaultDiscProcessLogType<ItemType>>,
-    > {
-        &mut self.log_emitter
-    }
-
     fn scheduled_event(
         &mut self,
     ) -> &mut Option<(MonotonicTime, ActionKey)> {
@@ -1662,25 +1679,25 @@ where
         &mut self.previous_check_time
     }
 
-    fn delay_modes(&mut self) -> &mut DelayModes {
-        &mut self.delay_modes
-    }
+    // fn delay_modes(&mut self) -> &mut DelayModes {
+    //     &mut self.delay_modes
+    // }
 
-    fn process_state(
-        &mut self,
-    ) -> &mut Option<(Duration, Vec<ItemType>)> {
-        &mut self.process_state
-    }
+    // fn process_state(
+    //     &mut self,
+    // ) -> &mut Option<(Duration, Vec<ItemType>)> {
+    //     &mut self.process_state
+    // }
 
-    fn env_state(&mut self) -> &mut BasicEnvironmentState {
-        &mut self.env_state
-    }
+    // fn env_state(&mut self) -> &mut BasicEnvironmentState {
+    //     &mut self.env_state
+    // }
 
-    fn req_environment(
-        &mut self,
-    ) -> &mut Requestor<(), BasicEnvironmentState> {
-        &mut self.req_environment
-    }
+    // fn req_environment(
+    //     &mut self,
+    // ) -> &mut Requestor<(), BasicEnvironmentState> {
+    //     &mut self.req_environment
+    // }
 
     fn time_to_next_process_event(
         &mut self,
@@ -1688,11 +1705,11 @@ where
         &mut self.time_to_next_process_event
     }
 
-    fn time_to_next_delay_event(
-        &mut self,
-    ) -> &mut Option<Duration> {
-        &mut self.time_to_next_delay_event
-    }
+    // fn time_to_next_delay_event(
+    //     &mut self,
+    // ) -> &mut Option<Duration> {
+    //     &mut self.time_to_next_delay_event
+    // }
 
     fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
         async move {
@@ -1784,35 +1801,35 @@ where
         }
     }
 
-    fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::DelayStart { delay_name },
-            }).await;
-            current_event_id
-        }
-    }
+    // fn log_type_delay_start(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
+    //     async move {
+    //         let current_event_id = self.get_next_event_id();
+    //         self.log_emitter.send(DiscProcessLog {
+    //             time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+    //             event_id: current_event_id.clone(),
+    //             source_event_id: source_event_id.clone(),
+    //             element_name: self.element_name.clone(),
+    //             element_type: self.element_type.clone(),
+    //             details: DefaultDiscProcessLogType::DelayStart { delay_name },
+    //         }).await;
+    //         current_event_id
+    //     }
+    // }
 
-    fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::DelayEnd { delay_name },
-            }).await;
-            current_event_id
-        }
-    }
+    // fn log_type_delay_end(&mut self, source_event_id: &mut EventId, delay_name: String, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
+    //     async move {
+    //         let current_event_id = self.get_next_event_id();
+    //         self.log_emitter.send(DiscProcessLog {
+    //             time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+    //             event_id: current_event_id.clone(),
+    //             source_event_id: source_event_id.clone(),
+    //             element_name: self.element_name.clone(),
+    //             element_type: self.element_type.clone(),
+    //             details: DefaultDiscProcessLogType::DelayEnd { delay_name },
+    //         }).await;
+    //         current_event_id
+    //     }
+    // }
     
     fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send {
         async move {
