@@ -166,6 +166,25 @@ pub trait DiscStock<
         }
     }
 
+    fn remove_one(&mut self, payload: EventId, cx: &mut Context<Self>) -> impl Future<Output = Option<ResourceType>> + Send 
+    where ResourceType:
+    {
+        async move {
+            *self.previous_state() = Some(self.get_state().clone());
+            let removed_entry = self.resources().remove_one();
+            let total = self.resources().total();
+            let event_id = self.log_type_remove_one(&mut payload.clone(), total, removed_entry.clone(), cx).await;
+            let prev = self.previous_state().clone();
+            let cur = self.get_state().clone();
+            if prev.is_none() || !prev.as_ref().unwrap().is_same_state(&cur) {
+                let t1ns = cx.time() + Duration::from_nanos(1);
+                cx.schedule_event(t1ns, Self::emit_change, (cur.clone(), event_id)).unwrap();
+            }
+            *self.previous_state() = Some(cur);
+            removed_entry
+        }
+    }
+
     fn remove_multi(&mut self, payload: (usize, EventId), cx: &mut Context<Self>) -> impl Future<Output = Vec<ResourceType>> + Send 
     where ResourceType:
     {

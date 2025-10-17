@@ -1,3 +1,11 @@
+/**
+ * Simulation of an assembly line process using default discrete components:
+ * - DefaulDiscSource
+ * - DefaultDiscStock
+ * - DefaultDiscProcess
+ * - DefaultDiscSink
+ */
+
 use quokkasim::prelude::*;
 use std::{time::{Duration, SystemTime}};
 

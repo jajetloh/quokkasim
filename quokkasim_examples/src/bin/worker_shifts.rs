@@ -1,11 +1,11 @@
-/*
- * Simulation of staff operations in a workshop, including parallel workstations
- * and staffing constraints.
+/**
+ * A stock representing a pool of available workers, managed by a custom process
+ * that adds and removes workers according to a periodic schedule
  */
 
 use quokkasim::prelude::*;
 use serde::Serialize;
-use std::{time::{Duration, SystemTime}};
+use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Serialize, Debug)]
 struct Worker(String); // Simple wrapper type for worker resource
@@ -15,9 +15,6 @@ impl Worker {
     }
 }
 
-#[derive(Clone, Serialize, Debug)]
-struct Job(String); // Simple wrapper type for job resource
-
 struct WorkerShiftManager {
     // Identification
     pub element_name: String,
@@ -26,14 +23,13 @@ struct WorkerShiftManager {
 
     // Ports
     pub add_worker: Output<(Worker, EventId)>,
-    pub remove_worker: Requestor<(Worker, EventId)>,
-    pub log_emitter: Output<DiscProcessLog<DefaultDiscProcessLogType<Worker>>>,
+    pub remove_worker: Requestor<EventId, Option<Worker>>,
+    pub log_emitter: Output<DiscProcessLog<Worker>>,
 
     // Configuration
-    pub weekly_work_schedule: Vec<(Worker, Duration, Duration)>,
+    pub weekly_work_schedule: Vec<(Duration, Duration)>,
 
     // Runtime state
-    pub current_workers: Vec<(Duration, Worker)>,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
@@ -44,7 +40,7 @@ struct WorkerShiftManager {
 
 impl Model for WorkerShiftManager {
     fn init(
-        mut self,
+        self,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> {
         async move {
@@ -52,20 +48,41 @@ impl Model for WorkerShiftManager {
                 "{}_{:06}",
                 self.element_code, self.next_event_index
             ));
-            self.update_state(source_event_id, ctx).await;
+            for (start_time, end_time) in &self.weekly_work_schedule {
+                ctx.schedule_periodic_event(*start_time, Duration::from_secs(7 * 24 * 3600), Self::add_worker, source_event_id.clone()).unwrap();
+                ctx.schedule_periodic_event(*end_time, Duration::from_secs(7 * 24 * 3600), Self::remove_worker, source_event_id.clone()).unwrap();
+            }
             self.into()
         }
     }
 }
 
-impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> for WorkerShiftManager {
+impl WorkerShiftManager {
+    fn add_worker(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            let next_event_id = self.log_type_process_start(&mut source_event_id, 1, vec![Worker::new("Worker")], cx).await;
+            self.add_worker.send((
+                Worker::new("Worker"),
+                next_event_id,
+            )).await;
+        }
+    }
+
+    fn remove_worker(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+        async move {
+            let next_event_id = self.log_type_process_start(&mut source_event_id, 1, vec![Worker::new("Worker")], cx).await;
+            self.remove_worker.send(next_event_id).await.next();
+        }
+    }
+}
+
+impl DiscProcessCore<Worker, DiscProcessLog<Worker>> for WorkerShiftManager {
     fn update_state(
             &mut self,
             source_event_id: EventId,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> + Send {
         async move {
-            // self.up
         }
     }
     fn element_name(&self) -> &str { &self.element_name }
@@ -79,7 +96,6 @@ impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> 
         self.next_event_index += 1;
         id
     }
-    fn log_emitter(&mut self) -> &mut Output<DiscProcessLog<DefaultDiscProcessLogType<Worker>>> { &mut self.log_emitter }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
         &mut self.scheduled_event
     }
@@ -189,90 +205,19 @@ impl DiscProcessCore<Worker, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> 
     }
 }
 
-struct WorkstationProcess {
-    // Identification
-    pub element_name: String,
-    pub element_code: String,
-    pub element_type: String,
-
-    // Ports
-    pub req_worker: Requestor<(), DiscStockState>,
-    pub seize_worker: Requestor<(), Worker>,
-    pub release_worker: Output<Worker>,
-
-    pub req_job: Requestor<(), DiscStockState>,
-    pub seize_job: Requestor<(), Job>,
-    pub release_job: Output<Job>,
-
-    pub log_emitter: Output<DiscProcessLog<DefaultDiscProcessLogType<Worker>>>,
-
-    // Configuration
-    pub process_time_factor_distr: Distribution,
-
-    // Runtime state
-    pub process_state: Option<(Duration, Worker, Job)>,
-
-    // Internals
-    pub time_to_next_process_event: Option<Duration>,
-    pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: u64,
-    pub previous_check_time: MonotonicTime,
-}
-
 impl Connect<WorkerShiftManager, DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>> for Connection {
     fn connect(
         &mut self,
         a: (&mut WorkerShiftManager, &Address<WorkerShiftManager>),
         b: (&mut DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>, &Address<DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>>),
     ) -> Result<(), String> {
-        a.0.add_worker.map_connect(|(worker, event_id)| (Some(*worker), *event_id),DefaultDiscStock::add_one, b.1.clone());
+        a.0.add_worker.map_connect(|(worker, event_id)| (Some(worker.clone()), event_id.clone()),DefaultDiscStock::add_one, b.1.clone());
         a.0.remove_worker.connect(DefaultDiscStock::remove_one, b.1.clone());
         Ok(())
     }
 }
 
 fn create_bench() {
-    let mut df = DistributionFactory::new(7_777_777);
-
-    // Component declarations
-
-    // let mut source: DefaultDiscSource<String, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> = DefaultDiscSource::new()
-    //     .with_name("Source")
-    //     .with_code("SRC")
-    //     .with_source_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
-    // let src_mbox = Mailbox::new();
-    // let src_addr = src_mbox.address();
-    // source.source_item_generator = Some(Box::new(SimpleStringGenerator::new("ITEM_{}".into())));
-
-    // let mut queue_1: DefaultDiscStock<String, DiscStockState, DiscStockLog<String>> = DefaultDiscStock::new()
-    //     .with_name("Queue 1")
-    //     .with_code("Q1")
-    //     .with_max_capacity(10);
-    // queue_1.resources().add_multi(["A1", "A2", "A3"].iter().map(|s| s.to_string()).collect());
-
-    // let q1_mbox = Mailbox::new();
-    // let q1_addr = q1_mbox.address();
-
-    // let mut process: DefaultDiscProcess<String, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> = DefaultDiscProcess::new()
-    //     .with_name("Process")
-    //     .with_code("P")
-    //     .with_process_time_distr(df.create(DistributionConfig::Constant(0.1)).unwrap());
-    // let p_mbox = Mailbox::new();
-    // let p_addr = p_mbox.address();
-
-    // let mut queue_2: DefaultDiscStock<String, DiscStockState, DiscStockLog<String>> = DefaultDiscStock::new()
-    //     .with_name("Queue 2")
-    //     .with_code("Q2")
-    //     .with_max_capacity(10);
-    // let q2_mbox = Mailbox::new();
-    // let q2_addr = q2_mbox.address();
-
-    // let mut sink : DefaultDiscSink<String, DiscProcessLog<DefaultDiscProcessLogType<Worker>>> = DefaultDiscSink::new()
-    //     .with_name("Sink")
-    //     .with_code("SNK")
-    //     .with_sink_time_distr(df.create(DistributionConfig::Constant(0.5)).unwrap());
-    // let snk_mbox = Mailbox::new();
-    // let snk_addr = snk_mbox.address();
 
     let mut worker_shift_manager = WorkerShiftManager {
         element_name: "WorkerShiftManager".to_string(),
@@ -282,13 +227,8 @@ fn create_bench() {
         remove_worker: Requestor::new(),
         log_emitter: Output::new(),
         weekly_work_schedule: vec![
-            (Worker::new("Worker1"), Duration::from_secs(8 * 3600), Duration::from_secs(17 * 3600)),
-            (Worker::new("Worker2"), Duration::from_secs(8 * 3600), Duration::from_secs(17 * 3600)),
-            (Worker::new("Worker3"), Duration::from_secs(8 * 3600), Duration::from_secs(17 * 3600)),
-            (Worker::new("Worker4"), Duration::from_secs(8 * 3600), Duration::from_secs(17 * 3600)),
-            (Worker::new("Worker5"), Duration::from_secs(8 * 3600), Duration::from_secs(17 * 3600)),
+            (Duration::from_secs(9 * 3600), Duration::from_secs(17 * 3600)),
         ],
-        current_workers: vec![],
         time_to_next_process_event: None,
         scheduled_event: None,
         next_event_index: 0,
@@ -301,9 +241,50 @@ fn create_bench() {
         .with_name("AvailableWorkers")
         .with_code("AW")
         .with_max_capacity(100);
+    let aw_mbox = Mailbox::new();
+    let aw_addr = aw_mbox.address();
 
     // Connections
 
     let mut c = Connection {};
 
+    c.connect(
+        (&mut worker_shift_manager, &wsm_addr),
+        (&mut available_workers, &aw_addr),
+    ).unwrap();
+
+    // Loggers
+
+    let process_logger = EventQueue::<DiscProcessLog<Worker>>::new();
+    worker_shift_manager.log_emitter.connect_sink(&process_logger);
+    let stock_logger = EventQueue::<DiscStockLog<Worker>>::new();
+    available_workers.log_emitter.connect_sink(&stock_logger);
+
+    // Simulation initialisation
+
+    let sim_init = SimInit::new()
+        .add_model(worker_shift_manager, wsm_mbox, "WorkerShiftManager")
+        .add_model(available_workers, aw_mbox, "AvailableWorkers");
+
+    let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
+    let duration = Duration::from_secs(14 * 24 * 3600);
+    let (mut sim, _) = sim_init.init(start_time).unwrap();
+
+    let time_at_start = SystemTime::now();
+    sim.step_until(start_time + duration).unwrap();
+    let time_at_end = SystemTime::now();
+    println!("Execution time: {:?}", time_at_end.duration_since(time_at_start));
+
+    for log in process_logger.into_reader() {
+        println!("{:?}", log);
+    }
+
+    for log in stock_logger.into_reader() {
+        println!("{:?}", log);
+    }
+
+}
+
+fn main() {
+    create_bench();
 }

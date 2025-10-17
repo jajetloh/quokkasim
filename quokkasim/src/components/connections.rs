@@ -218,7 +218,6 @@ impl<
     > for Connection
 where
     DiscStockLogType<ItemType>: Serialize,
-    DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>: ToLogRecord<DiscStockLogType<ItemType>, DiscStockLog<ItemType>>,
 {
     fn connect(
         &mut self,
@@ -248,7 +247,6 @@ impl<
     > for Connection
 where
     DiscStockLogType<ItemType>: Serialize,
-    DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>: ToLogRecord<DiscStockLogType<ItemType>, DiscStockLog<ItemType>>,
 {
     fn connect(
         &mut self,

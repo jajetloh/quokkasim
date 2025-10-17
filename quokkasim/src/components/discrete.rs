@@ -194,36 +194,6 @@ pub struct DiscStockLog<ItemType> {
     pub details: DiscStockLogType<ItemType>,
 }
 
-impl<ItemType> ToLogRecord<
-        DiscStockLogType<ItemType>,
-        DiscStockLog<ItemType>,
-    > for DefaultDiscStock<
-        ItemType,
-        DiscStockState,
-        DiscStockLog<ItemType>,
-    >
-where
-    ItemType: Clone + Debug + Serialize + Send + 'static,
-{
-    fn to_record(
-        &mut self,
-        now: MonotonicTime,
-        source_event_id: EventId,
-        event_id: EventId,
-        details: DiscStockLogType<ItemType>,
-    ) -> DiscStockLog<ItemType> {
-        DiscStockLog {
-            time: now.to_chrono_date_time(0).unwrap().to_string(),
-            event_id,
-            source_event_id,
-            element_name: self.element_name.clone(),
-            element_type: self.element_type.clone(),
-            details,
-        }
-    }
-}
-
-
 #[derive(WithMethods)]
 pub struct DefaultDiscProcess<
     ItemType,
