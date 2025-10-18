@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tai_time::MonotonicTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// A short, lightweight identifier for an event. Very useful for understanding causal flow of events via log files.

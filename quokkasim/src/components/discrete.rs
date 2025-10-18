@@ -270,7 +270,6 @@ impl<
             process_state: None,
 
             time_to_next_process_event: None,
-            // time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -453,13 +452,6 @@ where
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
-            let time_now = cx.time();
-
-            // let is_env_stopped =
-            //     matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            // let has_active_delay =
-            //     self.delay_modes().active_delay().is_some() || is_env_stopped;
-
             match self.process_state {
                 None => {
                     let upstream_state = self.req_upstream.send(()).await.next();
@@ -544,12 +536,6 @@ where
                 Some((time_left, _)) => {
                     self.time_to_next_process_event = Some(time_left);
                 }
-                // (_, true) => {
-                //     self.time_to_next_process_event = self
-                //         .delay_modes()
-                //         .active_delay()
-                //         .map(|(_, delay_state)| *delay_state);
-                // }
             }
         }
     }
@@ -876,34 +862,6 @@ where
     }
 }
 
-// impl<ItemType> ToLogRecord<
-//         DefaultDiscProcessLogType<ItemType>,
-//         DiscProcessLog<ItemType>,
-//     > for DefaultDiscSource<
-//         ItemType,
-//         DiscProcessLog<ItemType>,
-//     >
-// where
-//     ItemType: Clone + Debug + Serialize + Send + 'static,
-// {
-//     fn to_record(
-//         &mut self,
-//         now: MonotonicTime,
-//         source_event_id: EventId,
-//         event_id: EventId,
-//         details: DefaultDiscProcessLogType<ItemType>,
-//     ) -> DiscProcessLog<ItemType> {
-//         DiscProcessLog {
-//             time: now.to_chrono_date_time(0).unwrap().to_string(),
-//             event_id,
-//             source_event_id,
-//             element_name: self.element_name.clone(),
-//             element_type: self.element_type.clone(),
-//             details,
-//         }
-//     }
-// }
-
 impl<ItemType> DiscProcessCore<
     ItemType,
     DiscProcessLog<ItemType>,
@@ -951,14 +909,6 @@ where
         id
     }
 
-    // fn log_emitter(
-    //     &mut self,
-    // ) -> &mut Output<
-    //     DiscProcessLog<ItemType>,
-    // > {
-    //     &mut self.log_emitter
-    // }
-
     fn scheduled_event(
         &mut self,
     ) -> &mut Option<(MonotonicTime, ActionKey)> {
@@ -969,37 +919,12 @@ where
         &mut self.previous_check_time
     }
 
-    // fn delay_modes(&mut self) -> &mut DelayModes {
-    //     &mut self.delay_modes
-    // }
-
-    // fn process_state(
-    //     &mut self,
-    // ) -> &mut Option<(Duration, Vec<ItemType>)> {
-    //     &mut self.process_state
-    // }
-
-    // fn env_state(&mut self) -> &mut BasicEnvironmentState {
-    //     &mut self.env_state
-    // }
-
-    // fn req_environment(
-    //     &mut self,
-    // ) -> &mut Requestor<(), BasicEnvironmentState> {
-    //     &mut self.req_environment
-    // }
-
     fn time_to_next_process_event(
         &mut self,
     ) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
     }
 
-    // fn time_to_next_delay_event(
-    //     &mut self,
-    // ) -> &mut Option<Duration> {
-    //     &mut self.time_to_next_delay_event
-    // }
 
     fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
         async move {
@@ -1107,22 +1032,18 @@ pub struct DefaultDiscSink<
 
     // Ports
     pub req_upstream: Requestor<(), DiscStockState>,
-    // pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(usize, EventId), Vec<ItemType>>,
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
     pub sink_quantity_distr: Distribution,
     pub sink_time_distr: Distribution,
-    // pub delay_modes: DelayModes,
 
     // Runtime state
     pub process_state: Option<(Duration, Vec<ItemType>)>,
-    // pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    // pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: usize,
     pub previous_check_time: MonotonicTime,
@@ -1140,19 +1061,15 @@ impl<
             element_type: "DefaultDiscSink".into(),
 
             req_upstream: Requestor::default(),
-            // req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             log_emitter: Output::default(),
 
             sink_quantity_distr: Distribution::default(),
             sink_time_distr: Distribution::default(),
-            // delay_modes: DelayModes::default(),
 
             process_state: None,
-            // env_state: BasicEnvironmentState::Normal,
 
             time_to_next_process_event: None,
-            // time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -1213,30 +1130,6 @@ impl<
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {  
-            let time_now = cx.time();
-
-            // let new_env_state = match self.req_environment().send(()).await.next() {
-            //     Some(env) => env,
-            //     None => BasicEnvironmentState::Normal,
-            // };
-
-            // match (&self.env_state(), &new_env_state) {
-            //     (BasicEnvironmentState::Normal, BasicEnvironmentState::Stopped) => {
-            //         *source_event_id = self.log_type_process_stopped(source_event_id, "Stopped by environment", cx).await;
-            //         *self.env_state() = BasicEnvironmentState::Stopped;
-            //     }
-            //     (BasicEnvironmentState::Stopped, BasicEnvironmentState::Normal) => {
-            //         *source_event_id = self.log_type_process_continue(source_event_id, "Resumed by environment", cx).await;
-            //         *self.env_state() = BasicEnvironmentState::Normal;
-            //     }
-            //     _ => {}
-            // }
-
-            // let is_env_stopped =
-            //     matches!(self.env_state(), BasicEnvironmentState::Stopped);
-            // let has_active_delay =
-            //     self.delay_modes().active_delay().is_some() || is_env_stopped;
-
             match self.process_state {
                 None => {
                     let upstream_state = self.req_upstream.send(()).await.next();
@@ -1310,12 +1203,6 @@ impl<
                 Some((time_left, _)) => {
                     self.time_to_next_process_event = Some(time_left);
                 }
-                // (_, true) => {
-                //     self.time_to_next_process_event = self
-                //         .delay_modes()
-                //         .active_delay()
-                //         .map(|(_, delay_state)| *delay_state);
-                // }
             }  
         }
     }
@@ -1378,34 +1265,6 @@ impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDisc
     }
 }
 
-// impl<ItemType> ToLogRecord<
-//         DefaultDiscProcessLogType<ItemType>,
-//         DiscProcessLog<ItemType>,
-//     > for DefaultDiscSink<
-//         ItemType,
-//         DiscProcessLog<ItemType>,
-//     >
-// where
-//     ItemType: Clone + Debug + Serialize + Send + 'static,
-// {
-//     fn to_record(
-//         &mut self,
-//         now: MonotonicTime,
-//         source_event_id: EventId,
-//         event_id: EventId,
-//         details: DefaultDiscProcessLogType<ItemType>,
-//     ) -> DiscProcessLog<ItemType> {
-//         DiscProcessLog {
-//             time: now.to_chrono_date_time(0).unwrap().to_string(),
-//             event_id,
-//             source_event_id,
-//             element_name: self.element_name.clone(),
-//             element_type: self.element_type.clone(),
-//             details,
-//         }
-//     }
-// }
-
 impl<ItemType> DiscProcessCore<
         ItemType,
         DiscProcessLog<ItemType>,
@@ -1462,37 +1321,11 @@ where
         &mut self.previous_check_time
     }
 
-    // fn delay_modes(&mut self) -> &mut DelayModes {
-    //     &mut self.delay_modes
-    // }
-
-    // fn process_state(
-    //     &mut self,
-    // ) -> &mut Option<(Duration, Vec<ItemType>)> {
-    //     &mut self.process_state
-    // }
-
-    // fn env_state(&mut self) -> &mut BasicEnvironmentState {
-    //     &mut self.env_state
-    // }
-
-    // fn req_environment(
-    //     &mut self,
-    // ) -> &mut Requestor<(), BasicEnvironmentState> {
-    //     &mut self.req_environment
-    // }
-
     fn time_to_next_process_event(
         &mut self,
     ) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
     }
-
-    // fn time_to_next_delay_event(
-    //     &mut self,
-    // ) -> &mut Option<Duration> {
-    //     &mut self.time_to_next_delay_event
-    // }
 
     fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
         async move {

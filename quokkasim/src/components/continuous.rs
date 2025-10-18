@@ -335,38 +335,6 @@ where
     }
 }
 
-// impl<ResourceType: ContResource>
-//     ToLogRecord<
-//         DefaultContProcessLogType<ResourceType>,
-//         ContProcessLog<ResourceType>,
-//     >
-//     for DefaultContProcess<
-//         ResourceType,
-//         ContProcessLog<ResourceType>,
-//     >
-// {
-//     fn to_record(
-//         &mut self,
-//         now: MonotonicTime,
-//         source_event_id: EventId,
-//         event_id: EventId,
-//         details: DefaultContProcessLogType<ResourceType>,
-//     ) -> ContProcessLog<ResourceType> {
-//         ContProcessLog::<DefaultContProcessLogType<ResourceType>, ResourceType> {
-//             time: now
-//                 .to_chrono_date_time(0)
-//                 .unwrap()
-//                 .to_string(),
-//             event_id,
-//             source_event_id,
-//             element_name: self.element_name.clone(),
-//             element_type: self.element_type.clone(),
-//             details,
-//             phantom: std::marker::PhantomData,
-//         }
-//     }
-// }
-
 impl<ResourceType: ContResource + 'static>
     ContProcessCore<ResourceType, ContProcessLog<ResourceType>>
     for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
@@ -411,9 +379,9 @@ where
     fn previous_check_time(&mut self) -> &mut MonotonicTime {
         &mut self.previous_check_time
     }
-    fn process_state(&mut self) -> &mut Option<(Duration, ResourceType)> {
-        &mut self.process_state
-    }
+    // fn process_state(&mut self) -> &mut Option<(Duration, ResourceType)> {
+    //     &mut self.process_state
+    // }
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
     }
@@ -537,34 +505,33 @@ where
                             *source_event_id = self.log_type_withdraw_request(source_event_id, process_quantity, cx).await;
                             let moved = self.withdraw_upstream.send((process_quantity, source_event_id.clone())).await.next().unwrap();
                             let process_duration_secs = self.process_time_distr.sample();
-                            *self.process_state() = Some((
+                            self.process_state = Some((
                                 Duration::from_secs_f64(process_duration_secs),
                                 moved.clone(),
                             ));
                             *source_event_id = self.log_type_process_start(source_event_id, process_quantity, moved.clone(), cx).await;
-                            *self.time_to_next_process_event() =
-                                Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         }
                         (Some(ContStockState::Empty { .. }), _) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         (None, _) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         (_, None) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         (_, Some(ContStockState::Full { .. })) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 }
                 Some((time, _)) => {
-                    *self.time_to_next_process_event() = Some(*time);
+                    self.time_to_next_process_event = Some(*time);
                 }
             }
         }
@@ -577,32 +544,6 @@ where
     LogRecordType: Clone + Send + Debug + Serialize + 'static,
     Self: ContProcessCore<ResourceType, LogRecordType>,
 {}
-
-// impl<ResourceType: ContResource + 'static>
-//     ContProcess<ResourceType, ContProcessLog<ResourceType>>
-//     for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
-// where
-//     ContProcessLog<ResourceType>: Serialize,
-// {
-//     fn req_upstream(&mut self) -> &mut Requestor<(), ContStockState> {
-//         &mut self.req_upstream
-//     }
-//     fn withdraw_upstream(&mut self) -> &mut Requestor<(f64, EventId), ResourceType> {
-//         &mut self.withdraw_upstream
-//     }
-//     fn req_downstream(&mut self) -> &mut Requestor<(), ContStockState> {
-//         &mut self.req_downstream
-//     }
-//     fn push_downstream(&mut self) -> &mut Output<(ResourceType, EventId)> {
-//         &mut self.push_downstream
-//     }
-//     fn process_quantity_distr(&mut self) -> &mut Distribution {
-//         &mut self.process_quantity_distr
-//     }
-//     fn process_time_distr(&mut self) -> &mut Distribution {
-//         &mut self.process_time_distr
-//     }
-// }
 
 /* #endregion DefaultContProcess */
 
@@ -700,38 +641,6 @@ where
     }
 }
 
-// impl<ResourceType: ContResource>
-//     ToLogRecord<
-//         DefaultContProcessLogType<ResourceType>,
-//         ContProcessLog<ResourceType>,
-//     >
-//     for DefaultContSource<
-//         ResourceType,
-//         ContProcessLog<ResourceType>,
-//     >
-// {
-//     fn to_record(
-//         &mut self,
-//         now: MonotonicTime,
-//         source_event_id: EventId,
-//         event_id: EventId,
-//         details: DefaultContProcessLogType<ResourceType>,
-//     ) -> ContProcessLog<ResourceType> {
-//         ContProcessLog::<DefaultContProcessLogType<ResourceType>, ResourceType> {
-//             time: now
-//                 .to_chrono_date_time(0)
-//                 .unwrap()
-//                 .to_string(),
-//             event_id,
-//             source_event_id,
-//             element_name: self.element_name.clone(),
-//             element_type: self.element_type.clone(),
-//             details,
-//             phantom: std::marker::PhantomData,
-//         }
-//     }
-// }
-
 impl<ResourceType: ContResource + 'static>
     ContProcessCore<ResourceType, ContProcessLog<ResourceType>>
     for DefaultContSource<ResourceType, ContProcessLog<ResourceType>>
@@ -776,9 +685,6 @@ where
     }
     fn previous_check_time(&mut self) -> &mut MonotonicTime {
         &mut self.previous_check_time
-    }
-    fn process_state(&mut self) -> &mut Option<(Duration, ResourceType)> {
-        &mut self.process_state
     }
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
@@ -876,7 +782,10 @@ where
     }
 }
 
-impl<ResourceType, LogRecordType> ContProcessUpdateDecisionLogic<ResourceType, LogRecordType> for DefaultContSource<ResourceType, LogRecordType>
+impl<ResourceType, LogRecordType> ContProcessUpdateDecisionLogic<
+    ResourceType,
+    LogRecordType,
+> for DefaultContSource<ResourceType, LogRecordType>
 where
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + Debug + Serialize + 'static,
@@ -888,7 +797,7 @@ where
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
-            match &self.process_state() {
+            match self.process_state {
                 None => {
                     let ds_state = self.req_downstream.send(()).await.next();
 
@@ -901,25 +810,25 @@ where
 
                             *source_event_id = self.log_type_withdraw_request(source_event_id, process_quantity, cx).await;
                             let process_duration_secs = self.source_time_distr.sample();
-                            *self.process_state() = Some((
+                            self.process_state = Some((
                                 Duration::from_secs_f64(process_duration_secs),
                                 created_resource.clone()
                             ));
                             *source_event_id = self.log_type_process_start(source_event_id, process_quantity, created_resource.clone(), cx).await;
-                            *self.time_to_next_process_event() = Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         }
                         None => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         Some(ContStockState::Full { .. }) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 }
                 Some((time, _)) => {
-                    *self.time_to_next_process_event() = Some(*time);
+                    self.time_to_next_process_event = Some(time);
                 }
             }
         }
@@ -1071,9 +980,6 @@ where
     fn previous_check_time(&mut self) -> &mut MonotonicTime {
         &mut self.previous_check_time
     }
-    fn process_state(&mut self) -> &mut Option<(Duration, ResourceType)> {
-        &mut self.process_state
-    }
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
     }
@@ -1152,12 +1058,12 @@ where
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
         async move {
-            if let Some((mut process_time_left, resource)) = self.process_state().take() {
+            if let Some((mut process_time_left, resource)) = self.process_state.take() {
                 process_time_left = process_time_left.saturating_sub(duration_since_prev);
                 if process_time_left.is_zero() {
                     *source_event_id = self.log_type_process_success(source_event_id, resource.total(), resource.clone(), cx).await;
                 } else {
-                    *self.process_state() = Some((process_time_left, resource));
+                    self.process_state = Some((process_time_left, resource));
                 }
             }
         }
@@ -1176,7 +1082,7 @@ where
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
-            match &self.process_state() {
+            match self.process_state {
                 None => {
                     let us_state = self.req_upstream.send(()).await.next();
 
@@ -1188,26 +1094,25 @@ where
 
                             *source_event_id = self.log_type_withdraw_request(source_event_id, process_quantity, cx).await;
                             let process_duration_secs = self.sink_time_distr.sample();
-                            *self.process_state() = Some((
+                            self.process_state = Some((
                                 Duration::from_secs_f64(process_duration_secs),
                                 moved.clone()
                             ));
                             *source_event_id = self.log_type_process_start(source_event_id, process_quantity, moved.clone(), cx).await;
-                            *self.time_to_next_process_event() =
-                                Some(Duration::from_secs_f64(process_duration_secs));
+                            self.time_to_next_process_event = Some(Duration::from_secs_f64(process_duration_secs));
                         }
                         None => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                         Some(ContStockState::Full { .. }) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
-                            *self.time_to_next_process_event() = None;
+                            self.time_to_next_process_event = None;
                         }
                     }
                 }
                 Some((time, _)) => {
-                    *self.time_to_next_process_event() = Some(*time);
+                    self.time_to_next_process_event = Some(time);
                 }
             }
         }
