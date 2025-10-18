@@ -16,10 +16,6 @@ impl EventId {
     }
 }
 
-pub trait ToLogRecord<DetailsType, LogType> {
-    fn to_record(&mut self, now: MonotonicTime, source_event_id: EventId, event_id: EventId, details: DetailsType) -> LogType;
-}
-
 pub trait StockState {
     fn is_same_state(&self, other: &Self) -> bool;
 }

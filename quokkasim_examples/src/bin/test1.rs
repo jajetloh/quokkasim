@@ -11,7 +11,7 @@ fn bench_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), SimulationError
         .with_initial_resource(100.);
     let s1_mbox: Mailbox<DefaultContStock<f64, ContStockState, ContStockLog<f64>>> = Mailbox::new();
     let s1_addr: Address<DefaultContStock<f64, ContStockState, ContStockLog<f64>>> = s1_mbox.address();
-    let mut p1: DefaultContProcess<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> = DefaultContProcess::new()
+    let mut p1: DefaultContProcess<f64, ContProcessLog<f64>> = DefaultContProcess::new()
         .with_name("TestProcess1")
         .with_code("P1")
         .with_type("ProcessType1")
@@ -80,7 +80,7 @@ fn bench_array_f64(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Simulatio
         .with_initial_resource([50., 40., 30., 20., 10.]);
     let s1_mbox = Mailbox::new();
     let s1_addr = s1_mbox.address();
-    let mut p1: DefaultContProcess<[f64; 5], ContProcessLog<DefaultContProcessLogType<[f64; 5]>, [f64; 5]>> = DefaultContProcess::new()
+    let mut p1: DefaultContProcess<[f64; 5], ContProcessLog<[f64; 5]>> = DefaultContProcess::new()
         .with_name("TestProcess1")
         .with_code("P1")
         .with_type("ProcessType1")
@@ -245,7 +245,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let s1_mbox = Mailbox::new();
     let s1_addr = s1_mbox.address();
 
-    let mut p1: DefaultContProcess<IronOre, ContProcessLog<DefaultContProcessLogType<IronOre>, IronOre>> = DefaultContProcess::new()
+    let mut p1: DefaultContProcess<IronOre, ContProcessLog<IronOre>> = DefaultContProcess::new()
         .with_name("TestProcess1")
         .with_code("P1")
         .with_type("ProcessType1")
@@ -268,7 +268,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let s2_mbox = Mailbox::new();
     let s2_addr = s2_mbox.address();
 
-    let mut p2: DefaultContProcess<IronOre, ContProcessLog<DefaultContProcessLogType<IronOre>, IronOre>> = DefaultContProcess::new()
+    let mut p2: DefaultContProcess<IronOre, ContProcessLog<IronOre>> = DefaultContProcess::new()
         .with_name("TestProcess2")
         .with_code("P2")
         .with_type("ProcessType2")
@@ -291,7 +291,7 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let s3_mbox = Mailbox::new();
     let s3_addr = s3_mbox.address();
 
-    let mut p3: DefaultContProcess<IronOre, ContProcessLog<DefaultContProcessLogType<IronOre>, IronOre>> = DefaultContProcess::new()
+    let mut p3: DefaultContProcess<IronOre, ContProcessLog<IronOre>> = DefaultContProcess::new()
         .with_name("TestProcess3")
         .with_code("P3")
         .with_type("ProcessType3")
@@ -305,17 +305,12 @@ fn bench_custom_resource(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p3_mbox = Mailbox::new();
     let p3_addr = p3_mbox.address();
 
-    let mut p4: DefaultContProcess<IronOre, ContProcessLog<DefaultContProcessLogType<IronOre>, IronOre>> = DefaultContProcess::new()
+    let mut p4: DefaultContProcess<IronOre, ContProcessLog<IronOre>> = DefaultContProcess::new()
         .with_name("TestProcess4")
         .with_code("P4")
         .with_type("ProcessType4")
         .with_process_quantity_distr(df.create(DistributionConfig::TruncNormal { mean: 1., std: 0.3, min: Some(0.1), max: None }).unwrap())
         .with_process_time_distr(df.create(DistributionConfig::Exponential { mean: 3600. }).unwrap());
-    // p4.delay_modes.modify(DelayModeChange::Add(DelayMode {
-    //     name: "TestDelay".to_string(),
-    //     until_delay_distr: Distribution::Constant(5.1),
-    //     until_fix_distr: Distribution::Constant(0.2),
-    // }));
     let p4_mbox = Mailbox::new();
     let p4_addr = p4_mbox.address();
 
@@ -400,7 +395,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let s1_mbox = Mailbox::new();
     let s1_addr = s1_mbox.address();
 
-    let mut p1: DefaultContProcess<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> = DefaultContProcess::new()
+    let mut p1: DefaultContProcess<f64, ContProcessLog<f64>> = DefaultContProcess::new()
         .with_name("TestProcess1")
         .with_code("P1")
         .with_type("ProcessType1")
@@ -422,7 +417,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let s2_mbox = Mailbox::new();
     let s2_addr = s2_mbox.address();
 
-    let mut p2: DefaultContProcess<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> = DefaultContProcess::new()
+    let mut p2: DefaultContProcess<f64, ContProcessLog<f64>> = DefaultContProcess::new()
         .with_name("TestProcess2")
         .with_code("P2")
         .with_type("ProcessType2")
@@ -444,7 +439,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let s3_mbox = Mailbox::new();
     let s3_addr = s3_mbox.address();
 
-    let mut p3: DefaultContProcess<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> = DefaultContProcess::new()
+    let mut p3: DefaultContProcess<f64, ContProcessLog<f64>> = DefaultContProcess::new()
         .with_name("TestProcess3")
         .with_code("P3")
         .with_type("ProcessType3")
@@ -458,7 +453,7 @@ fn bench_f64_resource_v2(_cfg: ()) -> Result<(Simulation, EndpointRegistry), Sim
     let p3_mbox = Mailbox::new();
     let p3_addr = p3_mbox.address();
 
-    let mut p4: DefaultContProcess<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> = DefaultContProcess::new()
+    let mut p4: DefaultContProcess<f64, ContProcessLog<f64>> = DefaultContProcess::new()
         .with_name("TestProcess4")
         .with_code("P4")
         .with_type("ProcessType4")

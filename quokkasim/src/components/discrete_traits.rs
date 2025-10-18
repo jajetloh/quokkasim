@@ -407,7 +407,6 @@ where
     fn element_code(&self) -> &str;
     fn element_type(&self) -> &str;
     fn get_next_event_id(&mut self) -> EventId;
-    // fn log_emitter(&mut self) -> &mut Output<LogRecordType>;
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
     fn previous_check_time(&mut self) -> &mut MonotonicTime;
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
@@ -418,7 +417,6 @@ where
     fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
     fn log_type_process_stopped(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
     fn log_type_process_continue(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
 
     fn update_state(
         &mut self,

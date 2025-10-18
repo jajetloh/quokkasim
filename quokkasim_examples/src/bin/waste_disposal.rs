@@ -6,7 +6,7 @@ fn create_bench() {
 
     // Component declarations
 
-    let mut dump_source: DefaultContSource<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> =
+    let mut dump_source: DefaultContSource<f64, ContProcessLog<f64>> =
         DefaultContSource::new()
             .with_name("DumpSource")
             .with_code("DS")
@@ -27,7 +27,7 @@ fn create_bench() {
     let dp_mbox = Mailbox::new();
     let dp_addr = dp_mbox.address();
 
-    let mut material_sink: DefaultContSink<f64, ContProcessLog<DefaultContProcessLogType<f64>, f64>> =
+    let mut material_sink: DefaultContSink<f64, ContProcessLog<f64>> =
         DefaultContSink::new()
             .with_name("MaterialSink")
             .with_code("MS")
@@ -47,7 +47,7 @@ fn create_bench() {
 
     // Loggers
 
-    let process_logger = EventQueue::<ContProcessLog<DefaultContProcessLogType<f64>, f64>>::new();
+    let process_logger = EventQueue::<ContProcessLog<f64>>::new();
     let stock_logger = EventQueue::<ContStockLog<f64>>::new();
 
     dump_source.log_emitter.connect_sink(&process_logger);
@@ -64,7 +64,7 @@ fn create_bench() {
         .add_model(material_sink, ms_mbox, "MaterialSink");
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
-    let duration = Duration::from_secs(24 * 3600);
+    let duration = Duration::from_secs_f64( 0.25 * 3600.);
     let (mut sim, sched) = sim_init.init(start_time).unwrap();
 
     let time_at_start = SystemTime::now();

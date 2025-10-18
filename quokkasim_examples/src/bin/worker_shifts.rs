@@ -189,20 +189,6 @@ impl DiscProcessCore<Worker, DiscProcessLog<Worker>> for WorkerShiftManager {
             current_event_id
         }
     }
-    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::StateChange { new_state }
-            }).await;
-            current_event_id
-        }
-    }
 }
 
 impl Connect<WorkerShiftManager, DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>> for Connection {

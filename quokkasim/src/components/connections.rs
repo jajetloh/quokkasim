@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 
 use crate::{
-    common::ToLogRecord, components::{continuous_traits::{ContResource, ContStock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::*,
+    components::{continuous_traits::{ContResource, ContStock}, environment::BasicEnvironment}, nexosim::{Address, Model}, prelude::*,
 };
 
 pub trait Connect<A: Model, B: Model> {
@@ -15,76 +15,100 @@ pub struct Connection;
 // ──────────────────────────── DefaultProcess ────────────────────────────
 /* #region DefaultProcess */
 
-impl<T: ContResource + 'static, R: Clone + Send + Debug + Serialize + 'static, StockLogRecord: Clone + Send + Debug + Serialize + 'static>
-    Connect<DefaultContProcess<T, R>, DefaultContStock<T, ContStockState, StockLogRecord>> for Connection
+impl<
+    ResourceType: ContResource + 'static
+> Connect<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>> for Connection
 where
-    DefaultContStock<T, ContStockState, StockLogRecord>: Model,
-    StockLogRecord: Serialize,
-    DefaultContStock<T, ContStockState, StockLogRecord>: ToLogRecord<ContStockLogType<T>, StockLogRecord>,
-    DefaultContProcess<T, R>: ContProcess<T, R, DefaultContProcessLogType<T>>,
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: ContStock<ResourceType, ContStockState>,
+    DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultContProcess<T, R>, &Address<DefaultContProcess<T, R>>),
+        a: (&mut DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>>),
         b: (
-            &mut DefaultContStock<T, ContStockState, StockLogRecord>,
-            &Address<DefaultContStock<T, ContStockState, StockLogRecord>>,
+            &mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
+            &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>,
         ),
     ) -> Result<(), String> {
+        a.0.req_downstream.connect(DefaultContStock::get_state_async, b.1.clone());
         a.0.push_downstream.connect(DefaultContStock::add, b.1.clone());
-        a.0.req_downstream
-            .connect(DefaultContStock::get_state_async, b.1.clone());
         b.0.state_emitter.connect(DefaultContProcess::update_state, a.1);
         Ok(())
     }
 }
 
+// impl<
+//     ResourceType: ContResource + 'static,
+//     ProcessLogRecord: Clone + Send + Debug + Serialize + 'static,
+//     StockLogRecord: StockState + Clone + Send + Debug + Serialize + 'static
+// > Connect<DefaultContProcess<ResourceType, ProcessLogRecord>, DefaultContStock<ResourceType, ContStockState, StockLogRecord>> for Connection
+// where
+//     DefaultContStock<ResourceType, ContStockState, StockLogRecord>: ContStock<ResourceType, StockLogRecord>,
+//     DefaultContProcess<ResourceType, ProcessLogRecord>: ContProcessCore<ResourceType, ProcessLogRecord>,
+// {
+//     fn connect(
+//         &mut self,
+//         a: (&mut DefaultContProcess<ResourceType, ProcessLogRecord>, &Address<DefaultContProcess<ResourceType, ProcessLogRecord>>),
+//         b: (
+//             &mut DefaultContStock<ResourceType, ContStockState, StockLogRecord>,
+//             &Address<DefaultContStock<ResourceType, ContStockState, StockLogRecord>>,
+//         ),
+//     ) -> Result<(), String> {
+//         a.0.req_downstream.connect(DefaultContStock::get_state_async, b.1.clone());
+//         a.0.push_downstream.connect(DefaultContStock::add, b.1.clone());
+//         b.0.state_emitter.connect(DefaultContProcess::update_state, a.1);
+//         Ok(())
+//     }
+// }
+
 impl<
-    T: ContResource + Projectable<f64> + 'static,
-    R: Clone + Send + Debug + Serialize + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
-> Connect<DefaultContStock<T, ContStockState, StockLogRecord>, DefaultContProcess<T, R>> for Connection
+    ResourceType: ContResource + Projectable<f64> + 'static,
+> Connect<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>> for Connection
 where
-    DefaultContStock<T, ContStockState, StockLogRecord>: Model,
-    StockLogRecord: Serialize,
-    DefaultContStock<T, ContStockState, StockLogRecord>: ToLogRecord<ContStockLogType<T>, StockLogRecord>,
-    DefaultContProcess<T, R>: ContProcess<T, R, DefaultContProcessLogType<T>>,
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: Model,
+    DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>: Model
 {
     fn connect(
         &mut self,
         a: (
-            &mut DefaultContStock<T, ContStockState, StockLogRecord>,
-            &Address<DefaultContStock<T, ContStockState, StockLogRecord>>,
+            &mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
+            &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>,
         ),
-        b: (&mut DefaultContProcess<T, R>, &Address<DefaultContProcess<T, R>>),
+        b: (&mut DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>>),
     ) -> Result<(), String> {
-        b.0.withdraw_upstream
-            .connect(DefaultContStock::remove, a.1.clone());
-        b.0.req_upstream
-            .connect(DefaultContStock::get_state_async, a.1.clone());
+        b.0.withdraw_upstream.connect(DefaultContStock::remove, a.1.clone());
+        b.0.req_upstream.connect(DefaultContStock::get_state_async, a.1.clone());
         a.0.state_emitter.connect(DefaultContProcess::update_state, b.1);
         Ok(())
     }
 }
 
-impl<T: ContResource + 'static, R: Clone + Send + Debug + Serialize + 'static>
-    Connect<BasicEnvironment, DefaultContProcess<T, R>> for Connection
-where
-    DefaultContProcess<T, R>: ContProcess<T, R, DefaultContProcessLogType<T>>,
-    BasicEnvironment: Model,
-{
-    fn connect(
-        &mut self,
-        a: (&mut BasicEnvironment, &Address<BasicEnvironment>),
-        b: (&mut DefaultContProcess<T, R>, &Address<DefaultContProcess<T, R>>),
-    ) -> Result<(), String> {
-        a.0.emit_change
-            .connect(DefaultContProcess::update_state, b.1.clone());
-        b.0.req_environment
-            .connect(BasicEnvironment::get_state_async, a.1.clone());
-        Ok(())
-    }
-}
+
+// impl<
+//     ResourceType: ContResource + Projectable<f64> + 'static,
+//     ProcessLogRecord: Clone + Send + Debug + Serialize + 'static,
+//     StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+// > Connect<DefaultContStock<ResourceType, ContStockState, StockLogRecord>, DefaultContProcess<ResourceType, ProcessLogRecord>> for Connection
+// where
+//     DefaultContStock<ResourceType, ContStockState, StockLogRecord>: Model,
+//     DefaultContProcess<ResourceType, ProcessLogRecord>: Model
+// {
+//     fn connect(
+//         &mut self,
+//         a: (
+//             &mut DefaultContStock<ResourceType, ContStockState, StockLogRecord>,
+//             &Address<DefaultContStock<ResourceType, ContStockState, StockLogRecord>>,
+//         ),
+//         b: (&mut DefaultContProcess<ResourceType, ProcessLogRecord>, &Address<DefaultContProcess<ResourceType, ProcessLogRecord>>),
+//     ) -> Result<(), String> {
+//         b.0.withdraw_upstream
+//             .connect(DefaultContStock::remove, a.1.clone());
+//         b.0.req_upstream
+//             .connect(DefaultContStock::get_state_async, a.1.clone());
+//         a.0.state_emitter.connect(DefaultContProcess::update_state, b.1);
+//         Ok(())
+//     }
+// }
 
 /* #endregion DefaultProcess */
 
@@ -93,25 +117,23 @@ where
 
 impl<
     ResourceType: ContResource + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
+    // StockLogRecord: Clone + Send + Debug + Serialize + 'static,
     // ProcessLogRecord: Clone + Send + Debug + Serialize + 'static,
     // TODO: Make more generic, ContinuousProcessLog<...> -> ProcessLogRecord
 >
     Connect<
-        DefaultContStock<ResourceType, ContStockState, StockLogRecord>,
-        DefaultContSink<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>,
+        DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
+        DefaultContSink<ResourceType, ContProcessLog<ResourceType>>,
     > for Connection
 where
-    DefaultContSink<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>: Model,
-    DefaultContStock<ResourceType, ContStockState, StockLogRecord>: ToLogRecord<ContStockLogType<ResourceType>, StockLogRecord>,
-    DefaultContStock<ResourceType, ContStockState, StockLogRecord>: Model,
-    StockLogRecord: Serialize,
+    DefaultContSink<ResourceType, ContProcessLog<ResourceType>>: Model,
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: Model,
     ResourceType: Projectable<f64>,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultContStock<ResourceType, ContStockState, StockLogRecord>, &Address<DefaultContStock<ResourceType, ContStockState, StockLogRecord>>),
-        b: (&mut DefaultContSink<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>, &Address<DefaultContSink<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>>)
+        a: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>),
+        b: (&mut DefaultContSink<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContSink<ResourceType, ContProcessLog<ResourceType>>>)
     ) -> Result<(), String> {
         a.0.state_emitter.connect(DefaultContSink::update_state, b.1.clone());
         b.0.req_upstream.connect(DefaultContStock::get_state_async, a.1.clone());
@@ -128,22 +150,19 @@ where
 
 impl<
     ResourceType: ContResource + 'static,
-    StockLogRecord: Clone + Send + Debug + Serialize + 'static,
 >
     Connect<
-        DefaultContSource<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>,
-        DefaultContStock<ResourceType, ContStockState, StockLogRecord>,
+        DefaultContSource<ResourceType, ContProcessLog<ResourceType>>,
+        DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
     > for Connection
 where
-    DefaultContSource<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>: Model,
-    DefaultContStock<ResourceType, ContStockState, StockLogRecord>: ToLogRecord<ContStockLogType<ResourceType>, StockLogRecord>,
-    DefaultContStock<ResourceType, ContStockState, StockLogRecord>: Model,
-    StockLogRecord: Serialize,
+    DefaultContSource<ResourceType, ContProcessLog<ResourceType>>: Model,
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: Model,
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultContSource<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>, &Address<DefaultContSource<ResourceType, ContProcessLog<DefaultContProcessLogType<ResourceType>, ResourceType>>>),
-        b: (&mut DefaultContStock<ResourceType, ContStockState, StockLogRecord>, &Address<DefaultContStock<ResourceType, ContStockState, StockLogRecord>>),
+        a: (&mut DefaultContSource<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContSource<ResourceType, ContProcessLog<ResourceType>>>),
+        b: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>),
     ) -> Result<(), String> {
         b.0.state_emitter.connect(DefaultContSource::update_state, a.1.clone());
         a.0.req_downstream.connect(DefaultContStock::get_state_async, b.1.clone());
