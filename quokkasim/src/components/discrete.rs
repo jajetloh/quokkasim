@@ -338,96 +338,6 @@ where
     ) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
     }
-
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessFailure { reason },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_stopped(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessStopped { reason },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_continue(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessContinue { reason },
-            }).await;
-            current_event_id
-        }
-    }
 }
 
 impl<
@@ -539,6 +449,51 @@ where
             }
         }
     }
+
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
+            }).await;
+            current_event_id
+        }
+    }
+    
+    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
+            }).await;
+            current_event_id
+        }
+    }
+
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessFailure { reason },
+            }).await;
+            current_event_id
+        }
+    }
 }
 
 impl<
@@ -578,6 +533,21 @@ where
                     self.time_to_next_process_event = Some(time_left);
                 }
             }
+        }
+    }
+
+    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
+            }).await;
+            current_event_id
         }
     }
 }
@@ -725,6 +695,21 @@ where
             }
         }
     }
+
+    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
+            }).await;
+            current_event_id
+        }
+    }
 }
 
 impl<
@@ -819,6 +804,51 @@ where
                     self.time_to_next_process_event = Some(time_left);
                 }
             }
+        }
+    }
+    
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
+            }).await;
+            current_event_id
+        }
+    }
+    
+    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
+            }).await;
+            current_event_id
+        }
+    }
+
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessFailure { reason },
+            }).await;
+            current_event_id
         }
     }
 }
@@ -924,97 +954,6 @@ where
     ) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
     }
-
-
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessFailure { reason },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_stopped(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessStopped { reason },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_continue(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessContinue { reason },
-            }).await;
-            current_event_id
-        }
-    }
 }
 
 #[derive(WithMethods)]
@@ -1077,15 +1016,13 @@ impl<
     }
 }
 
-impl<ItemType, ProcessLog> DiscProcessUpdateSinceLast<
+impl<ItemType> DiscProcessUpdateSinceLast<
     ItemType,
-    ProcessLog,
-    > for DefaultDiscSink<
-    ItemType, ProcessLog
+    DiscProcessLog<ItemType>,
+> for DefaultDiscSink<
+    ItemType, DiscProcessLog<ItemType>
 > where
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    ProcessLog: Clone + Debug + Serialize + Send + 'static,
-    Self: DiscProcessCore<ItemType, ProcessLog>,
 {
     fn update_process_state_since_prev_event(
             &mut self, source_event_id: &mut EventId,
@@ -1108,21 +1045,34 @@ impl<ItemType, ProcessLog> DiscProcessUpdateSinceLast<
             }
         }
     }
+
+    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
+            }).await;
+            current_event_id
+        }
+    }
 }
 
 impl<
     ItemType,
-    ProcessLog,
     > DiscProcessUpdateDecisionLogic<
     ItemType,
-    ProcessLog,
+    DiscProcessLog<ItemType>,
     > for DefaultDiscSink<
     ItemType,
-    ProcessLog,
+    DiscProcessLog<ItemType>,
 > where
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    ProcessLog: Clone + Debug + Serialize + Send + 'static,
-    Self: DiscProcessCore<ItemType, ProcessLog>,
+    Self: DiscProcessCore<ItemType, DiscProcessLog<ItemType>>,
 {
     fn update_state_decision_logic(
         &mut self,
@@ -1206,6 +1156,52 @@ impl<
             }  
         }
     }
+
+    
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
+            }).await;
+            current_event_id
+        }
+    }
+    
+    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
+            }).await;
+            current_event_id
+        }
+    }
+
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+        async move {
+            let current_event_id = self.get_next_event_id();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event_id: current_event_id.clone(),
+                source_event_id: source_event_id.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessFailure { reason },
+            }).await;
+            current_event_id
+        }
+    }
 }
 
 impl<
@@ -1223,11 +1219,9 @@ impl<
     Self: DiscProcessCore<ItemType, ProcessLog>,
 {}
 
-impl<ItemType, ProcessLog> DefaultDiscSink<ItemType, ProcessLog>
+impl<ItemType> DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>
 where
     ItemType: Clone + Debug + Serialize + Send + 'static,
-    ProcessLog: Clone + Debug + Serialize + Send + 'static,
-    Self: DiscProcessCore<ItemType, ProcessLog>,
 {
     pub fn update_state(
         &mut self,
@@ -1325,95 +1319,5 @@ where
         &mut self,
     ) -> &mut Option<Duration> {
         &mut self.time_to_next_process_event
-    }
-
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessFailure { reason },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_stopped(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessStopped { reason },
-            }).await;
-            current_event_id
-        }
-    }
-
-    fn log_type_process_continue(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
-        async move {
-            let current_event_id = self.get_next_event_id();
-            self.log_emitter.send(DiscProcessLog {
-                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
-                element_name: self.element_name.clone(),
-                element_type: self.element_type.clone(),
-                details: DefaultDiscProcessLogType::ProcessContinue { reason },
-            }).await;
-            current_event_id
-        }
     }
 }

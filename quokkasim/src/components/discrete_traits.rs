@@ -315,6 +315,9 @@ where
             self.update_process_state_since_prev_event(source_event_id, cx, duration_since_prev).await;
         }
     }
+
+    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+
 }
 
 pub trait DiscProcessUpdateDecisionLogic<
@@ -332,6 +335,11 @@ pub trait DiscProcessUpdateDecisionLogic<
         source_event_id: &mut EventId,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
+
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+
 }
 
 pub trait DiscProcessUpdateForNextEvent<
@@ -410,13 +418,6 @@ where
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
     fn previous_check_time(&mut self) -> &mut MonotonicTime;
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
-
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_stopped(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_continue(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
 
     fn update_state(
         &mut self,
