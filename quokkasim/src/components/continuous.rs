@@ -26,6 +26,32 @@ impl StockState for ContStockState {
     }
 }
 
+impl ContStockState {
+    pub fn occupied_frac(&self) -> f64 {
+        match self {
+            ContStockState::Normal { occupied, empty } => {
+                occupied / (occupied + empty)
+            }
+            ContStockState::Full { .. } => 1.0,
+            ContStockState::Empty { .. } => 0.0,
+        }
+    }
+    pub fn occupied(&self) -> f64 {
+        match self {
+            ContStockState::Normal { occupied, .. } => *occupied,
+            ContStockState::Full { occupied, .. } => *occupied,
+            ContStockState::Empty { occupied, .. } => *occupied,
+        }
+    }
+    pub fn empty(&self) -> f64 {
+        match self {
+            ContStockState::Normal { empty, .. } => *empty,
+            ContStockState::Full { empty, .. } => *empty,
+            ContStockState::Empty { empty, .. } => *empty,
+        }
+    }
+}
+
 #[derive(WithMethods)]
 pub struct DefaultContStock<ResourceType, StockStateType: StockState, RecordLogType: Clone + Send + 'static>
 where
