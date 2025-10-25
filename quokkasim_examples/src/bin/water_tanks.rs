@@ -246,6 +246,9 @@ impl IntegrationService {
     fn integrate_rates(&mut self, source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             // Implementation of rate integration logic goes here
+
+            let time_elapsed_secs = (cx.time().duration_since(self.last_integration_time)).as_secs_f64();
+
             let mut stock_values = HashMap::new();
             for (code, req) in self.req_stock_levels.iter_mut() {
                 let value = req.send(()).await.next().unwrap();
@@ -260,7 +263,7 @@ impl IntegrationService {
                 ("F0".to_string(), 0.),
             ]));
             
-            let dt_sec = 0.1;
+            let dt_sec = time_elapsed_secs;
             let pipe_1_rate_fn = &self.process_rate_functions.get("PIPE1").unwrap().3;
             
             let diff_fn = |x: &VectorHashMap<String, f64>| -> VectorHashMap<String, f64> {
@@ -280,10 +283,10 @@ impl IntegrationService {
                 (k1.add(k2.mul(2.0)).add(k3.mul(2.0)).add(k4)).mul(dt_sec / 6.0)
             );
 
-            println!("After integration:");
-            for (k, v) in state_after_dt.iter() {
-                println!("  {}: {}", k, v);
-            }
+            // println!("After integration:");
+            // for (k, v) in state_after_dt.iter() {
+            //     println!("  {}: {}", k, v);
+            // }
 
             self.push_process_quantities.get_mut("PIPE1").unwrap().send((
                 state_after_dt.get("F0").unwrap().clone(),
@@ -420,15 +423,24 @@ fn main() {
     let (mut sim, mut sched) = sim_init.init(model_time).unwrap();
 
 
-    for _ in 0..10 {
-        model_time += Duration::from_secs(5);
+    for _ in 0..400 {
+        model_time += Duration::from_secs_f64(0.0005);
         sim.step_until(model_time).unwrap();
         sim.process_event(PipeProcess::update_state, EventId("fff".into()), pipe1_addr.clone()).unwrap();
     }
-
+    // 0.004236414353999841
+    // 0.0020771384133017935
 
     for x in stock_logger.into_reader() {
-        println!("{:?}", x);
+        // println!("{:?}", x);
+        if x.element_name == "Tank 1" {
+            match x.details {
+                ContStockLogType::Remove { balance, resource } => {
+                    println!("{} | {}", x.time, balance);
+                },
+                _ => {}
+            }
+        }
     }
     
 
