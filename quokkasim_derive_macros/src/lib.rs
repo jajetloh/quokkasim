@@ -55,18 +55,6 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
                     "source_vector" => {
                         methods.push(generate_with_and_inplace_method("source_vector", field_name, field_type));
                     },
-                    "delay_modes" => {
-                        methods.push(quote! {
-                            pub fn with_delay_mode(mut self, delay_mode_change: DelayModeChange) -> Self {
-                                self.delay_modes.modify(delay_mode_change);
-                                self
-                            }
-                            
-                            pub fn with_delay_mode_inplace(&mut self, delay_mode_change: DelayModeChange) {
-                                self.delay_modes.modify(delay_mode_change);
-                            }
-                        });
-                    },
                     "split_ratios" => {
                         methods.push(generate_with_and_inplace_method("split_ratios", field_name, field_type));
                     }

@@ -235,12 +235,6 @@ impl<ResourceType: ContResource> Serialize for ContProcessLog<ResourceType>
                 DefaultContProcessLogType::ProcessContinue { reason } => {
                     ("ProcessContinue", None, None, Some(reason.to_string()))
                 }
-                DefaultContProcessLogType::DelayStart { delay_name } => {
-                    ("DelayStart", None, None, Some(delay_name.clone()))
-                }
-                DefaultContProcessLogType::DelayEnd { delay_name } => {
-                    ("DelayEnd", None, None, Some(delay_name.clone()))
-                }
                 DefaultContProcessLogType::StateChange { new_state } => {
                     ("StateChange", None, None, Some(format!("{:?}", new_state)))
                 }
@@ -261,8 +255,6 @@ pub enum DefaultContProcessLogType<ResourceType: ContResource> {
     ProcessFailure { reason: &'static str },
     ProcessStopped { reason: &'static str },
     ProcessContinue { reason: &'static str },
-    DelayStart { delay_name: String },
-    DelayEnd { delay_name: String },
     StateChange { new_state: ContStockState },
 }
 
@@ -282,7 +274,6 @@ pub struct DefaultContProcess<
     // Ports
     pub req_upstream: Requestor<(), ContStockState>,
     pub req_downstream: Requestor<(), ContStockState>,
-    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(f64, EventId), ResourceType>,
     pub push_downstream: Output<(ResourceType, EventId)>,
     pub log_emitter: Output<ProcessLog>,
@@ -290,15 +281,12 @@ pub struct DefaultContProcess<
     // Configuration
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
-    pub delay_modes: DelayModes,
 
     // Runtime State
     pub process_state: Option<(Duration, ResourceType)>,
-    pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: u64,
     pub previous_check_time: MonotonicTime,
@@ -317,20 +305,16 @@ impl<
 
             req_upstream: Requestor::default(),
             req_downstream: Requestor::default(),
-            req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             push_downstream: Output::default(),
             log_emitter: Output::default(),
 
             process_state: None,
-            env_state: BasicEnvironmentState::Normal,
 
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
-            delay_modes: DelayModes::default(),
 
             time_to_next_process_event: None,
-            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -583,7 +567,6 @@ pub struct DefaultContSource<
 
     // Ports
     pub req_downstream: Requestor<(), ContStockState>,
-    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub push_downstream: Output<(ResourceType, EventId)>,
     pub log_emitter: Output<ProcessLog>,
 
@@ -591,15 +574,12 @@ pub struct DefaultContSource<
     pub source_resource: ResourceType,
     pub source_quantity_distr: Distribution,
     pub source_time_distr: Distribution,
-    pub delay_modes: DelayModes,
 
     // Runtime State
     pub process_state: Option<(Duration, ResourceType)>,
-    pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: u64,
     pub previous_check_time: MonotonicTime,
@@ -617,20 +597,16 @@ impl<
             element_type: "DefaultContSource".into(),
 
             req_downstream: Requestor::default(),
-            req_environment: Requestor::default(),
             push_downstream: Output::default(),
             log_emitter: Output::default(),
 
             process_state: None,
-            env_state: BasicEnvironmentState::Normal,
 
             source_resource: ResourceType::default(),
             source_quantity_distr: Distribution::default(),
             source_time_distr: Distribution::default(),
-            delay_modes: DelayModes::default(),
 
             time_to_next_process_event: None,
-            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
@@ -878,22 +854,18 @@ pub struct DefaultContSink<
 
     // Ports
     pub req_upstream: Requestor<(), ContStockState>,
-    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub withdraw_upstream: Requestor<(f64, EventId), ResourceType>,
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
     pub sink_quantity_distr: Distribution,
     pub sink_time_distr: Distribution,
-    pub delay_modes: DelayModes,
 
     // Runtime State
     pub process_state: Option<(Duration, ResourceType)>,
-    pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: u64,
     pub previous_check_time: MonotonicTime,
@@ -911,19 +883,15 @@ impl<
             element_type: "DefaultContSink".into(),
 
             req_upstream: Requestor::default(),
-            req_environment: Requestor::default(),
             withdraw_upstream: Requestor::default(),
             log_emitter: Output::default(),
 
             process_state: None,
-            env_state: BasicEnvironmentState::Normal,
 
             sink_quantity_distr: Distribution::default(),
             sink_time_distr: Distribution::default(),
-            delay_modes: DelayModes::default(),
 
             time_to_next_process_event: None,
-            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,

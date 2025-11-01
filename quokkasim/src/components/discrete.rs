@@ -601,7 +601,6 @@ pub struct DefaultDiscSource<
 
     // Ports
     pub req_downstream: Requestor<(), DiscStockState>,
-    pub req_environment: Requestor<(), BasicEnvironmentState>,
     pub push_downstream: Output<(Vec<ItemType>, EventId)>,
     pub log_emitter: Output<ProcessLog>,
 
@@ -609,15 +608,12 @@ pub struct DefaultDiscSource<
     pub source_item_generator: Option<Box<dyn Generator<ItemType> + Send>>,
     pub source_quantity_distr: Distribution,
     pub source_time_distr: Distribution,
-    pub delay_modes: DelayModes,
 
     // Runtime state
     pub process_state: Option<(Duration, Vec<ItemType>)>,
-    pub env_state: BasicEnvironmentState,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
-    pub time_to_next_delay_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
     pub next_event_index: usize,
     pub previous_check_time: MonotonicTime,
@@ -635,20 +631,16 @@ impl<
             element_type: "DefaultDiscSource".into(),
 
             req_downstream: Requestor::default(),
-            req_environment: Requestor::default(),
             push_downstream: Output::default(),
             log_emitter: Output::default(),
 
             source_item_generator: None,
             source_quantity_distr: Distribution::default(),
             source_time_distr: Distribution::default(),
-            delay_modes: DelayModes::default(),
 
             process_state: None,
-            env_state: BasicEnvironmentState::Normal,
 
             time_to_next_process_event: None,
-            time_to_next_delay_event: None,
             scheduled_event: None,
             next_event_index: 0,
             previous_check_time: MonotonicTime::EPOCH,
