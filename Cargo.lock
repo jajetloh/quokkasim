@@ -1086,6 +1086,7 @@ dependencies = [
  "csv",
  "indexmap",
  "log",
+ "nexosim",
  "paste",
  "quokkasim",
  "rayon",

@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub trait Connect<A: Model, B: Model> {
-    fn connect(&mut self, a: (&mut A, &Address<A>), b: (&mut B, &Address<B>))
+    fn connect(&mut self, a: (&mut A, &Address<A>, Option<usize>), b: (&mut B, &Address<B>, Option<usize>))
     -> Result<(), String>;
 }
 
@@ -24,10 +24,11 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>>),
+        a: (&mut DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>>, Option<usize>),
         b: (
             &mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
             &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>,
+            Option<usize>
         ),
     ) -> Result<(), String> {
         a.0.req_downstream.connect(DefaultContStock::get_state_async, b.1.clone());
@@ -49,8 +50,9 @@ where
         a: (
             &mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
             &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>,
+            Option<usize>
         ),
-        b: (&mut DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>>),
+        b: (&mut DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>>, Option<usize>),
     ) -> Result<(), String> {
         b.0.withdraw_upstream.connect(DefaultContStock::remove, a.1.clone());
         b.0.req_upstream.connect(DefaultContStock::get_state_async, a.1.clone());
@@ -78,8 +80,8 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>),
-        b: (&mut DefaultContSink<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContSink<ResourceType, ContProcessLog<ResourceType>>>)
+        a: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>, Option<usize>),
+        b: (&mut DefaultContSink<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContSink<ResourceType, ContProcessLog<ResourceType>>>, Option<usize>)
     ) -> Result<(), String> {
         a.0.state_emitter.connect(DefaultContSink::update_state, b.1.clone());
         b.0.req_upstream.connect(DefaultContStock::get_state_async, a.1.clone());
@@ -107,8 +109,8 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultContSource<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContSource<ResourceType, ContProcessLog<ResourceType>>>),
-        b: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>),
+        a: (&mut DefaultContSource<ResourceType, ContProcessLog<ResourceType>>, &Address<DefaultContSource<ResourceType, ContProcessLog<ResourceType>>>, Option<usize>),
+        b: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>, Option<usize>),
     ) -> Result<(), String> {
         b.0.state_emitter.connect(DefaultContSource::update_state, a.1.clone());
         a.0.req_downstream.connect(DefaultContStock::get_state_async, b.1.clone());
@@ -135,8 +137,8 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>>),
-        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
+        a: (&mut DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscSource<ItemType, DiscProcessLog<ItemType>>>, Option<usize>),
+        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>, Option<usize>),
     ) -> Result<(), String> {
         b.0.state_emitter.connect(DefaultDiscSource::update_state, a.1.clone());
         a.0.req_downstream.connect(DefaultDiscStock::get_state_async, b.1.clone());
@@ -163,8 +165,8 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>>),
-        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
+        a: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>>, Option<usize>),
+        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>, Option<usize>),
     ) -> Result<(), String> {
         b.0.state_emitter.connect(DefaultDiscProcess::update_state, a.1.clone());
         a.0.req_downstream.connect(DefaultDiscStock::get_state_async, b.1.clone());
@@ -185,8 +187,8 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
-        b: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>>),
+        a: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>, Option<usize>),
+        b: (&mut DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscProcess<ItemType, DiscProcessLog<ItemType>>>, Option<usize>),
     ) -> Result<(), String> {
         a.0.state_emitter.connect(DefaultDiscProcess::update_state, b.1.clone());
         b.0.req_upstream.connect(DefaultDiscStock::get_state_async, a.1.clone());
@@ -214,8 +216,8 @@ where
 {
     fn connect(
         &mut self,
-        a: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>),
-        b: (&mut DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>>),
+        a: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>, Option<usize>),
+        b: (&mut DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultDiscSink<ItemType, DiscProcessLog<ItemType>>>, Option<usize>),
     ) -> Result<(), String> {
         a.0.state_emitter.connect(DefaultDiscSink::update_state, b.1.clone());
         b.0.req_upstream.connect(DefaultDiscStock::get_state_async, a.1.clone());

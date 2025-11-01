@@ -123,6 +123,15 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
             }
         }
     }
+
+    methods.push(quote! {
+        pub fn create_mailbox(&self) -> (::nexosim::simulation::Mailbox<Self>, ::nexosim::simulation::Address<Self>) 
+        where Self: ::nexosim::model::Model {
+            let mailbox = ::nexosim::simulation::Mailbox::new();
+            let address = mailbox.address();
+            (mailbox, address)
+        }
+    });
     
     let expanded = quote! {
         impl #impl_generics #name #ty_generics #where_clause {
