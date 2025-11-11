@@ -105,20 +105,10 @@ impl<T> ContResource for T where T: ContArithmetic + Clone + Send + Debug + Defa
 pub trait ContProcessUpdateSinceLast<
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
->: ContProcessCore<
-    ResourceType,
-    LogRecordType
->
-where 
-    ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,
+>: ContProcessCore<ResourceType, LogRecordType>
 {
-    fn update_process_state_since_prev_event(
-        &mut self, source_event_id: &mut EventId,
-        cx: &mut Context<Self>,
-        duration_since_prev: Duration
-    ) -> impl Future<Output = ()>;
-
+    // Resolves the state of this process from the previous update time to now.
+    // Handles some edge case handling and logging as well.
     fn update_state_since_last_update(
         &mut self,
         source_event_id: &mut EventId,
@@ -137,18 +127,20 @@ where
         }
     }
 
+    // Concrete function to update the internal process state from the previous time to now
+    fn update_process_state_since_prev_event(
+        &mut self, source_event_id: &mut EventId,
+        cx: &mut Context<Self>,
+        duration_since_prev: Duration
+    ) -> impl Future<Output = ()>;
+
     fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: f64, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
 }
 
 pub trait ContProcessUpdateDecisionLogic<
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,  
->: ContProcessCore<
-    ResourceType,
-    LogRecordType
-> where
-    ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,
+>: ContProcessCore<ResourceType, LogRecordType>
 {
     fn update_state_decision_logic(
         &mut self,
@@ -165,14 +157,7 @@ pub trait ContProcessUpdateDecisionLogic<
 pub trait ContProcessUpdateForNextEvent<
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + 'static,
->
-where
-    Self: ContProcessCore<
-        ResourceType,
-        LogRecordType,
-    >,
-    ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,
+>: ContProcessCore<ResourceType, LogRecordType>
 {
     fn update_state_for_next_event(
         &mut self,
