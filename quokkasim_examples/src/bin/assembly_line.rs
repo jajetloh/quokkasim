@@ -55,10 +55,10 @@ fn create_bench() {
     // Connections
 
     let mut c = Connection {};
-    c.connect((&mut source, &src_addr), (&mut queue_1, &q1_addr)).unwrap();
-    c.connect((&mut queue_1, &q1_addr), (&mut process, &p_addr)).unwrap();
-    c.connect((&mut process, &p_addr), (&mut queue_2, &q2_addr)).unwrap();
-    c.connect((&mut queue_2, &q2_addr), (&mut sink, &snk_addr)).unwrap();
+    c.connect((&mut source, &src_addr, None), (&mut queue_1, &q1_addr, None)).unwrap();
+    c.connect((&mut queue_1, &q1_addr, None), (&mut process, &p_addr, None)).unwrap();
+    c.connect((&mut process, &p_addr, None), (&mut queue_2, &q2_addr, None)).unwrap();
+    c.connect((&mut queue_2, &q2_addr, None), (&mut sink, &snk_addr, None)).unwrap();
 
     // Loggers
 

@@ -125,8 +125,8 @@ impl DiscProcessCore<Worker, DiscProcessLog<Worker>> for WorkerShiftManager {
 impl Connect<WorkerShiftManager, DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>> for Connection {
     fn connect(
         &mut self,
-        a: (&mut WorkerShiftManager, &Address<WorkerShiftManager>),
-        b: (&mut DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>, &Address<DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>>),
+        a: (&mut WorkerShiftManager, &Address<WorkerShiftManager>, Option<usize>),
+        b: (&mut DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>, &Address<DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>>, Option<usize>),
     ) -> Result<(), String> {
         a.0.add_worker.map_connect(|(worker, event_id)| (Some(worker.clone()), event_id.clone()),DefaultDiscStock::add_one, b.1.clone());
         a.0.remove_worker.connect(DefaultDiscStock::remove_one, b.1.clone());
@@ -166,8 +166,8 @@ fn create_bench() {
     let mut c = Connection {};
 
     c.connect(
-        (&mut worker_shift_manager, &wsm_addr),
-        (&mut available_workers, &aw_addr),
+        (&mut worker_shift_manager, &wsm_addr, None),
+        (&mut available_workers, &aw_addr, None),
     ).unwrap();
 
     // Loggers

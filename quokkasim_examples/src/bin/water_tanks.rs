@@ -283,11 +283,6 @@ impl IntegrationService {
                 (k1.add(k2.mul(2.0)).add(k3.mul(2.0)).add(k4)).mul(dt_sec / 6.0)
             );
 
-            // println!("After integration:");
-            // for (k, v) in state_after_dt.iter() {
-            //     println!("  {}: {}", k, v);
-            // }
-
             self.push_process_quantities.get_mut("PIPE1").unwrap().send((
                 state_after_dt.get("F0").unwrap().clone(),
                 source_event_id.clone()
@@ -428,11 +423,8 @@ fn main() {
         sim.step_until(model_time).unwrap();
         sim.process_event(PipeProcess::update_state, EventId("fff".into()), pipe1_addr.clone()).unwrap();
     }
-    // 0.004236414353999841
-    // 0.0020771384133017935
 
     for x in stock_logger.into_reader() {
-        // println!("{:?}", x);
         if x.element_name == "Tank 1" {
             match x.details {
                 ContStockLogType::Remove { balance, resource } => {

@@ -42,8 +42,8 @@ fn create_bench() {
     // Connections
 
     let mut c = Connection {};
-    c.connect((&mut dump_source, &ds_addr), (&mut dump_point, &dp_addr)).unwrap();
-    c.connect((&mut dump_point, &dp_addr), (&mut material_sink, &ms_addr)).unwrap();
+    c.connect((&mut dump_source, &ds_addr, None), (&mut dump_point, &dp_addr, None)).unwrap();
+    c.connect((&mut dump_point, &dp_addr, None), (&mut material_sink, &ms_addr, None)).unwrap();
 
     // Loggers
 
