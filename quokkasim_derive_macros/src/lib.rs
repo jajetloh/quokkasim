@@ -2,6 +2,10 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
 
+extern crate quokkasim_reexports;
+// pub use quokkasim_reexports::nexosim::*;
+//
+
 #[proc_macro_derive(WithMethods)]
 pub fn derive_with_methods(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -112,10 +116,18 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
         }
     }
 
+    // methods.push(quote! {
+    //     pub fn create_mailbox(&self) -> (::quokkasim_reexports::nexosim::Mailbox<Self>, ::quokkasim_reexports::nexosim::Address<Self>) 
+    //     where Self: ::quokkasim_reexports::nexosim::Model {
+    //         let mailbox = ::quokkasim_reexports::nexosim::Mailbox::new();
+    //         let address = mailbox.address();
+    //         (mailbox, address)
+    //     }
+    // });
     methods.push(quote! {
-        pub fn create_mailbox(&self) -> (::nexosim::simulation::Mailbox<Self>, ::nexosim::simulation::Address<Self>) 
-        where Self: ::nexosim::model::Model {
-            let mailbox = ::nexosim::simulation::Mailbox::new();
+        pub fn create_mailbox(&self) -> (::quokkasim::nexosim::Mailbox<Self>, ::quokkasim::nexosim::Address<Self>) 
+        where Self: ::quokkasim::nexosim::Model {
+            let mailbox = ::quokkasim::nexosim::Mailbox::new();
             let address = mailbox.address();
             (mailbox, address)
         }

@@ -1,0 +1,7 @@
+[package]
+name = "quokkasim_reexports"
+version = "0.3.0-alpha.1"
+edition = "2024"
+
+[dependencies]
+nexosim = { version = "0.3.4", features = ["server"] }

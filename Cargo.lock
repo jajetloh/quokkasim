@@ -825,9 +825,9 @@ dependencies = [
 
 [[package]]
 name = "nexosim"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8a708d20872a4140f14af9efd81d3eb357e00dbde507001dcd8720a566c2bf7"
+checksum = "d14f829bd1d7b025f8851f68d01ad9561c05dee3f19b98a12e862a7110a7901d"
 dependencies = [
  "async-event",
  "bytes",
@@ -1060,6 +1060,7 @@ dependencies = [
  "nexosim",
  "paste",
  "quokkasim_derive_macros",
+ "quokkasim_reexports",
  "rand",
  "rand_distr",
  "serde",
@@ -1074,6 +1075,7 @@ name = "quokkasim_derive_macros"
 version = "0.3.0-alpha.1"
 dependencies = [
  "proc-macro2",
+ "quokkasim_reexports",
  "quote",
  "syn",
 ]
@@ -1086,9 +1088,9 @@ dependencies = [
  "csv",
  "indexmap",
  "log",
- "nexosim",
  "paste",
  "quokkasim",
+ "quokkasim_reexports",
  "rayon",
  "serde",
  "serde_json",
@@ -1096,6 +1098,13 @@ dependencies = [
  "strum",
  "strum_macros",
  "unzip3",
+]
+
+[[package]]
+name = "quokkasim_reexports"
+version = "0.3.0-alpha.1"
+dependencies = [
+ "nexosim",
 ]
 
 [[package]]
