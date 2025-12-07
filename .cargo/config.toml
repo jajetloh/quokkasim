@@ -1,3 +1,4 @@
 [patch.crates-io]
 quokkasim    = { path = "quokkasim" }
 quokkasim_derive_macros = { path = "quokkasim_derive_macros" }
+quokkasim_reexports = { path = "quokkasim_reexports" }

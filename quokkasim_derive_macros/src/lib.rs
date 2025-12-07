@@ -1,6 +1,12 @@
 use proc_macro::TokenStream;
+use proc_macro_crate::{crate_name, FoundCrate};
+use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Type, Error as SynError};
+
+extern crate quokkasim_reexports;
+// pub use quokkasim_reexports::nexosim::*;
+//
 
 #[proc_macro_derive(WithMethods)]
 pub fn derive_with_methods(input: TokenStream) -> TokenStream {
@@ -9,6 +15,17 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     
+    let path_to_main = match crate_name("quokkasim") {
+        Ok(FoundCrate::Itself) => quote!(crate),
+        Ok(FoundCrate::Name(name)) => {
+            // crate names on crates.io use hyphens, but Rust paths use underscores
+            let name = name.replace('-', "_");
+            let ident = syn::Ident::new(&name, Span::call_site());
+            quote!(#ident)
+        }
+        Err(e) => return SynError::new(Span::call_site(), e.to_string()).to_compile_error().into(),
+    };
+
     let mut methods = Vec::new();
     methods.push(generate_new_struct_method());
 
@@ -113,9 +130,9 @@ pub fn derive_with_methods(input: TokenStream) -> TokenStream {
     }
 
     methods.push(quote! {
-        pub fn create_mailbox(&self) -> (::nexosim::simulation::Mailbox<Self>, ::nexosim::simulation::Address<Self>) 
-        where Self: ::nexosim::model::Model {
-            let mailbox = ::nexosim::simulation::Mailbox::new();
+        pub fn create_mailbox(&self) -> (#path_to_main::nexosim::Mailbox<Self>, #path_to_main::nexosim::Address<Self>) 
+        where Self: #path_to_main::nexosim::Model {
+            let mailbox = #path_to_main::nexosim::Mailbox::new();
             let address = mailbox.address();
             (mailbox, address)
         }
