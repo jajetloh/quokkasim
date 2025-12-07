@@ -4,3 +4,5 @@ pub mod connections;
 
 pub mod discrete;
 pub mod discrete_traits;
+
+pub mod mixed;
