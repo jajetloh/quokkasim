@@ -43,14 +43,17 @@ pub struct DefaultLoadingProcess<
 }
 
 impl<
-    ContainerType: Clone + Send + 'static,
-    ContainerProcessLogType: Clone + Send + 'static,
-    ResourceType: ContArithmetic + Clone + Serialize + Send + 'static,
+    ContainerType,
+    ResourceType,
 > Model for DefaultLoadingProcess<
     ContainerType,
-    ContainerProcessLogType,
+    DiscProcessLog<ContainerType>,
     ResourceType,
-> {
+> where
+    ContainerType: LoadResource<ResourceType> + Clone + Debug + Serialize + Send + 'static,
+    DiscProcessLog<ContainerType>: Clone + Debug + Serialize + Send + 'static,
+    ResourceType: Projectable<f64> + ContResource + Clone + Debug + Serialize + Send + 'static,
+{
     fn init(
         mut self,
         ctx: &mut Context<Self>,
@@ -82,7 +85,6 @@ where
     ContainerType: LoadResource<ResourceType> + Clone + Debug + Serialize + Send + 'static,
     DiscProcessLog<ContainerType>: Clone + Debug + Serialize + Send + 'static,
     ResourceType: Projectable<f64> + ContResource + Clone + Debug + Serialize + Send + 'static,
-    Self: DiscProcessCore<ContainerType, DiscProcessLog<ContainerType>>,
 {
     fn update_state(
             &mut self,
