@@ -45,6 +45,41 @@ pub struct DefaultLoadingProcess<
 impl<
     ContainerType,
     ResourceType,
+> Default for DefaultLoadingProcess<
+    ContainerType,
+    DiscProcessLog<ContainerType>,
+    ResourceType,
+> where 
+    ContainerType: LoadResource<ResourceType> + Clone + Debug + Serialize + Send + 'static,
+    DiscProcessLog<ContainerType>: Clone + Debug + Serialize + Send + 'static,
+    ResourceType: Projectable<f64> + ContResource + Clone + Debug + Serialize + Send + 'static,
+{
+    fn default() -> Self {
+        Self {
+            element_name: String::new(),
+            element_code: String::new(),
+            element_type: String::from("DefaultLoadingProcess"),
+            req_upstream_vehicles: Requestor::new(),
+            withdraw_upstream_vehicles: Requestor::new(),
+            req_upstream_resources: Requestor::new(),
+            withdraw_upstream_resources: Requestor::new(),
+            req_downstream: Requestor::new(),
+            push_downstream: Output::new(),
+            log_emitter: Output::new(),
+            process_quantity_distr: Distribution::default(),
+            process_time_distr: Distribution::default(),
+            process_state: None,
+            time_to_next_process_event: None,
+            scheduled_event: None,
+            next_event_index: 0,
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+}
+
+impl<
+    ContainerType,
+    ResourceType,
 > Model for DefaultLoadingProcess<
     ContainerType,
     DiscProcessLog<ContainerType>,
@@ -408,6 +443,42 @@ pub struct DefaultUnloadingProcess<
     pub next_event_index: u64,
     pub previous_check_time: MonotonicTime,
 }
+
+impl<
+    ContainerType,
+    ResourceType,
+> Default for DefaultUnloadingProcess<
+    ContainerType,
+    DiscProcessLog<ContainerType>,
+    ResourceType,
+> where
+    ContainerType: LoadResource<ResourceType> + Clone + Debug + Serialize + Send + 'static,
+    DiscProcessLog<ContainerType>: Clone + Debug + Serialize + Send + 'static,
+    ResourceType: Projectable<f64> + ContResource + Clone + Debug + Serialize + Send + 'static,
+{
+    fn default() -> Self {
+        Self {
+            element_name: String::new(),
+            element_code: String::new(),
+            element_type: String::from("DefaultUnloadingProcess"),
+            req_upstream: Requestor::new(),
+            withdraw_upstream: Requestor::new(),
+            req_downstream_vehicles: Requestor::new(),
+            push_downstream_vehicles: Output::new(),
+            req_downstream_resources: Requestor::new(),
+            push_downstream_resources: Output::new(),
+            log_emitter: Output::new(),
+            process_quantity_distr: Distribution::default(),
+            process_time_distr: Distribution::default(),
+            process_state: None,
+            time_to_next_process_event: None,
+            scheduled_event: None,
+            next_event_index: 0,
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+}
+
 
 impl<
     ContainerType,

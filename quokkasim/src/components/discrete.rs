@@ -214,9 +214,11 @@ pub struct DefaultDiscProcess<
     // Configuration
     pub process_quantity_distr: Distribution,
     pub process_time_distr: Distribution,
+    pub max_parallel_processes: usize,
+    pub max_count_per_process: usize,
 
     // Runtime state
-    pub process_state: Option<(Duration, Vec<ItemType>)>,
+    pub process_state: Vec<(Duration, Vec<ItemType>)>,
 
     // Internals
     pub time_to_next_process_event: Option<Duration>,
@@ -266,8 +268,10 @@ impl<
 
             process_quantity_distr: Distribution::default(),
             process_time_distr: Distribution::default(),
+            max_parallel_processes: usize::MAX,
+            max_count_per_process: 1,
 
-            process_state: None,
+            process_state: Vec::new(),
 
             time_to_next_process_event: None,
             scheduled_event: None,
@@ -362,91 +366,104 @@ where
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
-            match self.process_state {
-                None => {
-                    let upstream_state = self.req_upstream.send(()).await.next();
-                    let downstream_state =
-                        self.req_downstream.send(()).await.next();
+            // match self.process_state {
+            //     None => {
+            loop {
+                let upstream_state = self.req_upstream.send(()).await.next();
+                let downstream_state =
+                    self.req_downstream.send(()).await.next();
+                let has_capacity = self.process_state.len() < self.max_parallel_processes;
 
-                    match (&upstream_state, &downstream_state) {
-                        (
-                            Some(DiscStockState::Normal { .. })
-                            | Some(DiscStockState::Full { .. }),
-                            Some(DiscStockState::Empty { .. })
-                            | Some(DiscStockState::Normal { .. }),
-                        ) => {
-                            let mut requested =
-                                self.process_quantity_distr.sample().round();
-                            if !requested.is_finite() {
-                                requested = 1.0;
-                            }
-                            let requested = requested.clamp(1.0, u32::MAX as f64) as usize;
+                match (has_capacity, &upstream_state, &downstream_state) {
+                    (
+                        true,
+                        Some(DiscStockState::Normal { .. })
+                        | Some(DiscStockState::Full { .. }),
+                        Some(DiscStockState::Empty { .. })
+                        | Some(DiscStockState::Normal { .. }),
+                    ) => {
+                        let mut requested =
+                            self.process_quantity_distr.sample().round();
+                        if !requested.is_finite() {
+                            requested = 1.0;
+                        }
+                        let requested = requested.clamp(1.0, u32::MAX as f64) as usize;
 
-                            *source_event_id = self.log_type_withdraw_request(source_event_id, requested, cx).await;
+                        *source_event_id = self.log_type_withdraw_request(source_event_id, requested, cx).await;
 
-                            let pulled = self
-                                .withdraw_upstream
-                                .send((requested, source_event_id.clone()))
-                                .await
-                                .next();
+                        let pulled = self
+                            .withdraw_upstream
+                            .send((requested, source_event_id.clone()))
+                            .await
+                            .next();
 
-                            match pulled {
-                                Some(batch) => {
-                                    if batch.is_empty() {
-                                        *source_event_id = self.log_type_process_failure(source_event_id, "Upstream returned no items", cx).await;
-                                        self.time_to_next_process_event = None;
-                                        return;
-                                    }
-
-                                    let mut process_secs =
-                                        self.process_time_distr.sample();
-                                    if !process_secs.is_finite() {
-                                        process_secs = 0.0;
-                                    }
-                                    process_secs = process_secs.max(0.0);
-                                    let mut process_duration =
-                                        Duration::from_secs_f64(process_secs);
-                                    if process_duration.is_zero() {
-                                        process_duration = Duration::from_nanos(1);
-                                    }
-
-                                    let quantity = batch.len();
-                                    let log_payload = batch.clone();
-
-                                    self.process_state =
-                                        Some((process_duration, batch));
-                                    *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
-                                    self.time_to_next_process_event =
-                                        Some(process_duration);
-                                }
-                                None => {
-                                    *source_event_id = self.log_type_process_failure(source_event_id, "Upstream requestor closed", cx).await;
+                        match pulled {
+                            Some(batch) => {
+                                if batch.is_empty() {
+                                    *source_event_id = self.log_type_process_failure(source_event_id, "Upstream returned no items", cx).await;
                                     self.time_to_next_process_event = None;
+                                    return;
                                 }
+
+                                let mut process_secs =
+                                    self.process_time_distr.sample();
+                                if !process_secs.is_finite() {
+                                    process_secs = 0.0;
+                                }
+                                process_secs = process_secs.max(0.0);
+                                let mut process_duration =
+                                    Duration::from_secs_f64(process_secs);
+                                if process_duration.is_zero() {
+                                    process_duration = Duration::from_nanos(1);
+                                }
+
+                                let quantity = batch.len();
+                                let log_payload = batch.clone();
+
+                                self.process_state.push((process_duration, batch));
+                                *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
+                                self.time_to_next_process_event =
+                                    Some(process_duration);
+                            }
+                            None => {
+                                *source_event_id = self.log_type_process_failure(source_event_id, "Upstream requestor closed", cx).await;
+                                self.time_to_next_process_event = None;
+                        break;
                             }
                         }
-                        (Some(DiscStockState::Empty { .. }), _) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
-                            self.time_to_next_process_event = None;
-                        }
-                        (None, _) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
-                            self.time_to_next_process_event = None;
-                        }
-                        (_, None) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
-                            self.time_to_next_process_event = None;
-                        }
-                        (_, Some(DiscStockState::Full { .. })) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
-                            self.time_to_next_process_event = None;
-                        }
+                    },
+                    (false, _, _) => {
+                        *source_event_id = self.log_type_process_failure(source_event_id, "At max parallel processes", cx).await;
+                        self.time_to_next_process_event = None;
+                        break;
                     }
-                }
-                Some((time_left, _)) => {
-                    self.time_to_next_process_event = Some(time_left);
+                    (_, Some(DiscStockState::Empty { .. }), _) => {
+                        *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
+                        self.time_to_next_process_event = None;
+                        break;
+                    }
+                    (_, None, _) => {
+                        *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
+                        self.time_to_next_process_event = None;
+                        break;
+                    }
+                    (_, _, None) => {
+                        *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
+                        self.time_to_next_process_event = None;
+                        break;
+                    }
+                    (_, _, Some(DiscStockState::Full { .. })) => {
+                        *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
+                        self.time_to_next_process_event = None;
+                        break;
+                    }
+                    
                 }
             }
+            //     Some((time_left, _)) => {
+            //         self.time_to_next_process_event = Some(time_left);
+            //     }
+            // }
         }
     }
 
@@ -519,20 +536,25 @@ where
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
         async move {
-            if let Some((mut time_left, resources)) = self.process_state.take() {
+            let old_state = std::mem::take(&mut self.process_state);
+            let mut process_state_after = Vec::new();
+
+            for (mut time_left, resources) in old_state {
                 time_left = time_left.saturating_sub(duration_since_prev);
                 if time_left.is_zero() {
                     let log_payload = resources.clone();
-                    *source_event_id = self.log_type_process_success(source_event_id, 1, log_payload, cx).await;
+                    *source_event_id =
+                        self.log_type_process_success(source_event_id, 1, log_payload, cx).await;
                     self.push_downstream
                         .send((resources, source_event_id.clone()))
                         .await;
                     self.time_to_next_process_event = None;
                 } else {
-                    self.process_state = Some((time_left, resources));
-                    self.time_to_next_process_event = Some(time_left);
+                    process_state_after.push((time_left, resources));
                 }
             }
+
+            self.process_state = process_state_after;
         }
     }
 
