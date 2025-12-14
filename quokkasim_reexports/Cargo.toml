@@ -1,7 +1,13 @@
 [package]
 name = "quokkasim_reexports"
+description = "Re-exports used in QuokkaSim crates"
 version = "0.3.0-alpha.2"
 edition = "2024"
+readme = "../README.md"
+repository = "https://github.com/jajetloh/quokkasim"
+documentation = "https://jajetloh.github.io/quokkasim-book/"
+license-file = "LICENCE"
+authors = ["Ja-Jet Loh"]
 
 [dependencies]
 nexosim = { version = "0.3.4", features = ["server"] }
