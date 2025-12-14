@@ -5,6 +5,8 @@ use crate::{
     components::{continuous_traits::{ContResource, ContStock}, mixed::DefaultLoadingProcess}, nexosim::{Address, Model}, prelude::*,
 };
 
+use super::mixed::DefaultUnloadingProcess;
+
 pub trait Connect<A: Model, B: Model> {
     fn connect(&mut self, a: (&mut A, &Address<A>, Option<usize>), b: (&mut B, &Address<B>, Option<usize>))
     -> Result<(), String>;
@@ -304,10 +306,84 @@ where
         a: (&mut DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
         b: (&mut DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>, &Address<DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>>, Option<usize>),
     ) -> Result<(), String> {
+        a.0.req_downstream.connect(DefaultDiscStock::get_state_async, b.1.clone());
         a.0.push_downstream.connect(DefaultDiscStock::add_multi, b.1.clone());
         b.0.state_emitter.connect(DefaultLoadingProcess::update_state, a.1.clone());
         Ok(())
     }
 }
 
+/* #endregion DefaultLoadingProcess */
 
+// ──────────────────────────── DefaultUnloadingProcess ────────────────────────────
+/* #region DefaultUnloadingProcess */
+
+
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>,
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+> for Connection
+where
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+{
+    fn connect(&mut self, 
+        a: (&mut DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>, &Address<DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>>, Option<usize>),
+        b: (&mut DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+    ) -> Result<(), String> {
+        b.0.req_upstream.connect(DefaultDiscStock::get_state_async, a.1.clone());
+        b.0.withdraw_upstream.connect(DefaultDiscStock::remove_multi, a.1.clone());
+        a.0.state_emitter.connect(DefaultUnloadingProcess::update_state, b.1.clone());
+        Ok(())
+    }
+}
+
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
+> for Connection
+where
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: Model,
+{
+    fn connect(&mut self, 
+        a: (&mut DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+        b: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>, Option<usize>),
+    ) -> Result<(), String> {
+        a.0.req_downstream_resources.connect(DefaultContStock::get_state_async, b.1.clone());
+        a.0.push_downstream_resources.connect(DefaultContStock::add, b.1.clone());
+        b.0.state_emitter.connect(DefaultUnloadingProcess::update_state, a.1.clone());
+        Ok(())
+    }
+}
+
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+    DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>,
+> for Connection
+where
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+{
+    fn connect(&mut self, 
+        a: (&mut DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+        b: (&mut DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>, &Address<DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>>, Option<usize>),
+    ) -> Result<(), String> {
+        a.0.req_downstream_vehicles.connect(DefaultDiscStock::get_state_async, b.1.clone());
+        a.0.push_downstream_vehicles.connect(DefaultDiscStock::add_multi, b.1.clone());
+        b.0.state_emitter.connect(DefaultUnloadingProcess::update_state, a.1.clone());
+        Ok(())
+    }
+}
+
+/* #endregion DefaultUnloadingProcess */

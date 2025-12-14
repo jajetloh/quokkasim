@@ -234,7 +234,7 @@ where
 pub trait LoadResource<ResourceType> where ResourceType: Projectable<f64> {
     fn load_resource(&mut self, resource: ResourceType);
     fn unload_resource(&mut self, amount: f64) -> ResourceType;
-    fn unload_resource_all(&mut self) -> ResourceType;
+    fn unload_resource_all(&mut self) -> Option<ResourceType>;
 }
 
 impl<
@@ -322,18 +322,30 @@ where
                                 }
                             }
                         }
-                        (Some(ContStockState::Empty { .. }) | None, _, _) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream resource is empty or disconnected", cx).await;
+                        (None, _, _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream resource is disconnected", cx).await;
                             self.time_to_next_process_event = None;
                         },
-                        (_, Some(DiscStockState::Empty { .. }) | None, _) => {
+                        (Some(ContStockState::Empty { .. }), _, _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream resource is empty", cx).await;
+                            self.time_to_next_process_event = None;
+                        },
+                        (_, None, _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream vehicles are disconnected", cx).await;
+                            self.time_to_next_process_event = None;
+                        },
+                        (_, Some(DiscStockState::Empty { .. }), _) => {
                             *source_event_id = self.log_type_process_failure(source_event_id, "Upstream vehicles are empty", cx).await;
                             self.time_to_next_process_event = None;
-                        }
-                        (_, _, Some(DiscStockState::Full { .. }) | None) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream vehicles are full or disconnected", cx).await;
+                        },
+                        (_, _, None) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream vehicles are disconnected", cx).await;
                             self.time_to_next_process_event = None;
-                        }
+                        },
+                        (_, _, Some(DiscStockState::Full { .. })) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream vehicles are full", cx).await;
+                            self.time_to_next_process_event = None;
+                        },
                     }
                 }
                 Some((time_left, _)) => {
@@ -607,7 +619,9 @@ where
                 let mut unloaded_resources = ResourceType::default();
                 for vehicle in &mut vehicles {
                     let resource = vehicle.unload_resource_all();
-                    unloaded_resources.add(resource);
+                    if let Some(res) = resource {
+                        unloaded_resources.add(res);
+                    }
                 }
                 time_left = time_left.saturating_sub(duration_since_prev);
                 if time_left.is_zero() {
@@ -724,18 +738,30 @@ where
                                 }
                             }
                         }
-                        (Some(DiscStockState::Empty { .. }) | None, _, _) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty or disconnected", cx).await;
+                        (None, _, _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is disconnected", cx).await;
                             self.time_to_next_process_event = None;
                         },
-                        (_, Some(DiscStockState::Full { .. }) | None, _) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream vehicles are full or disconnec ted", cx).await;
+                        (Some(DiscStockState::Empty { .. }), _, _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
                             self.time_to_next_process_event = None;
-                        }
-                        (_, _, Some(ContStockState::Full { .. }) | None) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream resource stock is full or disconnected", cx).await;
+                        },
+                        (_, None, _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream vehicles are disconnected", cx).await;
                             self.time_to_next_process_event = None;
-                        }
+                        },
+                        (_, Some(DiscStockState::Full { .. }), _) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream vehicles are full", cx).await;
+                            self.time_to_next_process_event = None;
+                        },
+                        (_, _, None) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream resource stock is disconnected", cx).await;
+                            self.time_to_next_process_event = None;
+                        },
+                        (_, _, Some(ContStockState::Full { .. })) => {
+                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream resource stock is full", cx).await;
+                            self.time_to_next_process_event = None;
+                        },
                     }
                 }
                 Some((time_left, _)) => {
