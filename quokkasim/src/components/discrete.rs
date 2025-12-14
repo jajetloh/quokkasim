@@ -181,6 +181,21 @@ impl<
     }
 }
 
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    DiscStockState: Clone + Debug + Serialize + Send + StockState + 'static,
+    LogRecordType: Clone + Send + 'static,
+> DefaultDiscStock<
+    ItemType,
+    DiscStockState,
+    LogRecordType,
+> {
+    pub fn with_initial_resources(mut self, resources: Vec<ItemType>) -> Self {
+        self.resources.add_multi(resources);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct DiscStockLog<ItemType> {
     pub time: String,

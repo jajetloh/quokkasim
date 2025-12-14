@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::fmt::Debug;
 
 use crate::{
-    components::{continuous_traits::{ContResource, ContStock}}, nexosim::{Address, Model}, prelude::*,
+    components::{continuous_traits::{ContResource, ContStock}, mixed::DefaultLoadingProcess}, nexosim::{Address, Model}, prelude::*,
 };
 
 pub trait Connect<A: Model, B: Model> {
@@ -11,6 +11,12 @@ pub trait Connect<A: Model, B: Model> {
 }
 
 pub struct Connection;
+
+impl Connection {
+    pub fn new() -> Self {
+        Connection
+    }
+}
 
 // ──────────────────────────── DefaultProcess ────────────────────────────
 /* #region DefaultProcess */
@@ -227,3 +233,81 @@ where
 }
 
 /* #endregion DefaultDiscSink */
+
+// ──────────────────────────── DefaultLoadingProcess ────────────────────────────
+/* #region DefaultLoadingProcess */
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+> for Connection
+where
+    DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: Model,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+    ResourceType: Projectable<f64>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>, &Address<DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>>, Option<usize>),
+        b: (&mut DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+    ) -> Result<(), String> {
+        b.0.req_upstream_resources.connect(DefaultContStock::get_state_async, a.1.clone());
+        b.0.withdraw_upstream_resources.connect(DefaultContStock::remove, a.1.clone());
+        a.0.state_emitter.connect(DefaultLoadingProcess::update_state, b.1.clone());
+        Ok(())
+    }
+}
+
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+> for Connection
+where
+    DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>: Model,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+    ResourceType: Projectable<f64>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>, &Address<DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>>, Option<usize>),
+        b: (&mut DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+    ) -> Result<(), String> {
+        b.0.req_upstream_vehicles.connect(DefaultDiscStock::get_state_async, a.1.clone());
+        b.0.withdraw_upstream_vehicles.connect(DefaultDiscStock::remove_multi, a.1.clone());
+        a.0.state_emitter.connect(DefaultLoadingProcess::update_state, b.1.clone());
+        Ok(())
+    }
+}
+
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+    DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>,
+> for Connection
+where
+    DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>: Model,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+    ResourceType: Projectable<f64>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+        b: (&mut DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>, &Address<DefaultDiscStock<ContainerType, DiscStockState, DiscStockLog<ContainerType>>>, Option<usize>),
+    ) -> Result<(), String> {
+        a.0.push_downstream.connect(DefaultDiscStock::add_multi, b.1.clone());
+        b.0.state_emitter.connect(DefaultLoadingProcess::update_state, a.1.clone());
+        Ok(())
+    }
+}
+
+
