@@ -689,7 +689,7 @@ where
                             let vehicle_pulled = self.withdraw_upstream.send((1, source_event.clone())).await.next();
 
                             match vehicle_pulled {
-                                Some(mut vehicles) => {
+                                Some(vehicles) => {
                                     if vehicles.len() != 1 {
                                         println!("Warning: Expected to withdraw 1 vehicle, but got {}", vehicles.len());
                                     }
