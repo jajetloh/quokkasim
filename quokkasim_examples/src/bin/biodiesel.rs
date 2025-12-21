@@ -95,9 +95,9 @@ struct ReactionVessel {
     pub req_upstream_oil: Requestor<(), ContStockState>,
     pub req_upstream_methanol: Requestor<(), ContStockState>,
     pub req_downstream: Requestor<(), ContStockState>,
-    pub withdraw_upstream_oil: Requestor<(f64, EventId), Reactants>,
-    pub withdraw_upstream_methanol: Requestor<(f64, EventId), Reactants>,
-    pub push_downstream: Output<(Reactants, EventId)>,
+    pub withdraw_upstream_oil: Requestor<(f64, EventMetadata), Reactants>,
+    pub withdraw_upstream_methanol: Requestor<(f64, EventMetadata), Reactants>,
+    pub push_downstream: Output<(Reactants, EventMetadata)>,
     pub log_emitter: Output<ContProcessLog<Reactants>>,
 
     // Configuration
@@ -110,7 +110,7 @@ struct ReactionVessel {
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: u64,
+    pub previous_event: EventMetadata,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -132,7 +132,7 @@ impl Default for ReactionVessel {
             process_state: None,
             time_to_next_process_event: None,
             scheduled_event: None,
-            next_event_index: 0,
+            previous_event: EventMetadata::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -144,12 +144,8 @@ impl Model for ReactionVessel {
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
-            self.update_state(source_event_id, ctx).await;
-            println!("Initialized ReactionVessel");
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
+            self.update_state(self.previous_event.clone(), ctx).await;
             self.into()
         }
     }
@@ -159,13 +155,8 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
-    fn get_next_event_id(&mut self) -> EventId {
-        let event_id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        event_id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
         &mut self.scheduled_event
@@ -178,7 +169,7 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
     }
     fn update_state(
             &mut self,
-            mut source_event_id: EventId,
+            mut source_event_id: EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> + Send {
         async move {
@@ -191,7 +182,7 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
 
 impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
     fn update_process_state_since_prev_event(
-        &mut self, source_event_id: &mut EventId,
+        &mut self, source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
@@ -213,18 +204,18 @@ impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Reacti
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_success(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::ProcessSuccess { quantity, resource },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -232,7 +223,7 @@ impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Reacti
 impl ContProcessUpdateDecisionLogic<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
     fn update_state_decision_logic(
             &mut self,
-            source_event_id: &mut EventId,
+            source_event_id: &mut EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
@@ -290,48 +281,48 @@ impl ContProcessUpdateDecisionLogic<Reactants, ContProcessLog<Reactants>> for Re
         }
     }
     
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: f64, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventMetadata, quantity: f64, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::WithdrawRequest { quantity },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_start(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::ProcessStart { quantity, resource },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::ProcessFailure { reason },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -406,9 +397,9 @@ struct Splitter {
     pub req_upstream: Requestor<(), ContStockState>,
     pub req_downstream_1: Requestor<(), ContStockState>,
     pub req_downstream_2: Requestor<(), ContStockState>,
-    pub withdraw_upstream: Requestor<(f64, EventId), Reactants>,
-    pub push_downstream_1: Output<(Reactants, EventId)>,
-    pub push_downstream_2: Output<(Reactants, EventId)>,
+    pub withdraw_upstream: Requestor<(f64, EventMetadata), Reactants>,
+    pub push_downstream_1: Output<(Reactants, EventMetadata)>,
+    pub push_downstream_2: Output<(Reactants, EventMetadata)>,
     pub log_emitter: Output<ContProcessLog<Reactants>>,
 
     // Configuration
@@ -423,7 +414,7 @@ struct Splitter {
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: u64,
+    pub previous_event: EventMetadata,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -454,7 +445,7 @@ impl Default for Splitter {
             process_state: None,
             time_to_next_process_event: None,
             scheduled_event: None,
-            next_event_index: 0,
+            previous_event: EventMetadata::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -466,12 +457,8 @@ impl Model for Splitter {
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
-            self.update_state(source_event_id, ctx).await;
-            println!("Initialized Splitter {}", self.element_name);
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
+            self.update_state(self.previous_event.clone(), ctx).await;
             self.into()
         }
     }
@@ -481,13 +468,8 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for Splitter {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
-    fn get_next_event_id(&mut self) -> EventId {
-        let event_id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        event_id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
         &mut self.scheduled_event
@@ -500,7 +482,7 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for Splitter {
     }
     fn update_state(
             &mut self,
-            mut source_event_id: EventId,
+            mut source_event_id: EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> + Send {
         async move {
@@ -514,7 +496,7 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for Splitter {
 
 impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Splitter {
     fn update_process_state_since_prev_event(
-        &mut self, source_event_id: &mut EventId,
+        &mut self, source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
@@ -542,18 +524,18 @@ impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Splitt
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_success(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::ProcessSuccess { quantity, resource },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -561,7 +543,7 @@ impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Splitt
 impl ContProcessUpdateDecisionLogic<Reactants, ContProcessLog<Reactants>> for Splitter {
 fn update_state_decision_logic(
             &mut self,
-            source_event_id: &mut EventId,
+            source_event_id: &mut EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
@@ -617,48 +599,48 @@ fn update_state_decision_logic(
         }
     }
 
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: f64, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventMetadata, quantity: f64, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::WithdrawRequest { quantity },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_start(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: Reactants, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::ProcessStart { quantity, resource },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(ContProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
+                event_id: current_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultContProcessLogType::ProcessFailure { reason },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }

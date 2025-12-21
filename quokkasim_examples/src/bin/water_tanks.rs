@@ -13,14 +13,14 @@ struct PipeProcess {
     pub req_input_state: Requestor<(), ContStockState>,
     pub req_output_state: Requestor<(), ContStockState>,
     
-    pub withdraw_input: Requestor<(f64, EventId), f64>,
-    pub push_output: Output<(f64, EventId)>,
+    pub withdraw_input: Requestor<(f64, EventMetadata), f64>,
+    pub push_output: Output<(f64, EventMetadata)>,
     pub log_emitter: Output<ContProcessLog<f64>>,
 
     pub rate_change_emitter: Output<(String, String, String, Arc<dyn Fn(f64, f64) -> f64 + Send + Sync>)>,
     pub rate_change_emitter_test: Output<(String, f64)>,
 
-    pub req_integration: Requestor<EventId, ()>,
+    pub req_integration: Requestor<EventMetadata, ()>,
 
     // Configuration
     pub transfer_rate_per_sec: f64,
@@ -31,7 +31,7 @@ struct PipeProcess {
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: u64,
+    pub previous_event: EventMetadata,
     pub last_integration_time: MonotonicTime,
 
     pub upstream_element_name: Option<String>,
@@ -53,10 +53,8 @@ impl ContProcessCore<f64, ContProcessLog<f64>> for PipeProcess {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
-    fn get_next_event_id(&mut self) -> EventId {
-        let eid = EventId(format!("{}_{}", self.element_code, self.next_event_index));
-        self.next_event_index += 1;
-        eid
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
         &mut self.scheduled_event
@@ -69,7 +67,7 @@ impl ContProcessCore<f64, ContProcessLog<f64>> for PipeProcess {
     }
     fn update_state(
         &mut self,
-        source_event_id: EventId,
+        source_event_id: EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
@@ -81,7 +79,7 @@ impl ContProcessCore<f64, ContProcessLog<f64>> for PipeProcess {
 
 impl ContProcessUpdateSinceLast<f64, ContProcessLog<f64>> for PipeProcess {
     fn update_process_state_since_prev_event(
-            &mut self, source_event_id: &mut EventId,
+            &mut self, source_event_id: &mut EventMetadata,
             cx: &mut Context<Self>,
             duration_since_prev: Duration
         ) -> impl Future<Output = ()> {
@@ -91,23 +89,19 @@ impl ContProcessUpdateSinceLast<f64, ContProcessLog<f64>> for PipeProcess {
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: f64, resource: f64, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_success(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: f64, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let new_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
+            let new_event = self.previous_event.next();
             let log = ContProcessLog {
                 time: cx.time().to_string(),
-                event_id: new_event_id.clone(),
+                event_id: new_event.clone(),
                 source_event_id: source_event_id.clone(),
                 element_name: self.element_name.clone(),
                 element_type: "PipeProcess".to_string(),
                 details: DefaultContProcessLogType::ProcessSuccess { quantity, resource }
             };
             self.log_emitter.send(log).await;
-            self.next_event_index += 1;
-            new_event_id
+            new_event
         }
     }
 }
@@ -120,7 +114,7 @@ impl PipeProcess {
         }
     }
 
-    fn process_quantity(&mut self, payload: (f64, EventId)) -> impl Future<Output = ()> + Send {
+    fn process_quantity(&mut self, payload: (f64, EventMetadata)) -> impl Future<Output = ()> + Send {
         async move {
             let received = self.withdraw_input.send(payload.clone()).await.next().unwrap();
             self.push_output.send((received, payload.1)).await;
@@ -137,7 +131,7 @@ struct IntegrationService {
     // Ports
     pub log_emitter: Output<ContProcessLog<f64>>,
     pub req_stock_levels: HashMap<String, Requestor<(), ContStockState>>,
-    pub push_process_quantities: HashMap<String, Output<(f64, EventId)>>,
+    pub push_process_quantities: HashMap<String, Output<(f64, EventMetadata)>>,
 
     // Configuration
 
@@ -209,29 +203,6 @@ impl<K, V> Mul<f64> for VectorHashMap<K, V> where K: Eq + Hash + Clone, V: Mul<f
     }
 }
 
-// impl VectorHashMap<String, f64> {
-//     fn add(&self, other: VectorHashMap<String, f64>) -> VectorHashMap<String, f64> {
-//         let mut result = self.0.clone();
-//         for (k, v) in other.0 {
-//             if result.contains_key(&k) {
-//                 let entry = result.get_mut(&k).unwrap();
-//                 *entry = *entry + v;
-//             } else {
-//                 result.insert(k, v);
-//             }
-//         }
-//         VectorHashMap(result)
-//     }
-
-//     fn mul(&self, scalar: f64) -> VectorHashMap<String, f64> {
-//         let mut result = HashMap::new();
-//         for (k, v) in &self.0 {
-//             result.insert(k.clone(), *v * scalar);
-//         }
-//         VectorHashMap(result)
-//     }
-// }
-
 impl IntegrationService {
     fn register_rate_function(&mut self, 
         params: (String, String, String, Arc<dyn Fn(f64, f64) -> f64 + Send + Sync>)
@@ -243,7 +214,7 @@ impl IntegrationService {
 
     }
 
-    fn integrate_rates(&mut self, source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn integrate_rates(&mut self, source_event_id: EventMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             // Implementation of rate integration logic goes here
 
@@ -294,8 +265,6 @@ impl IntegrationService {
 }
 
 fn main() {
-    let mut df = DistributionFactory::new(55555);
-
     // Component declarations
     let mut tank1 = DefaultContStock::<f64, ContStockState, ContStockLog<f64>>::new()
         .with_name("Tank 1")
@@ -344,7 +313,7 @@ fn main() {
         }),
         time_to_next_process_event: None,
         scheduled_event: None,
-        next_event_index: 0,
+        previous_event: EventMetadata::default(),
         last_integration_time: MonotonicTime::MIN,
         upstream_element_name: None,
         downstream_element_name: None,
@@ -417,11 +386,11 @@ fn main() {
 
     let (mut sim, mut sched) = sim_init.init(model_time).unwrap();
 
-
+    let e = EventMetadata::from_scheduler();
     for _ in 0..400 {
         model_time += Duration::from_secs_f64(0.0005);
         sim.step_until(model_time).unwrap();
-        sim.process_event(PipeProcess::update_state, EventId("fff".into()), pipe1_addr.clone()).unwrap();
+        sim.process_event(PipeProcess::update_state, e.clone(), pipe1_addr.clone()).unwrap();
     }
 
     for x in stock_logger.into_reader() {

@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::{fmt::Debug, time::Duration};
 
 use crate::{
-    common::{EventId, StockState},
+    common::{EventMetadata, StockState},
     nexosim::{ActionKey, Context, Model, MonotonicTime, Output},
 };
 
@@ -111,7 +111,7 @@ pub trait ContProcessUpdateSinceLast<
     // Handles some edge case handling and logging as well.
     fn update_state_since_last_update(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
@@ -129,12 +129,12 @@ pub trait ContProcessUpdateSinceLast<
 
     // Concrete function to update the internal process state from the previous time to now
     fn update_process_state_since_prev_event(
-        &mut self, source_event_id: &mut EventId,
+        &mut self, source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
         duration_since_prev: Duration
     ) -> impl Future<Output = ()>;
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: f64, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+    fn log_type_process_success(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
 }
 
 pub trait ContProcessUpdateDecisionLogic<
@@ -144,13 +144,13 @@ pub trait ContProcessUpdateDecisionLogic<
 {
     fn update_state_decision_logic(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
 
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: f64, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: f64, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventMetadata, quantity: f64, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
+    fn log_type_process_start(&mut self, source_event_id: &mut EventMetadata, quantity: f64, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
+    fn log_type_process_failure(&mut self, source_event_id: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
 
 }
 
@@ -161,7 +161,7 @@ pub trait ContProcessUpdateForNextEvent<
 {
     fn update_state_for_next_event(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
@@ -216,14 +216,14 @@ pub trait ContProcessCore<
     fn element_name(&self) -> &str;
     fn element_code(&self) -> &str;
     fn element_type(&self) -> &str;
-    fn get_next_event_id(&mut self) -> EventId;
+    fn get_next_event_meta(&mut self) -> EventMetadata;
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
     fn previous_check_time(&mut self) -> &mut MonotonicTime;
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
 
     fn update_state(
         &mut self,
-        source_event_id: EventId,
+        source_event_id: EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send;
 }
@@ -242,13 +242,13 @@ pub trait ContStock<
         }
     }
 
-    fn get_next_event_id(&mut self) -> EventId;
+    fn get_next_event_meta(&mut self) -> EventMetadata;
 
     fn previous_state(&mut self) -> &mut Option<StateType>;
     fn resource(&mut self) -> &mut ResourceType;
-    fn state_emitter(&mut self) -> &mut Output<EventId>;
+    fn state_emitter(&mut self) -> &mut Output<EventMetadata>;
 
-    fn add(&mut self, payload: (ResourceType, EventId), mut cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn add(&mut self, payload: (ResourceType, EventMetadata), mut cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             self.resource().add(payload.0.clone());
@@ -266,7 +266,7 @@ pub trait ContStock<
         }
     }
 
-    fn remove<T: Send>(&mut self, payload: (T, EventId), mut cx: &mut Context<Self>) -> impl Future<Output = ResourceType> + Send where ResourceType: Projectable<T> {
+    fn remove<T: Send>(&mut self, payload: (T, EventMetadata), mut cx: &mut Context<Self>) -> impl Future<Output = ResourceType> + Send where ResourceType: Projectable<T> {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             let removed = self.resource().remove(payload.0);
@@ -285,20 +285,20 @@ pub trait ContStock<
         }
     }
 
-    fn remove_void<T: Send>(&mut self, payload: (T, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where ResourceType: Projectable<T> {
+    fn remove_void<T: Send>(&mut self, payload: (T, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send where ResourceType: Projectable<T> {
         async move {
             self.remove(payload, cx).await;
         }
     }
 
-    fn emit_change(&mut self, payload: (StateType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn emit_change(&mut self, payload: (StateType, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             let event_id = self.log_type_state_change(&mut payload.1.clone(), payload.0.clone(), cx).await;
             self.state_emitter().send(event_id).await;
         }
     }
 
-    fn log_type_add(&mut self, source_event_id: &mut EventId, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_remove(&mut self, source_event_id: &mut EventId, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: StateType, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_add(&mut self, source_event_id: &mut EventMetadata, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
+    fn log_type_remove(&mut self, source_event_id: &mut EventMetadata, resource: ResourceType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
+    fn log_type_state_change(&mut self, source_event_id: &mut EventMetadata, new_state: StateType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
 }

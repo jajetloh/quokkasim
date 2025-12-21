@@ -22,8 +22,8 @@ struct WorkerShiftManager {
     pub element_type: String,
 
     // Ports
-    pub add_worker: Output<(Worker, EventId)>,
-    pub remove_worker: Requestor<EventId, Option<Worker>>,
+    pub add_worker: Output<(Worker, EventMetadata)>,
+    pub remove_worker: Requestor<EventMetadata, Option<Worker>>,
     pub log_emitter: Output<DiscProcessLog<Worker>>,
 
     // Configuration
@@ -34,23 +34,20 @@ struct WorkerShiftManager {
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: u64,
+    pub previous_event: EventMetadata,
     pub previous_check_time: MonotonicTime,
 }
 
 impl Model for WorkerShiftManager {
     fn init(
-        self,
+        mut self,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> {
         async move {
-            let source_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
             for (start_time, end_time) in &self.weekly_work_schedule {
-                ctx.schedule_periodic_event(*start_time, Duration::from_secs(7 * 24 * 3600), Self::add_worker, source_event_id.clone()).unwrap();
-                ctx.schedule_periodic_event(*end_time, Duration::from_secs(7 * 24 * 3600), Self::remove_worker, source_event_id.clone()).unwrap();
+                ctx.schedule_periodic_event(*start_time, Duration::from_secs(7 * 24 * 3600), Self::add_worker, self.previous_event.clone()).unwrap();
+                ctx.schedule_periodic_event(*end_time, Duration::from_secs(7 * 24 * 3600), Self::remove_worker, self.previous_event.clone()).unwrap();
             }
             self.into()
         }
@@ -58,9 +55,9 @@ impl Model for WorkerShiftManager {
 }
 
 impl WorkerShiftManager {
-    fn add_worker(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn add_worker(&mut self, mut source_event: EventMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            let next_event_id = self.log_type_process_start(&mut source_event_id, 1, vec![Worker::new("Worker")], cx).await;
+            let next_event_id = self.log_type_process_start(&mut source_event, 1, vec![Worker::new("Worker")], cx).await;
             self.add_worker.send((
                 Worker::new("Worker"),
                 next_event_id,
@@ -68,25 +65,25 @@ impl WorkerShiftManager {
         }
     }
 
-    fn remove_worker(&mut self, mut source_event_id: EventId, cx: &mut Context<Self>) -> impl Future<Output = ()> {
+    fn remove_worker(&mut self, mut source_event: EventMetadata, cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
-            let next_event_id = self.log_type_process_start(&mut source_event_id, 1, vec![Worker::new("Worker")], cx).await;
+            let next_event_id = self.log_type_process_start(&mut source_event, 1, vec![Worker::new("Worker")], cx).await;
             self.remove_worker.send(next_event_id).await.next();
         }
     }
 
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<Worker>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_start(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<Worker>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessStart { quantity, resources }
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -94,7 +91,7 @@ impl WorkerShiftManager {
 impl DiscProcessCore<Worker, DiscProcessLog<Worker>> for WorkerShiftManager {
     fn update_state(
             &mut self,
-            source_event_id: EventId,
+            source_event: EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> + Send {
         async move {
@@ -103,13 +100,8 @@ impl DiscProcessCore<Worker, DiscProcessLog<Worker>> for WorkerShiftManager {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
-    fn get_next_event_id(&mut self) -> EventId {
-        let id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)> {
         &mut self.scheduled_event
@@ -128,7 +120,7 @@ impl Connect<WorkerShiftManager, DefaultDiscStock<Worker, DiscStockState, DiscSt
         a: (&mut WorkerShiftManager, &Address<WorkerShiftManager>, Option<usize>),
         b: (&mut DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>, &Address<DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>>, Option<usize>),
     ) -> Result<(), String> {
-        a.0.add_worker.map_connect(|(worker, event_id)| (Some(worker.clone()), event_id.clone()),DefaultDiscStock::add_one, b.1.clone());
+        a.0.add_worker.map_connect(|(worker, event)| (Some(worker.clone()), event.clone()),DefaultDiscStock::add_one, b.1.clone());
         a.0.remove_worker.connect(DefaultDiscStock::remove_one, b.1.clone());
         Ok(())
     }
@@ -148,7 +140,7 @@ fn create_bench() {
         ],
         time_to_next_process_event: None,
         scheduled_event: None,
-        next_event_index: 0,
+        previous_event: EventMetadata::default(),
         previous_check_time: MonotonicTime::MIN,
     };
     let wsm_mbox = Mailbox::new();

@@ -127,12 +127,12 @@ pub trait DiscStock<
     fn get_state_async(&mut self, _: (), _: &mut Context<Self>) -> impl Future<Output = StateType> + Send {
         async move { self.get_state() }
     }
-    fn get_next_event_id(&mut self) -> EventId;
+    fn get_next_event_meta(&mut self) -> EventMetadata;
     fn previous_state(&mut self) -> &mut Option<StateType>;
     fn resources(&mut self) -> &mut VecDequeStock<ResourceType>;
-    fn state_emitter(&mut self) -> &mut Output<EventId>;
+    fn state_emitter(&mut self) -> &mut Output<EventMetadata>;
 
-    fn add_one(&mut self, payload: (Option<ResourceType>, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn add_one(&mut self, payload: (Option<ResourceType>, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             if let (Some(resource), _) = payload.clone() {
@@ -150,7 +150,7 @@ pub trait DiscStock<
         }
     }
 
-    fn add_multi(&mut self, payload: (Vec<ResourceType>, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn add_multi(&mut self, payload: (Vec<ResourceType>, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             self.resources().add_multi(payload.0.clone());
@@ -166,7 +166,7 @@ pub trait DiscStock<
         }
     }
 
-    fn remove_one(&mut self, payload: EventId, cx: &mut Context<Self>) -> impl Future<Output = Option<ResourceType>> + Send 
+    fn remove_one(&mut self, payload: EventMetadata, cx: &mut Context<Self>) -> impl Future<Output = Option<ResourceType>> + Send 
     where ResourceType:
     {
         async move {
@@ -185,7 +185,7 @@ pub trait DiscStock<
         }
     }
 
-    fn remove_multi(&mut self, payload: (usize, EventId), cx: &mut Context<Self>) -> impl Future<Output = Vec<ResourceType>> + Send 
+    fn remove_multi(&mut self, payload: (usize, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = Vec<ResourceType>> + Send 
     where ResourceType:
     {
         async move {
@@ -211,17 +211,17 @@ pub trait DiscStock<
         }
     }
 
-    fn emit_change(&mut self, payload: (StateType, EventId), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn emit_change(&mut self, payload: (StateType, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
         async move {
             let event_id = self.log_type_state_change(&mut payload.1.clone(), payload.0.clone(), cx).await;
             self.state_emitter().send(event_id).await;
         }
     }
-    fn log_type_add_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_add_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_remove_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_remove_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
-    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: StateType, cx: &mut Context<Self>) -> impl Future<Output = EventId> + Send;
+    fn log_type_add_one(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
+    fn log_type_add_multi(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
+    fn log_type_remove_one(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
+    fn log_type_remove_multi(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
+    fn log_type_state_change(&mut self, source_event: &mut EventMetadata, new_state: StateType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -230,8 +230,8 @@ where
     ItemType: Clone + Serialize + Debug,
 {
     pub time: String,
-    pub event_id: EventId,
-    pub source_event_id: EventId,
+    pub event: EventMetadata,
+    pub source_event: EventMetadata,
     pub element_name: String,
     pub element_type: String,
     pub details: DefaultDiscProcessLogType<ItemType>,
@@ -293,14 +293,14 @@ where
     ProcessLogType: Clone + Debug + Serialize + Send + 'static,
 {
     fn update_process_state_since_prev_event(
-        &mut self, source_event_id: &mut EventId,
+        &mut self, source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
         duration_since_prev: Duration
     ) -> impl Future<Output = ()>;
 
     fn update_state_since_last_update(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
@@ -312,11 +312,11 @@ where
 
             let duration_since_prev = cx.time().duration_since(*self.previous_check_time());
 
-            self.update_process_state_since_prev_event(source_event_id, cx, duration_since_prev).await;
+            self.update_process_state_since_prev_event(source_event, cx, duration_since_prev).await;
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+    fn log_type_process_success(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
 
 }
 
@@ -332,13 +332,13 @@ pub trait DiscProcessUpdateDecisionLogic<
 {
     fn update_state_decision_logic(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()>;
 
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId>;
+    fn log_type_withdraw_request(&mut self, source_event: &mut EventMetadata, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
+    fn log_type_process_start(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
+    fn log_type_process_failure(&mut self, source_event: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata>;
 
 }
 
@@ -356,7 +356,7 @@ ProcessLogType: Clone + Debug + Serialize + Send + 'static,
 {
     fn update_state_for_next_event(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send {
         async move {
@@ -378,7 +378,7 @@ ProcessLogType: Clone + Debug + Serialize + Send + 'static,
                             .schedule_keyed_event(
                                 next_time,
                                 Self::update_state,
-                                source_event_id.clone(),
+                                source_event.clone(),
                             )
                             .unwrap();
                         *self.scheduled_event() = Some((next_time, new_key));
@@ -391,7 +391,7 @@ ProcessLogType: Clone + Debug + Serialize + Send + 'static,
                         .schedule_keyed_event(
                             next_time,
                             Self::update_state,
-                            source_event_id.clone(),
+                            source_event.clone(),
                         )
                         .unwrap();
                     *self.scheduled_event() = Some((next_time, new_key));
@@ -414,14 +414,14 @@ where
     fn element_name(&self) -> &str;
     fn element_code(&self) -> &str;
     fn element_type(&self) -> &str;
-    fn get_next_event_id(&mut self) -> EventId;
+    fn get_next_event_meta(&mut self) -> EventMetadata;
     fn scheduled_event(&mut self) -> &mut Option<(MonotonicTime, ActionKey)>;
     fn previous_check_time(&mut self) -> &mut MonotonicTime;
     fn time_to_next_process_event(&mut self) -> &mut Option<Duration>;
 
     fn update_state(
         &mut self,
-        source_event_id: EventId,
+        source_event: EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> + Send;
 }

@@ -24,7 +24,7 @@ pub struct DefaultDiscStock<ItemType, S: StockState, RecordLogType: Clone + Send
 
     // Ports
     pub log_emitter: Output<RecordLogType>,
-    pub state_emitter: Output<EventId>,
+    pub state_emitter: Output<EventMetadata>,
 
     // Configuration
     pub low_capacity: usize,
@@ -35,7 +35,7 @@ pub struct DefaultDiscStock<ItemType, S: StockState, RecordLogType: Clone + Send
 
     // Internals
     prev_state: Option<S>,
-    next_event_index: usize,
+    previous_event: EventMetadata,
 }
 
 impl<
@@ -67,7 +67,7 @@ impl<T: 'static, S: StockState + Send + 'static, RecordLogType: Clone + Send + '
             resources: VecDequeStock::new(VecDequeAccess::FIFO),
 
             prev_state: None,
-            next_event_index: 0,
+            previous_event: EventMetadata::default(),
         }
     }
 }
@@ -91,13 +91,8 @@ impl<
         }
     }
 
-    fn get_next_event_id(&mut self) -> EventId {
-        let event_id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        event_id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
 
     fn previous_state(&mut self) -> &mut Option<DiscStockState> {
@@ -106,77 +101,77 @@ impl<
     fn resources(&mut self) -> &mut VecDequeStock<ItemType> {
         &mut self.resources
     }
-    fn state_emitter(&mut self) -> &mut Output<EventId> {
+    fn state_emitter(&mut self) -> &mut Output<EventMetadata> {
         &mut self.state_emitter
     }
-    fn log_type_add_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_add_one(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Option<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscStockLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DiscStockLogType::AddOne { balance, added: resource.clone() },
             }).await;
-            current_event_id
+            current_event
         }
     }
-    fn log_type_add_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_add_multi(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscStockLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DiscStockLogType::AddMulti { balance, added: resource.clone() },
             }).await;
-            current_event_id
+            current_event
         }
     }
-    fn log_type_remove_one(&mut self, source_event_id: &mut EventId, balance: usize, resource: Option<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_remove_one(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Option<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscStockLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DiscStockLogType::RemoveOne { balance, removed: resource.clone() },
             }).await;
-            current_event_id
+            current_event
         }
     }
-    fn log_type_remove_multi(&mut self, source_event_id: &mut EventId, balance: usize, resource: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_remove_multi(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscStockLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DiscStockLogType::RemoveMulti { balance, removed: resource.clone() },
             }).await;
-            current_event_id
+            current_event
         }
     }
-    fn log_type_state_change(&mut self, source_event_id: &mut EventId, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_state_change(&mut self, source_event: &mut EventMetadata, new_state: DiscStockState, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscStockLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DiscStockLogType::StateChange { new_state: new_state.clone() },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -199,8 +194,8 @@ impl<
 #[derive(Debug, Clone, Serialize)]
 pub struct DiscStockLog<ItemType> {
     pub time: String,
-    pub event_id: EventId,
-    pub source_event_id: EventId,
+    pub event: EventMetadata,
+    pub source_event: EventMetadata,
     pub element_name: String,
     pub element_type: String,
     pub details: DiscStockLogType<ItemType>,
@@ -222,8 +217,8 @@ pub struct DefaultDiscProcess<
     // Ports
     pub req_upstream: Requestor<(), DiscStockState>,
     pub req_downstream: Requestor<(), DiscStockState>,
-    pub withdraw_upstream: Requestor<(usize, EventId), Vec<ItemType>>,
-    pub push_downstream: Output<(Vec<ItemType>, EventId)>,
+    pub withdraw_upstream: Requestor<(usize, EventMetadata), Vec<ItemType>>,
+    pub push_downstream: Output<(Vec<ItemType>, EventMetadata)>,
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
@@ -238,7 +233,7 @@ pub struct DefaultDiscProcess<
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: u64,
+    pub previous_event: EventMetadata,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -254,11 +249,8 @@ where
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
-            self.update_state(source_event_id, ctx).await;
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
+            self.update_state(self.previous_event.clone(), ctx).await;
             self.into()
         }
     }
@@ -290,7 +282,7 @@ impl<
 
             time_to_next_process_event: None,
             scheduled_event: None,
-            next_event_index: 0,
+            previous_event: EventMetadata::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -308,15 +300,15 @@ where
 {
     fn update_state(
             &mut self,
-            source_event_id: EventId,
+            source_event: EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
-            self.update_state_since_last_update(&mut source_event_id.clone(), cx)
+            self.update_state_since_last_update(&mut source_event.clone(), cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id.clone(), cx)
+            self.update_state_decision_logic(&mut source_event.clone(), cx)
                 .await;
-            self.update_state_for_next_event(&mut source_event_id.clone(), cx)
+            self.update_state_for_next_event(&mut source_event.clone(), cx)
                 .await;
         }
     }
@@ -333,13 +325,8 @@ where
         &self.element_type
     }
 
-    fn get_next_event_id(&mut self) -> EventId {
-        let id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
 
     fn scheduled_event(
@@ -377,7 +364,7 @@ where
 {
     fn update_state_decision_logic(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
@@ -404,18 +391,18 @@ where
                         }
                         let requested = requested.clamp(1.0, u32::MAX as f64) as usize;
 
-                        *source_event_id = self.log_type_withdraw_request(source_event_id, requested, cx).await;
+                        *source_event = self.log_type_withdraw_request(source_event, requested, cx).await;
 
                         let pulled = self
                             .withdraw_upstream
-                            .send((requested, source_event_id.clone()))
+                            .send((requested, source_event.clone()))
                             .await
                             .next();
 
                         match pulled {
                             Some(batch) => {
                                 if batch.is_empty() {
-                                    *source_event_id = self.log_type_process_failure(source_event_id, "Upstream returned no items", cx).await;
+                                    *source_event = self.log_type_process_failure(source_event, "Upstream returned no items", cx).await;
                                     self.time_to_next_process_event = None;
                                     return;
                                 }
@@ -436,39 +423,39 @@ where
                                 let log_payload = batch.clone();
 
                                 self.process_state.push((process_duration, batch));
-                                *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
+                                *source_event = self.log_type_process_start(source_event, quantity, log_payload, cx).await;
                                 self.time_to_next_process_event =
                                     Some(process_duration);
                             }
                             None => {
-                                *source_event_id = self.log_type_process_failure(source_event_id, "Upstream requestor closed", cx).await;
+                                *source_event = self.log_type_process_failure(source_event, "Upstream requestor closed", cx).await;
                                 self.time_to_next_process_event = None;
                         break;
                             }
                         }
                     },
                     (false, _, _) => {
-                        *source_event_id = self.log_type_process_failure(source_event_id, "At max parallel processes", cx).await;
+                        *source_event = self.log_type_process_failure(source_event, "At max parallel processes", cx).await;
                         self.time_to_next_process_event = None;
                         break;
                     }
                     (_, Some(DiscStockState::Empty { .. }), _) => {
-                        *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
+                        *source_event = self.log_type_process_failure(source_event, "Upstream is empty", cx).await;
                         self.time_to_next_process_event = None;
                         break;
                     }
                     (_, None, _) => {
-                        *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
+                        *source_event = self.log_type_process_failure(source_event, "Upstream is not connected", cx).await;
                         self.time_to_next_process_event = None;
                         break;
                     }
                     (_, _, None) => {
-                        *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
+                        *source_event = self.log_type_process_failure(source_event, "Downstream is not connected", cx).await;
                         self.time_to_next_process_event = None;
                         break;
                     }
                     (_, _, Some(DiscStockState::Full { .. })) => {
-                        *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
+                        *source_event = self.log_type_process_failure(source_event, "Downstream is full", cx).await;
                         self.time_to_next_process_event = None;
                         break;
                     }
@@ -482,48 +469,48 @@ where
         }
     }
 
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_withdraw_request(&mut self, source_event: &mut EventMetadata, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
             }).await;
-            current_event_id
+            current_event
         }
     }
     
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_start(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_failure(&mut self, source_event: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessFailure { reason },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -546,7 +533,7 @@ where
 {
     fn update_process_state_since_prev_event(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
@@ -558,10 +545,10 @@ where
                 time_left = time_left.saturating_sub(duration_since_prev);
                 if time_left.is_zero() {
                     let log_payload = resources.clone();
-                    *source_event_id =
-                        self.log_type_process_success(source_event_id, 1, log_payload, cx).await;
+                    *source_event =
+                        self.log_type_process_success(source_event, 1, log_payload, cx).await;
                     self.push_downstream
-                        .send((resources, source_event_id.clone()))
+                        .send((resources, source_event.clone()))
                         .await;
                     self.time_to_next_process_event = None;
                 } else {
@@ -573,18 +560,18 @@ where
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_success(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -638,7 +625,7 @@ pub struct DefaultDiscSource<
 
     // Ports
     pub req_downstream: Requestor<(), DiscStockState>,
-    pub push_downstream: Output<(Vec<ItemType>, EventId)>,
+    pub push_downstream: Output<(Vec<ItemType>, EventMetadata)>,
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
@@ -652,7 +639,7 @@ pub struct DefaultDiscSource<
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: usize,
+    pub previous_event: EventMetadata,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -679,7 +666,7 @@ impl<
 
             time_to_next_process_event: None,
             scheduled_event: None,
-            next_event_index: 0,
+            previous_event: EventMetadata::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -702,7 +689,7 @@ where
     >,
 {
     fn update_process_state_since_prev_event(
-        &mut self, source_event_id: &mut EventId,
+        &mut self, source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
         duration_since_prev: Duration
     ) -> impl Future<Output = ()> {
@@ -712,9 +699,9 @@ where
                 if time_left.is_zero() {
                     let quantity = resources.len();
                     let log_payload = resources.clone();
-                    *source_event_id = self.log_type_process_success(source_event_id, quantity, log_payload, cx).await;
+                    *source_event = self.log_type_process_success(source_event, quantity, log_payload, cx).await;
                     self.push_downstream
-                        .send((resources, source_event_id.clone()))
+                        .send((resources, source_event.clone()))
                         .await;
                     self.time_to_next_process_event = None;
                 } else {
@@ -725,18 +712,18 @@ where
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_success(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -759,7 +746,7 @@ where
 {
     fn update_state_decision_logic(
             &mut self,
-            source_event_id: &mut EventId,
+            source_event: &mut EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
@@ -783,7 +770,7 @@ where
                             let generator = match self.source_item_generator.as_mut() {
                                 Some(generator) => generator.next(),
                                 None => {
-                                    *source_event_id = self.log_type_process_failure(source_event_id, "Source item generator not configured", cx).await;
+                                    *source_event = self.log_type_process_failure(source_event, "Source item generator not configured", cx).await;
                                     self.time_to_next_process_event = None;
                                     return;
                                 }
@@ -792,12 +779,12 @@ where
                             let mut batch = Vec::with_capacity(requested);
                             batch.resize_with(requested, || generator.clone());
                             if batch.is_empty() {
-                                *source_event_id = self.log_type_process_failure(source_event_id, "Source produced an empty batch", cx).await;
+                                *source_event = self.log_type_process_failure(source_event, "Source produced an empty batch", cx).await;
                                 self.time_to_next_process_event = None;
                                 return;
                             }
 
-                            *source_event_id = self.log_type_withdraw_request(source_event_id, batch.len(), cx).await;
+                            *source_event = self.log_type_withdraw_request(source_event, batch.len(), cx).await;
 
                             let mut process_secs = self.source_time_distr.sample();
                             if !process_secs.is_finite() {
@@ -813,18 +800,18 @@ where
                             let quantity = batch.len();
                             let log_payload = batch.clone();
 
-                            *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
+                            *source_event = self.log_type_process_start(source_event, quantity, log_payload, cx).await;
                             self.process_state =
                                 Some((process_duration, batch));
                             self.time_to_next_process_event =
                                 Some(process_duration);
                         }
                         None => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is not connected", cx).await;
+                            *source_event = self.log_type_process_failure(source_event, "Downstream is not connected", cx).await;
                             self.time_to_next_process_event = None;
                         }
                         Some(DiscStockState::Full { .. }) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Downstream is full", cx).await;
+                            *source_event = self.log_type_process_failure(source_event, "Downstream is full", cx).await;
                             self.time_to_next_process_event = None;
                         }
                     }
@@ -836,48 +823,48 @@ where
         }
     }
     
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_withdraw_request(&mut self, source_event: &mut EventMetadata, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
             }).await;
-            current_event_id
+            current_event
         }
     }
     
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_start(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_failure(&mut self, source_event: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessFailure { reason },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -911,11 +898,8 @@ where
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
-            self.update_state(source_event_id, ctx).await;
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
+            self.update_state(self.previous_event.clone(), ctx).await;
             self.into()
         }
     }
@@ -934,15 +918,15 @@ where
 
     fn update_state(
             &mut self,
-            mut source_event_id: EventId,
+            mut source_event: EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> + Send {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, cx)
+            self.update_state_since_last_update(&mut source_event, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, cx)
+            self.update_state_decision_logic(&mut source_event, cx)
                 .await;
-            self.update_state_for_next_event(&mut source_event_id, cx)
+            self.update_state_for_next_event(&mut source_event, cx)
                 .await;
         }
     }
@@ -959,13 +943,8 @@ where
         &self.element_type
     }
 
-    fn get_next_event_id(&mut self) -> EventId {
-        let id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
 
     fn scheduled_event(
@@ -1000,7 +979,7 @@ pub struct DefaultDiscSink<
 
     // Ports
     pub req_upstream: Requestor<(), DiscStockState>,
-    pub withdraw_upstream: Requestor<(usize, EventId), Vec<ItemType>>,
+    pub withdraw_upstream: Requestor<(usize, EventMetadata), Vec<ItemType>>,
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
@@ -1013,7 +992,7 @@ pub struct DefaultDiscSink<
     // Internals
     pub time_to_next_process_event: Option<Duration>,
     pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
-    pub next_event_index: usize,
+    pub previous_event: EventMetadata,
     pub previous_check_time: MonotonicTime,
 }
 
@@ -1039,7 +1018,7 @@ impl<
 
             time_to_next_process_event: None,
             scheduled_event: None,
-            next_event_index: 0,
+            previous_event: EventMetadata::default(),
             previous_check_time: MonotonicTime::EPOCH,
         }
     }
@@ -1054,7 +1033,7 @@ impl<ItemType> DiscProcessUpdateSinceLast<
     ItemType: Clone + Debug + Serialize + Send + 'static,
 {
     fn update_process_state_since_prev_event(
-            &mut self, source_event_id: &mut EventId,
+            &mut self, source_event: &mut EventMetadata,
             cx: &mut Context<Self>,
             duration_since_prev: Duration
         ) -> impl Future<Output = ()> {
@@ -1064,7 +1043,7 @@ impl<ItemType> DiscProcessUpdateSinceLast<
                 if time_left.is_zero() {
                     let quantity = resources.len();
                     let log_payload = resources.clone();
-                    *source_event_id = self.log_type_process_success(source_event_id, quantity, log_payload.clone(), cx).await;
+                    *source_event = self.log_type_process_success(source_event, quantity, log_payload.clone(), cx).await;
                     resources.clear();
                     self.time_to_next_process_event = None;
                 } else {
@@ -1075,18 +1054,18 @@ impl<ItemType> DiscProcessUpdateSinceLast<
         }
     }
 
-    fn log_type_process_success(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_success(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -1105,7 +1084,7 @@ impl<
 {
     fn update_state_decision_logic(
         &mut self,
-        source_event_id: &mut EventId,
+        source_event: &mut EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {  
@@ -1126,18 +1105,18 @@ impl<
                                 requested = 1;
                             }
 
-                            *source_event_id = self.log_type_withdraw_request(source_event_id, requested, cx).await;
+                            *source_event = self.log_type_withdraw_request(source_event, requested, cx).await;
 
                             let pulled = self
                                 .withdraw_upstream
-                                .send((requested, source_event_id.clone()))
+                                .send((requested, source_event.clone()))
                                 .await
                                 .next();
 
                             match pulled {
                                 Some(batch) => {
                                     if batch.is_empty() {
-                                        *source_event_id = self.log_type_process_failure(source_event_id, "Upstream returned an empty batch", cx).await;
+                                        *source_event = self.log_type_process_failure(source_event, "Upstream returned an empty batch", cx).await;
                                         self.time_to_next_process_event = None;
                                         return;
                                     }
@@ -1157,24 +1136,24 @@ impl<
                                     let quantity = batch.len();
                                     let log_payload = batch.clone();
 
-                                    *source_event_id = self.log_type_process_start(source_event_id, quantity, log_payload, cx).await;
+                                    *source_event = self.log_type_process_start(source_event, quantity, log_payload, cx).await;
                                     self.process_state =
                                         Some((process_duration, batch));
                                     self.time_to_next_process_event =
                                         Some(process_duration);
                                 }
                                 None => {
-                                    *source_event_id = self.log_type_process_failure(source_event_id, "Upstream requestor closed", cx).await;
+                                    *source_event = self.log_type_process_failure(source_event, "Upstream requestor closed", cx).await;
                                     self.time_to_next_process_event = None;
                                 }
                             }
                         }
                         Some(DiscStockState::Empty { .. }) => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is empty", cx).await;
+                            *source_event = self.log_type_process_failure(source_event, "Upstream is empty", cx).await;
                             self.time_to_next_process_event = None;
                         }
                         None => {
-                            *source_event_id = self.log_type_process_failure(source_event_id, "Upstream is not connected", cx).await;
+                            *source_event = self.log_type_process_failure(source_event, "Upstream is not connected", cx).await;
                             self.time_to_next_process_event = None;
                         }
                     }
@@ -1187,48 +1166,48 @@ impl<
     }
 
     
-    fn log_type_withdraw_request(&mut self, source_event_id: &mut EventId, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_withdraw_request(&mut self, source_event: &mut EventMetadata, quantity: usize, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::WithdrawRequest { quantity },
             }).await;
-            current_event_id
+            current_event
         }
     }
     
-    fn log_type_process_start(&mut self, source_event_id: &mut EventId, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_start(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessStart { quantity, resources },
             }).await;
-            current_event_id
+            current_event
         }
     }
 
-    fn log_type_process_failure(&mut self, source_event_id: &mut EventId, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventId> {
+    fn log_type_process_failure(&mut self, source_event: &mut EventMetadata, reason: &'static str, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
         async move {
-            let current_event_id = self.get_next_event_id();
+            let current_event = self.get_next_event_meta();
             self.log_emitter.send(DiscProcessLog {
                 time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
-                event_id: current_event_id.clone(),
-                source_event_id: source_event_id.clone(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
                 element_name: self.element_name.clone(),
                 element_type: self.element_type.clone(),
                 details: DefaultDiscProcessLogType::ProcessFailure { reason },
             }).await;
-            current_event_id
+            current_event
         }
     }
 }
@@ -1254,15 +1233,15 @@ where
 {
     pub fn update_state(
         &mut self,
-        mut source_event_id: EventId,
+        mut source_event: EventMetadata,
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, cx)
+            self.update_state_since_last_update(&mut source_event, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, cx)
+            self.update_state_decision_logic(&mut source_event, cx)
                 .await;
-            self.update_state_for_next_event(&mut source_event_id, cx)
+            self.update_state_for_next_event(&mut source_event, cx)
                 .await;
         }
     }
@@ -1278,11 +1257,8 @@ impl<ItemType: Clone + Debug + Serialize + Send + 'static> Model for DefaultDisc
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> + Send {
         async move {
-            let source_event_id = EventId(format!(
-                "{}_{:06}",
-                self.element_code, self.next_event_index
-            ));
-            self.update_state(source_event_id, ctx).await;
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
+            self.update_state(self.previous_event.clone(), ctx).await;
             self.into()
         }
     }
@@ -1300,15 +1276,15 @@ where
 {
     fn update_state(
             &mut self,
-            mut source_event_id: EventId,
+            mut source_event: EventMetadata,
             cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> {
         async move {
-            self.update_state_since_last_update(&mut source_event_id, cx)
+            self.update_state_since_last_update(&mut source_event, cx)
                 .await;
-            self.update_state_decision_logic(&mut source_event_id, cx)
+            self.update_state_decision_logic(&mut source_event, cx)
                 .await;
-            self.update_state_for_next_event(&mut source_event_id, cx)
+            self.update_state_for_next_event(&mut source_event, cx)
                 .await;
         }
     }
@@ -1325,13 +1301,8 @@ where
         &self.element_type
     }
 
-    fn get_next_event_id(&mut self) -> EventId {
-        let id = EventId(format!(
-            "{}_{:06}",
-            self.element_code, self.next_event_index
-        ));
-        self.next_event_index += 1;
-        id
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
     }
 
     fn scheduled_event(
