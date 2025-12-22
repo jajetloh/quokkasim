@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+use std::mem::{replace, swap, take};
 use std::time::Duration;
 use std::fmt::Debug;
 
 use nexosim::ports::Output;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use serde::Serialize;
 use crate::prelude::*;
 
@@ -1321,3 +1325,240 @@ where
         &mut self.time_to_next_process_event
     }
 }
+
+#[derive(WithMethods)]
+pub struct DefaultTravelProcess<ItemType, ProcessLog>
+where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    ProcessLog: Clone + Debug + Serialize + Send + 'static,
+{
+    // Identification
+    pub element_name: String,
+    pub element_code: String,
+    pub element_type: String,
+
+    // Ports
+    pub req_destination: HashMap<String, Requestor<(), DiscStockState>>,
+    pub push_to_destination: HashMap<String, Output<(ItemType, EventMetadata)>>,
+    pub log_emitter: Output<ProcessLog>,
+
+    // Configuration
+    pub travel_time_fn: Box<dyn FnMut(&mut SmallRng, ItemType, EventMetadata) -> (Duration, String)>,
+
+    // Runtime state
+    pub process_state: Vec<(Duration, ItemType, String)>, // Travel duration left, vehicle, destination name
+
+    // Internals
+    pub rng: SmallRng,
+    pub dummy_rng: SmallRng,
+    
+    pub time_to_next_process_event: Option<Duration>,
+    pub scheduled_event: Option<(MonotonicTime, ActionKey)>,
+    pub previous_event: EventMetadata,
+    pub previous_check_time: MonotonicTime,
+}
+
+impl<ItemType> Default for DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> where
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+{
+    fn default() -> Self {
+        Self {
+            element_name: String::new(),
+            element_code: String::new(),
+            element_type: String::new(),
+            req_destination: HashMap::new(),
+            push_to_destination: HashMap::new(),
+            log_emitter: Output::default(),
+            travel_time_fn: Box::new(|_, _, _| (Duration::from_secs(1), String::new())),
+            process_state: Vec::new(),
+            rng: SmallRng::seed_from_u64(123),
+            dummy_rng: SmallRng::seed_from_u64(456),
+            time_to_next_process_event: None,
+            scheduled_event: None,
+            previous_event: EventMetadata::default(),
+            previous_check_time: MonotonicTime::EPOCH,
+        }
+    }
+}
+
+impl<ItemType> DiscProcessCore<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> for DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> where 
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: Model
+{
+    fn update_state(
+            &mut self,
+            mut source_event: EventMetadata,
+            cx: &mut Context<Self>,
+        ) -> impl Future<Output = ()> {
+        async move {
+            self.update_state_since_last_update(&mut source_event, cx)
+                .await;
+            // self.update_state_decision_logic(&mut source_event, cx)
+            //     .await;
+            self.update_state_for_next_event(&mut source_event, cx)
+                .await;
+        }
+    }
+
+
+    fn element_name(&self) -> &str {
+        &self.element_name
+    }
+
+    fn element_code(&self) -> &str {
+        &self.element_code
+    }
+
+    fn element_type(&self) -> &str {
+        &self.element_type
+    }
+
+    fn get_next_event_meta(&mut self) -> EventMetadata {
+        self.previous_event.next()
+    }
+
+    fn scheduled_event(
+        &mut self,
+    ) -> &mut Option<(MonotonicTime, ActionKey)> {
+        &mut self.scheduled_event
+    }
+
+    fn previous_check_time(&mut self) -> &mut MonotonicTime {
+        &mut self.previous_check_time
+    }
+
+    fn time_to_next_process_event(
+        &mut self,
+    ) -> &mut Option<Duration> {
+        &mut self.time_to_next_process_event
+    }
+}
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> DiscProcessUpdateSinceLast<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> for DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> where 
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<ItemType>,
+    >,
+{
+    fn update_process_state_since_prev_event(
+            &mut self, source_event: &mut EventMetadata,
+            cx: &mut Context<Self>,
+            duration_since_prev: Duration
+        ) -> impl Future<Output = ()> {
+        async move {
+            for (time_left, resources, destination_name) in &mut self.process_state.iter_mut() {
+                *time_left = time_left.saturating_sub(duration_since_prev);
+            }
+            let completed = self.process_state.extract_if(.., |(time_left, _, _)| time_left.is_zero()).collect::<Vec<_>>();
+            for (time_left, resources, destination_name) in completed {
+                if time_left.is_zero() {
+                    let quantity = 1;
+                    let log_payload = resources.clone();
+                    *source_event = self.log_type_process_success(source_event, quantity, vec![log_payload], cx).await;
+                    if let Some(push_port) = self.push_to_destination.get_mut(&destination_name) {
+                        push_port
+                            .send((resources.clone(), source_event.clone()))
+                            .await;
+                    } else {
+                        panic!("No push port found for destination {}", destination_name);
+                    }
+                }
+            }
+        }
+    }
+
+    fn log_type_process_success(&mut self, source_event: &mut EventMetadata, quantity: usize, resources: Vec<ItemType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> {
+        async move {
+            let current_event = self.get_next_event_meta();
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event: current_event.clone(),
+                source_event: source_event.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessSuccess { quantity, resources },
+            }).await;
+            current_event
+        }
+    }
+}
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> where Self: DiscProcessCore<
+    ItemType,
+    DiscProcessLog<ItemType>,
+>
+    {
+    pub fn add(
+        &mut self,
+        payload: (ItemType, EventMetadata),
+        cx: &mut Context<Self>,
+    ) -> impl Future<Output = ()> {
+        async move {
+            let (item, source_event) = payload;
+            let mut rng = self.rng.clone();
+            let mut new_source_event = self.get_next_event_meta();
+
+            self.log_emitter.send(DiscProcessLog {
+                time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                event: new_source_event.clone(),
+                source_event: source_event.clone(),
+                element_name: self.element_name.clone(),
+                element_type: self.element_type.clone(),
+                details: DefaultDiscProcessLogType::ProcessStart { quantity: 1, resources: vec![item.clone()] },
+            }).await;
+
+            let (travel_duration, destination_name) = (self.travel_time_fn)(&mut rng, item.clone(), new_source_event.clone());
+            if !self.req_destination.contains_key(&destination_name) {
+                panic!("No requestor found for destination {}", destination_name);
+            }
+            self.process_state
+                .push((travel_duration, item, destination_name));
+
+            self.time_to_next_process_event = self
+                .process_state
+                .iter()
+                .map(|(time_left, _, _)| *time_left)
+                .min();
+            self.update_state_for_next_event(&mut new_source_event, cx).await;
+        }
+    }
+
+}
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> DiscProcessUpdateForNextEvent<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> for DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>,
+> where
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<ItemType>,
+    >,
+{}
