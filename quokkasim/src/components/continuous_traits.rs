@@ -16,6 +16,62 @@ pub trait ContArithmetic {
     fn remove_all(&mut self) -> Self;
 }
 
+/// Trait to project a value of type T into the same shape as Self
+/// 
+/// # Examples
+/// 
+/// ```rust
+/// use quokkasim::prelude::Projectable;
+/// 
+/// let mut initial_vector: [f64; 3] = [10.0, 20.0, 30.0];
+/// let projected: [f64; 3] = initial_vector.project(1.2);
+/// assert_eq!(projected, [10./60.*1.2, 20./60.*1.2, 30./60.*1.2]);
+/// 
+/// // An example with a custom struct. In this example, not all properties sum
+/// // to the total, but all properties should be projected proportionally
+/// struct IronOre {
+///     iron: f64,
+///     silica: f64,
+///     phosphorus: f64,
+///     other: f64,
+/// 
+///     hematite: f64,
+///     magnetite: f64,
+///     limonite: f64,
+/// }
+/// 
+/// impl IronOre {
+///     fn total(&self) -> f64 {
+///         self.iron + self.silica + self.phosphorus + self.other
+///     }
+/// }
+/// 
+/// impl Projectable<f64> for IronOre {
+///     fn project(self, arg: f64) -> Self {
+///         let total = self.total();
+///         IronOre {
+///             iron: self.iron / total * arg,
+///             silica: self.silica / total * arg,
+///             phosphorus: self.phosphorus / total * arg,
+///             other: self.other / total * arg,
+///             hematite: self.hematite / total * arg,
+///             magnetite: self.magnetite / total * arg,
+///             limonite: self.limonite / total * arg
+///        }
+///     }
+/// }
+/// let ore_sample = IronOre {
+///     iron: 60.0,
+///     silica: 20.0,
+///     phosphorus: 5.0,
+///     other: 15.0,
+///     hematite: 30.0,
+///     magnetite: 20.0,
+///     limonite: 10.0,
+/// };
+/// let projected_ore = ore_sample.project(120.0);
+/// assert_eq!(projected_ore.iron, 60.0 / 100.0 * 120.0);
+/// ```
 pub trait Projectable<T> {
     fn project(self, arg: T) -> Self;
 }
