@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::mem::{replace, swap, take};
+use std::mem;
 use std::time::Duration;
 use std::fmt::Debug;
 
@@ -1343,7 +1343,8 @@ where
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
-    pub travel_time_fn: Box<dyn FnMut(&mut SmallRng, ItemType, EventMetadata) -> (Duration, String)>,
+    // pub travel_time_fn: Box<dyn FnMut(&mut Distribution, ItemType, EventMetadata) -> (Duration, String)>,
+    pub travel_routing_fn: Box<dyn FnMut(&Self) -> (Duration, String)>,
 
     // Runtime state
     pub process_state: Vec<(Duration, ItemType, String)>, // Travel duration left, vehicle, destination name
@@ -1372,7 +1373,7 @@ impl<ItemType> Default for DefaultTravelProcess<
             req_destination: HashMap::new(),
             push_to_destination: HashMap::new(),
             log_emitter: Output::default(),
-            travel_time_fn: Box::new(|_, _, _| (Duration::from_secs(1), String::new())),
+            travel_routing_fn: Box::new(|_| (Duration::from_secs(1), String::new())),
             process_state: Vec::new(),
             rng: SmallRng::seed_from_u64(123),
             dummy_rng: SmallRng::seed_from_u64(456),
@@ -1506,19 +1507,20 @@ impl<
 > DefaultTravelProcess<
     ItemType,
     DiscProcessLog<ItemType>,
-> where Self: DiscProcessCore<
-    ItemType,
-    DiscProcessLog<ItemType>,
->
-    {
+> where
+    Self: DiscProcessCore<
+        ItemType,
+        DiscProcessLog<ItemType>,
+    >,
+    Self: Model
+{
     pub fn add(
         &mut self,
         payload: (ItemType, EventMetadata),
-        cx: &mut Context<Self>,
+        cx: &mut Context<Self>
     ) -> impl Future<Output = ()> {
         async move {
             let (item, source_event) = payload;
-            let mut rng = self.rng.clone();
             let mut new_source_event = self.get_next_event_meta();
 
             self.log_emitter.send(DiscProcessLog {
@@ -1530,7 +1532,10 @@ impl<
                 details: DefaultDiscProcessLogType::ProcessStart { quantity: 1, resources: vec![item.clone()] },
             }).await;
 
-            let (travel_duration, destination_name) = (self.travel_time_fn)(&mut rng, item.clone(), new_source_event.clone());
+            let dummy_fn = |_: &Self| { (Duration::ZERO, String::from("dummy_fn")) };
+            let mut travel_routing_fn = mem::replace(&mut self.travel_routing_fn, Box::new(dummy_fn));
+            let (travel_duration, destination_name) = travel_routing_fn(&self);
+            self.travel_routing_fn = travel_routing_fn;
             if !self.req_destination.contains_key(&destination_name) {
                 panic!("No requestor found for destination {}", destination_name);
             }
@@ -1546,6 +1551,45 @@ impl<
         }
     }
 
+    pub fn add_multi(
+        &mut self,
+        payload: (Vec<ItemType>, EventMetadata),
+        cx: &mut Context<Self>
+    ) -> impl Future<Output = ()> {
+        async move {
+            // let (item, source_event) = payload;
+            let mut new_source_event = self.get_next_event_meta();
+            let source_event = payload.1;
+            for item in payload.0.iter() {
+
+                self.log_emitter.send(DiscProcessLog {
+                    time: cx.time().to_chrono_date_time(0).unwrap().to_string(),
+                    event: new_source_event.clone(),
+                    source_event: source_event.clone(),
+                    element_name: self.element_name.clone(),
+                    element_type: self.element_type.clone(),
+                    details: DefaultDiscProcessLogType::ProcessStart { quantity: 1, resources: vec![item.clone()] },
+                }).await;
+
+                let dummy_fn = |_: &Self| { (Duration::ZERO, String::from("dummy_fn")) };
+                let mut travel_routing_fn = mem::replace(&mut self.travel_routing_fn, Box::new(dummy_fn));
+                let (travel_duration, destination_name) = travel_routing_fn(&self);
+                self.travel_routing_fn = travel_routing_fn;
+                if !self.req_destination.contains_key(&destination_name) {
+                    panic!("No requestor found for destination {}", destination_name);
+                }
+                self.process_state
+                    .push((travel_duration, item.clone(), destination_name));
+
+                self.time_to_next_process_event = self
+                    .process_state
+                    .iter()
+                    .map(|(time_left, _, _)| *time_left)
+                    .min();
+                self.update_state_for_next_event(&mut new_source_event, cx).await;
+            }
+        }
+    }
 }
 
 impl<
@@ -1562,3 +1606,17 @@ impl<
         DiscProcessLog<ItemType>,
     >,
 {}
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>
+>
+{
+    pub fn get_state_async(&mut self, _: ()) -> impl Future<Output=DiscStockState> {
+        async move {
+            DiscStockState::Normal { occupied: self.process_state.len(), empty: u32::MAX as usize }
+        }
+    }  
+}

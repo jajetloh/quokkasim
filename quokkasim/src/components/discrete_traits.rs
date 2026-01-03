@@ -150,7 +150,7 @@ pub trait DiscStock<
         }
     }
 
-    fn add_multi(&mut self, payload: (Vec<ResourceType>, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn add_multi(&mut self, payload: (Vec<ResourceType>, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             self.resources().add_multi(payload.0.clone());

@@ -313,6 +313,34 @@ where
     }
 }
 
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+    DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>,
+> for Connection
+where
+    DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>: Model,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+    ResourceType: Projectable<f64>,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+        b: (&mut DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>, &Address<DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>>, Option<usize>),
+    ) -> Result<(), String> {
+        a.0.req_downstream.connect(DefaultTravelProcess::get_state_async, b.1.clone());
+        a.0.push_downstream.map_connect(|x| {
+            let payload = (*x.0.first().unwrap(), x.1);
+            payload
+        }, DefaultTravelProcess::add, b.1.clone());
+        // a.0.push_downstream.connect(DefaultTravelProcess::add_multi, b.1.clone());
+        Ok(())
+    }
+}
+
 /* #endregion DefaultLoadingProcess */
 
 // ──────────────────────────── DefaultUnloadingProcess ────────────────────────────

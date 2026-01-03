@@ -1,12 +1,12 @@
 use std::time::Duration;
 use quokkasim::{
     components::mixed::{DefaultLoadingProcess, DefaultUnloadingProcess, LoadResource},
-    prelude::{Connect, Connection, ContResource, ContStockLog, ContStockState, DefaultContStock, DefaultDiscProcess,
-        DefaultDiscStock, DiscProcessLog, DiscStockLog, DiscStockState, DistributionFactory, EventQueue,
-        MonotonicTime, Projectable, SimInit
+    prelude::{Connect, Connection, ContResource, ContStockLog, ContStockState, DefaultContStock, DefaultDiscProcess, DefaultDiscStock, DefaultTravelProcess, DiscProcessLog, DiscStockLog, DiscStockState, DistributionConfig, DistributionFactory, EventQueue, MonotonicTime, Projectable, SimInit
     }
 };
 use serde::Serialize;
+use rand_core::RngCore;
+use rand_distr::{Uniform};
 
 #[derive(Clone, Debug, Serialize, Default)]
 struct Truck<ResourceType> where ResourceType: ContResource + Projectable<f64> {
@@ -81,32 +81,24 @@ fn main() {
         .with_name("TruckLoading")
         .with_code("L")
         .with_process_time_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(15.0))
+            df.create(DistributionConfig::Constant(15.0))
                 .unwrap(),
         )
         .with_process_quantity_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(1.0))
+            df.create(DistributionConfig::Constant(1.0))
                 .unwrap(),
         );
     let (truck_loading_mailbox, truck_loading_address) = truck_loading.create_mailbox();
-    let mut loaded_trucks_queue: DefaultDiscStock<Truck<f64>, DiscStockState, DiscStockLog<Truck<f64>>> = DefaultDiscStock::new()
-        .with_name("LoadedTrucksQueue")
-        .with_code("PostLQ")
-        .with_low_capacity(0)
-        .with_max_capacity(10);
-    let (loaded_trucks_queue_mailbox, loaded_trucks_queue_address) = loaded_trucks_queue.create_mailbox();
-    let mut loaded_trucks_travel: DefaultDiscProcess<Truck<f64>, DiscProcessLog<Truck<f64>>> = DefaultDiscProcess::new()
-        .with_name("LoadedTrucksTravel")
-        .with_code("LT")
-        .with_process_time_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(60.0))
-                .unwrap(),
-        )
-        .with_process_quantity_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(1.0))
-                .unwrap(),
-        );
-    let (loaded_trucks_travel_mailbox, loaded_trucks_travel_address) = loaded_trucks_travel.create_mailbox();
+
+    let mut distr2 = df.create(DistributionConfig::Uniform { min: 60., max: 120. }).unwrap();
+    let mut truck_travel_manager: DefaultTravelProcess<Truck<f64>, DiscProcessLog<Truck<f64>>> = DefaultTravelProcess::new()
+        .with_name("TruckTravelManager")
+        .with_code("TTM");
+    let (truck_travel_manager_mailbox, truck_travel_manager_address) = truck_travel_manager.create_mailbox();
+    truck_travel_manager.travel_routing_fn = Box::new(move |x| {
+        (Duration::from_secs_f64(distr2.sample()), "TruckUnloadingQueue".into())
+    });
+
     let mut truck_unloading_queue: DefaultDiscStock<Truck<f64>, DiscStockState, DiscStockLog<Truck<f64>>> = DefaultDiscStock::new()
         .with_name("TruckUnloadingQueue")
         .with_code("PreUQ")
@@ -117,11 +109,11 @@ fn main() {
         .with_name("TruckUnloading")
         .with_code("U")
         .with_process_time_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(15.0))
+            df.create(DistributionConfig::Constant(15.0))
                 .unwrap(),
         )
         .with_process_quantity_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(1.0))
+            df.create(DistributionConfig::Constant(1.0))
                 .unwrap(),
         );
     let (truck_unloading_mailbox, truck_unloading_address) = truck_unloading.create_mailbox();
@@ -135,7 +127,7 @@ fn main() {
         .with_name("EmptyTrucksTravel")
         .with_code("ET")
         .with_process_time_distr(
-            df.create(quokkasim::distributions::DistributionConfig::Constant(1.0))
+            df.create(DistributionConfig::Constant(1.0))
                 .unwrap(),
         );
     let (empty_trucks_travel_mailbox, empty_trucks_travel_address) = empty_trucks_travel.create_mailbox();
@@ -153,6 +145,13 @@ fn main() {
         (&mut stockpile_1, &stockpile_1_address, None),
         (&mut truck_loading, &truck_loading_address, None),
     ).unwrap();  
-    
+    c.connect(
+        (&mut truck_loading_queue, &truck_loading_queue_address, None),
+        (&mut truck_loading, &truck_loading_address, None),
+    ).unwrap();
+    c.connect(
+        (&mut truck_loading, &truck_loading_address, None),
+        (&mut truck_travel_manager, &truck_travel_manager_address, None),
+    ).unwrap();
 
 }
