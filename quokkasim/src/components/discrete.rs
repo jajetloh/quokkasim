@@ -1343,8 +1343,7 @@ where
     pub log_emitter: Output<ProcessLog>,
 
     // Configuration
-    // pub travel_time_fn: Box<dyn FnMut(&mut Distribution, ItemType, EventMetadata) -> (Duration, String)>,
-    pub travel_routing_fn: Box<dyn FnMut(&Self) -> (Duration, String) + Send>,
+    pub travel_routing_fn: Box<dyn FnMut(&Self, ItemType) -> (Duration, String) + Send>,
 
     // Runtime state
     pub process_state: Vec<(Duration, ItemType, String)>, // Travel duration left, vehicle, destination name
@@ -1373,7 +1372,7 @@ impl<ItemType> Default for DefaultTravelProcess<
             req_destination: HashMap::new(),
             push_to_destination: HashMap::new(),
             log_emitter: Output::default(),
-            travel_routing_fn: Box::new(|_| (Duration::from_secs(1), String::new())),
+            travel_routing_fn: Box::new(|_, _| (Duration::from_secs(1), String::new())),
             process_state: Vec::new(),
             rng: SmallRng::seed_from_u64(123),
             dummy_rng: SmallRng::seed_from_u64(456),
@@ -1532,9 +1531,9 @@ impl<
                 details: DefaultDiscProcessLogType::ProcessStart { quantity: 1, resources: vec![item.clone()] },
             }).await;
 
-            let dummy_fn = |_: &Self| { (Duration::ZERO, String::from("dummy_fn")) };
+            let dummy_fn = |_: &Self, _: ItemType| { (Duration::ZERO, String::from("dummy_fn")) };
             let mut travel_routing_fn = mem::replace(&mut self.travel_routing_fn, Box::new(dummy_fn));
-            let (travel_duration, destination_name) = travel_routing_fn(&self);
+            let (travel_duration, destination_name) = travel_routing_fn(&self, item.clone());
             self.travel_routing_fn = travel_routing_fn;
             if !self.req_destination.contains_key(&destination_name) {
                 panic!("No requestor found for destination {}", destination_name);
@@ -1571,9 +1570,9 @@ impl<
                     details: DefaultDiscProcessLogType::ProcessStart { quantity: 1, resources: vec![item.clone()] },
                 }).await;
 
-                let dummy_fn = |_: &Self| { (Duration::ZERO, String::from("dummy_fn")) };
+                let dummy_fn = |_: &Self, _: ItemType| { (Duration::ZERO, String::from("dummy_fn")) };
                 let mut travel_routing_fn = mem::replace(&mut self.travel_routing_fn, Box::new(dummy_fn));
-                let (travel_duration, destination_name) = travel_routing_fn(&self);
+                let (travel_duration, destination_name) = travel_routing_fn(&self, item.clone());
                 self.travel_routing_fn = travel_routing_fn;
                 if !self.req_destination.contains_key(&destination_name) {
                     panic!("No requestor found for destination {}", destination_name);

@@ -1,12 +1,10 @@
 use std::time::Duration;
 use quokkasim::{
     components::mixed::{DefaultLoadingProcess, DefaultUnloadingProcess, LoadResource},
-    prelude::{Connect, Connection, ContResource, ContStockLog, ContStockState, DefaultContStock, DefaultDiscProcess, DefaultDiscStock, DefaultTravelProcess, DiscProcessLog, DiscStockLog, DiscStockState, DistributionConfig, DistributionFactory, EventQueue, MonotonicTime, Projectable, SimInit
+    prelude::{Connect, Connection, ContResource, ContStockLog, ContStockState, DefaultContStock, DefaultDiscStock, DefaultTravelProcess, DiscProcessLog, DiscStockLog, DiscStockState, DistributionConfig, DistributionFactory, EventQueue, MonotonicTime, Projectable, SimInit
     }
 };
 use serde::Serialize;
-use rand_core::RngCore;
-use rand_distr::{Uniform};
 
 #[derive(Clone, Debug, Serialize, Default)]
 struct Truck<ResourceType> where ResourceType: ContResource + Projectable<f64> {
@@ -90,13 +88,24 @@ fn main() {
         );
     let (truck_loading_mailbox, truck_loading_address) = truck_loading.create_mailbox();
 
-    let mut distr2 = df.create(DistributionConfig::Uniform { min: 60., max: 120. }).unwrap();
     let mut truck_travel_manager: DefaultTravelProcess<Truck<f64>, DiscProcessLog<Truck<f64>>> = DefaultTravelProcess::new()
         .with_name("TruckTravelManager")
         .with_code("TTM");
     let (truck_travel_manager_mailbox, truck_travel_manager_address) = truck_travel_manager.create_mailbox();
-    truck_travel_manager.travel_routing_fn = Box::new(move |x| {
-        (Duration::from_secs_f64(distr2.sample()), "TruckUnloadingQueue".into())
+    
+    let mut loaded_travel_distr = df.create(DistributionConfig::Uniform { min: 60., max: 120. }).unwrap();
+    let mut empty_travel_distr = df.create(DistributionConfig::Uniform { min: 30., max: 90. }).unwrap();
+    truck_travel_manager.travel_routing_fn = Box::new(move |p, truck| {
+        match truck.contents {
+            Some(_) => {
+                let travel_time = loaded_travel_distr.sample();
+                (Duration::from_secs_f64(travel_time), "PreUQ".into())
+            },
+            None => {
+                let travel_time = empty_travel_distr.sample();
+                (Duration::from_secs_f64(travel_time), "PreLQ".into())
+            }
+        }
     });
 
     let mut truck_unloading_queue: DefaultDiscStock<Truck<f64>, DiscStockState, DiscStockLog<Truck<f64>>> = DefaultDiscStock::new()
@@ -119,33 +128,6 @@ fn main() {
         );
     let (truck_unloading_mailbox, truck_unloading_address) = truck_unloading.create_mailbox();
     
-    let mut truck_unloading_2: DefaultUnloadingProcess<Truck<f64>, DiscProcessLog<Truck<f64>>, f64> = DefaultUnloadingProcess::new()
-        .with_name("TruckUnloading")
-        .with_code("U")
-        .with_process_time_distr(
-            df.create(DistributionConfig::Constant(15.0))
-                .unwrap(),
-        )
-        .with_process_quantity_distr(
-            df.create(DistributionConfig::Constant(1.0))
-                .unwrap(),
-        );
-    let (truck_unloading_2_mailbox, truck_unloading_2_address) = truck_unloading_2.create_mailbox();
-    
-    let mut empty_trucks_queue: DefaultDiscStock<Truck<f64>, DiscStockState, DiscStockLog<Truck<f64>>> = DefaultDiscStock::new()
-        .with_name("EmptyTrucksQueue")
-        .with_code("PostUQ")
-        .with_low_capacity(0)
-        .with_max_capacity(10);
-    let (empty_trucks_queue_mailbox, empty_trucks_queue_address) = empty_trucks_queue.create_mailbox();
-    let mut empty_trucks_travel: DefaultDiscProcess<Truck<f64>, DiscProcessLog<Truck<f64>>> = DefaultDiscProcess::new()
-        .with_name("EmptyTrucksTravel")
-        .with_code("ET")
-        .with_process_time_distr(
-            df.create(DistributionConfig::Constant(1.0))
-                .unwrap(),
-        );
-    let (empty_trucks_travel_mailbox, empty_trucks_travel_address) = empty_trucks_travel.create_mailbox();
     let mut stockpile_2: DefaultContStock<f64, ContStockState, ContStockLog<f64>> = DefaultContStock::new()
         .with_name("Stockpile2")
         .with_code("SP2")
@@ -189,7 +171,23 @@ fn main() {
         (&mut truck_loading_queue, &truck_loading_queue_address, None),
     ).unwrap();
 
-    let mut sim_init = SimInit::new()
+    // Loggers
+
+    let stock_logger = EventQueue::<ContStockLog<f64>>::new();
+    let process_logger = EventQueue::<DiscProcessLog<Truck<f64>>>::new();
+    let truck_queue_logger = EventQueue::<DiscStockLog<Truck<f64>>>::new();
+
+    stockpile_1.log_emitter.connect_sink(&stock_logger);
+    truck_loading_queue.log_emitter.connect_sink(&truck_queue_logger);
+    truck_loading.log_emitter.connect_sink(&process_logger);
+    truck_travel_manager.log_emitter.connect_sink(&process_logger);
+    truck_unloading_queue.log_emitter.connect_sink(&truck_queue_logger);
+    truck_unloading.log_emitter.connect_sink(&process_logger);
+    stockpile_2.log_emitter.connect_sink(&stock_logger);
+
+    // Model run
+
+    let sim_init = SimInit::new()
         .add_model(stockpile_1, stockpile_1_mailbox, "Stockpile1".to_string())
         .add_model(truck_loading_queue, truck_loading_queue_mailbox, "TruckLoadingQueue".to_string())
         .add_model(truck_loading, truck_loading_mailbox, "TruckLoading".to_string())
@@ -202,5 +200,7 @@ fn main() {
     let (mut simu, sched) = sim_init.init(start_time).unwrap();
     simu.step_until(start_time + sim_duration).unwrap();
 
-    
+    for log_entry in process_logger.into_reader() {
+        println!("{:?}", log_entry);
+    }
 }

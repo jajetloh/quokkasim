@@ -455,7 +455,9 @@ where
         a: (&mut DefaultTravelProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultTravelProcess<ItemType, DiscProcessLog<ItemType>>>, Option<usize>),
         b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>, Option<usize>),
     ) -> Result<(), String> {
+        a.0.req_destination.insert(b.0.element_code.clone(), Requestor::new());
         a.0.req_destination.get_mut(&b.0.element_code).unwrap().connect(DefaultDiscStock::get_state_async, b.1.clone());
+        a.0.push_to_destination.insert(b.0.element_code.clone(), Output::new());
         a.0.push_to_destination.get_mut(&b.0.element_code).unwrap().map_connect(|x| (Some(x.0.clone()), x.1.clone()), DefaultDiscStock::add_one, b.1.clone());
         Ok(())
     }
