@@ -124,7 +124,7 @@ pub trait DiscStock<
 {
     fn get_state(&mut self) -> StateType;
 
-    fn get_state_async(&mut self, _: (), _: &mut Context<Self>) -> impl Future<Output = StateType> + Send {
+    fn get_state_async(&mut self, _: (), _: &mut Context<Self>) -> impl Future<Output = StateType> {
         async move { self.get_state() }
     }
     fn get_next_event_meta(&mut self) -> EventMetadata;
@@ -132,7 +132,7 @@ pub trait DiscStock<
     fn resources(&mut self) -> &mut VecDequeStock<ResourceType>;
     fn state_emitter(&mut self) -> &mut Output<EventMetadata>;
 
-    fn add_one(&mut self, payload: (Option<ResourceType>, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> + Send {
+    fn add_one(&mut self, payload: (Option<ResourceType>, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = ()> {
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             if let (Some(resource), _) = payload.clone() {
@@ -166,7 +166,7 @@ pub trait DiscStock<
         }
     }
 
-    fn remove_one(&mut self, payload: EventMetadata, cx: &mut Context<Self>) -> impl Future<Output = Option<ResourceType>> + Send 
+    fn remove_one(&mut self, payload: EventMetadata, cx: &mut Context<Self>) -> impl Future<Output = Option<ResourceType>>
     where ResourceType:
     {
         async move {
@@ -185,7 +185,7 @@ pub trait DiscStock<
         }
     }
 
-    fn remove_multi(&mut self, payload: (usize, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = Vec<ResourceType>> + Send 
+    fn remove_multi(&mut self, payload: (usize, EventMetadata), cx: &mut Context<Self>) -> impl Future<Output = Vec<ResourceType>>
     where ResourceType:
     {
         async move {

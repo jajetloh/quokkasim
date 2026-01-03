@@ -1344,7 +1344,7 @@ where
 
     // Configuration
     // pub travel_time_fn: Box<dyn FnMut(&mut Distribution, ItemType, EventMetadata) -> (Duration, String)>,
-    pub travel_routing_fn: Box<dyn FnMut(&Self) -> (Duration, String)>,
+    pub travel_routing_fn: Box<dyn FnMut(&Self) -> (Duration, String) + Send>,
 
     // Runtime state
     pub process_state: Vec<(Duration, ItemType, String)>, // Travel duration left, vehicle, destination name
@@ -1518,7 +1518,7 @@ impl<
         &mut self,
         payload: (ItemType, EventMetadata),
         cx: &mut Context<Self>
-    ) -> impl Future<Output = ()> {
+    ) -> impl Future<Output = ()> + Send {
         async move {
             let (item, source_event) = payload;
             let mut new_source_event = self.get_next_event_meta();
@@ -1619,4 +1619,23 @@ impl<
             DiscStockState::Normal { occupied: self.process_state.len(), empty: u32::MAX as usize }
         }
     }  
+}
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> Model for DefaultTravelProcess<
+    ItemType,
+    DiscProcessLog<ItemType>
+>
+{
+    fn init(
+        mut self,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = InitializedModel<Self>> + Send {
+        async move {
+            self.previous_event = EventMetadata { source_name: self.element_name.clone(), source_code: self.element_code.clone(), index: 0 };
+            self.update_state(self.previous_event.clone(), ctx).await;
+            self.into()
+        }
+    }
 }

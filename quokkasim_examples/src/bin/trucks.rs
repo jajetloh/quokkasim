@@ -105,6 +105,7 @@ fn main() {
         .with_low_capacity(0)
         .with_max_capacity(10);
     let (truck_unloading_queue_mailbox, truck_unloading_queue_address) = truck_unloading_queue.create_mailbox();
+    
     let mut truck_unloading: DefaultUnloadingProcess<Truck<f64>, DiscProcessLog<Truck<f64>>, f64> = DefaultUnloadingProcess::new()
         .with_name("TruckUnloading")
         .with_code("U")
@@ -117,6 +118,20 @@ fn main() {
                 .unwrap(),
         );
     let (truck_unloading_mailbox, truck_unloading_address) = truck_unloading.create_mailbox();
+    
+    let mut truck_unloading_2: DefaultUnloadingProcess<Truck<f64>, DiscProcessLog<Truck<f64>>, f64> = DefaultUnloadingProcess::new()
+        .with_name("TruckUnloading")
+        .with_code("U")
+        .with_process_time_distr(
+            df.create(DistributionConfig::Constant(15.0))
+                .unwrap(),
+        )
+        .with_process_quantity_distr(
+            df.create(DistributionConfig::Constant(1.0))
+                .unwrap(),
+        );
+    let (truck_unloading_2_mailbox, truck_unloading_2_address) = truck_unloading_2.create_mailbox();
+    
     let mut empty_trucks_queue: DefaultDiscStock<Truck<f64>, DiscStockState, DiscStockLog<Truck<f64>>> = DefaultDiscStock::new()
         .with_name("EmptyTrucksQueue")
         .with_code("PostUQ")
@@ -153,5 +168,39 @@ fn main() {
         (&mut truck_loading, &truck_loading_address, None),
         (&mut truck_travel_manager, &truck_travel_manager_address, None),
     ).unwrap();
+    c.connect(
+        (&mut truck_travel_manager, &truck_travel_manager_address, None),
+        (&mut truck_unloading_queue, &truck_unloading_queue_address, None),
+    ).unwrap();
+    c.connect(
+        (&mut truck_unloading_queue, &truck_unloading_queue_address, None),
+        (&mut truck_unloading, &truck_unloading_address, None),
+    ).unwrap();
+    c.connect(
+        (&mut truck_unloading, &truck_unloading_address, None),
+        (&mut truck_travel_manager, &truck_travel_manager_address, None),
+    ).unwrap();
+    c.connect(
+        (&mut truck_unloading, &truck_unloading_address, None),
+        (&mut stockpile_2, &stockpile_2_address, None),
+    ).unwrap();
+    c.connect(
+        (&mut truck_travel_manager, &truck_travel_manager_address, None),
+        (&mut truck_loading_queue, &truck_loading_queue_address, None),
+    ).unwrap();
 
+    let mut sim_init = SimInit::new()
+        .add_model(stockpile_1, stockpile_1_mailbox, "Stockpile1".to_string())
+        .add_model(truck_loading_queue, truck_loading_queue_mailbox, "TruckLoadingQueue".to_string())
+        .add_model(truck_loading, truck_loading_mailbox, "TruckLoading".to_string())
+        .add_model(truck_travel_manager, truck_travel_manager_mailbox, "TruckTravelManager".to_string())
+        .add_model(truck_unloading_queue, truck_unloading_queue_mailbox, "TruckUnloadingQueue".to_string())
+        .add_model(truck_unloading, truck_unloading_mailbox, "TruckUnloading".to_string())
+        .add_model(stockpile_2, stockpile_2_mailbox, "Stockpile2".to_string());
+    let start_time = MonotonicTime::try_from_date_time(2026, 1, 1, 0, 0, 0, 0).unwrap();
+    let sim_duration = Duration::from_secs(86400); // 1 day
+    let (mut simu, sched) = sim_init.init(start_time).unwrap();
+    simu.step_until(start_time + sim_duration).unwrap();
+
+    
 }

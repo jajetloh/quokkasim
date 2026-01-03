@@ -323,7 +323,7 @@ impl<
 > for Connection
 where
     DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>: Model,
-    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: DiscProcessCore<ContainerType, ContainerProcessLogType>,
+    DefaultLoadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: Model,
     ResourceType: Projectable<f64>,
 {
     fn connect(
@@ -333,10 +333,9 @@ where
     ) -> Result<(), String> {
         a.0.req_downstream.connect(DefaultTravelProcess::get_state_async, b.1.clone());
         a.0.push_downstream.map_connect(|x| {
-            let payload = (*x.0.first().unwrap(), x.1);
-            payload
+            let payload = (x.0.first().unwrap().clone(), x.1.clone());
+            return payload
         }, DefaultTravelProcess::add, b.1.clone());
-        // a.0.push_downstream.connect(DefaultTravelProcess::add_multi, b.1.clone());
         Ok(())
     }
 }
@@ -414,4 +413,53 @@ where
     }
 }
 
+impl<
+    ContainerType: Debug + Clone + Send + Serialize + 'static,
+    ContainerProcessLogType: Clone + Send + 'static,
+    ResourceType: Projectable<f64> + ContArithmetic + Default + Debug + Clone + Serialize + Send + 'static,
+> Connect<
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>,
+    DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>,
+> for Connection
+where
+    DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>: Model,
+    DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>: Model,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>, &Address<DefaultUnloadingProcess<ContainerType, ContainerProcessLogType, ResourceType>>, Option<usize>),
+        b: (&mut DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>, &Address<DefaultTravelProcess<ContainerType, DiscProcessLog<ContainerType>>>, Option<usize>),
+    ) -> Result<(), String> {
+        a.0.push_downstream_vehicles.map_connect(|x| { (x.0.first().unwrap().clone(), x.1.clone()) }, DefaultTravelProcess::add, b.1.clone());
+        a.0.req_downstream_vehicles.connect(DefaultTravelProcess::get_state_async, b.1.clone());
+        Ok(())
+    }
+}
+
 /* #endregion DefaultUnloadingProcess */
+
+// ──────────────────────────── DefaultTravelProcess ────────────────────────────
+/* #region DefaultTravelProcess */
+
+impl<
+    ItemType: Clone + Debug + Serialize + Send + 'static,
+> Connect<
+    DefaultTravelProcess<ItemType, DiscProcessLog<ItemType>>,
+    DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>,
+> for Connection
+where
+    DiscStockLogType<ItemType>: Serialize,
+{
+    fn connect(
+        &mut self,
+        a: (&mut DefaultTravelProcess<ItemType, DiscProcessLog<ItemType>>, &Address<DefaultTravelProcess<ItemType, DiscProcessLog<ItemType>>>, Option<usize>),
+        b: (&mut DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>, &Address<DefaultDiscStock<ItemType, DiscStockState, DiscStockLog<ItemType>>>, Option<usize>),
+    ) -> Result<(), String> {
+        a.0.req_destination.get_mut(&b.0.element_code).unwrap().connect(DefaultDiscStock::get_state_async, b.1.clone());
+        a.0.push_to_destination.get_mut(&b.0.element_code).unwrap().map_connect(|x| (Some(x.0.clone()), x.1.clone()), DefaultDiscStock::add_one, b.1.clone());
+        Ok(())
+    }
+}
+
+
+/* #endregion DefaultTravelProcess */
