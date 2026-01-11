@@ -2,13 +2,14 @@ use nexosim::{
     model::Model,
     ports::{Output, Requestor},
 };
-use serde::{Serialize, ser::SerializeStruct};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
+use strum_macros::Display;
 use std::{fmt::Debug, time::Duration};
 use tai_time::MonotonicTime;
 
 use crate::{distributions::Distribution, prelude::*};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Display, Clone, Serialize, Deserialize)]
 pub enum ContStockState {
     Normal { occupied: f64, empty: f64 },
     Full { occupied: f64, empty: f64 },
@@ -171,7 +172,7 @@ impl<
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct ContStockLog<ResourceType: ContArithmetic> {
     pub time: String,
     pub event_id: EventMetadata,
@@ -181,8 +182,31 @@ pub struct ContStockLog<ResourceType: ContArithmetic> {
     pub details: ContStockLogType<ResourceType>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "event_type")]
+impl<ResourceType: ContArithmetic + Clone + Serialize> Serialize for ContStockLog<ResourceType> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        let mut state = serializer.serialize_struct("ContinuousStockLog", 8)?;
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event_id", &self.event_id)?;
+        state.serialize_field("source_event_id", &self.source_event_id)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let details: ContStockLogType<ResourceType> = self.details.clone().into();
+        let (event_type, balance, resource): (&str, f64, Option<ResourceType>) =
+            match details {
+                ContStockLogType::Add { balance, resource } => ("Add", balance, Some(resource)),
+                ContStockLogType::Remove { balance, resource } => ("Remove", balance, Some(resource)),
+                ContStockLogType::StateChange { new_state  } => ("StateChange", new_state.occupied(), None),
+            };
+        state.serialize_field("event_type", &event_type)?;
+        state.serialize_field("balance", &balance)?;
+        state.serialize_field("resource", &resource)?;
+        state.end()
+    }
+}
+
+#[derive(Debug, Display, Clone, Serialize)]
 pub enum ContStockLogType<ResourceType: ContArithmetic> {
     Add { balance: f64, resource: ResourceType },
     Remove { balance: f64, resource: ResourceType },
@@ -205,7 +229,7 @@ impl<ResourceType: ContResource> Serialize for ContProcessLog<ResourceType>
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("ContinuousProcessLog", 6)?;
+        let mut state = serializer.serialize_struct("ContinuousProcessLog", 9)?;
         state.serialize_field("time", &self.time)?;
         state.serialize_field("event_id", &self.event_id)?;
         state.serialize_field("source_event_id", &self.source_event_id)?;
@@ -242,7 +266,7 @@ impl<ResourceType: ContResource> Serialize for ContProcessLog<ResourceType>
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Display, Clone)]
 pub enum DefaultContProcessLogType<ResourceType: ContResource> {
     WithdrawRequest { quantity: f64 },
     ProcessStart { quantity: f64, resource: ResourceType },

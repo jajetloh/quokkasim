@@ -6,10 +6,11 @@ use std::fmt::Debug;
 use nexosim::ports::Output;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
-use serde::Serialize;
+use serde::{Serialize, ser::SerializeStruct};
+use strum_macros::Display;
 use crate::prelude::*;
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, Display)]
 pub enum DiscStockLogType<T> {
     AddOne { balance: usize, added: Option<T> },
     AddMulti { balance: usize, added: Vec<T> },
@@ -195,7 +196,7 @@ impl<
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct DiscStockLog<ItemType> {
     pub time: String,
     pub event: EventMetadata,
@@ -204,6 +205,97 @@ pub struct DiscStockLog<ItemType> {
     pub element_type: String,
     pub details: DiscStockLogType<ItemType>,
 }
+
+impl<ItemType> Serialize for DiscStockLog<ItemType>
+where
+    ItemType: Serialize + Clone,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("DiscStockLog", 8)?;
+
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event", &self.event)?;
+        state.serialize_field("source_event", &self.source_event)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let details = self.details.clone();
+        let (event_type, balance, resources): (&str, usize, Vec<ItemType>) = match details {
+            DiscStockLogType::AddOne { balance, added } => ("AddOne", balance, added.into_iter().collect()),
+            DiscStockLogType::AddMulti { balance, added } => ("AddMulti", balance, added),
+            DiscStockLogType::RemoveOne { balance, removed } => ("RemoveOne", balance, removed.into_iter().collect()),
+            DiscStockLogType::RemoveMulti { balance, removed } => ("RemoveMulti", balance, removed),
+            DiscStockLogType::StateChange { new_state  } => ("StateChange", new_state.occupied(), Vec::new()),
+        };
+        state.serialize_field("event_type", &event_type)?;
+        state.serialize_field("balance", &balance)?;
+        state.serialize_field("resources", &resources)?;
+        state.end()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DiscProcessLog<ItemType>
+where
+    ItemType: Clone + Serialize + Debug,
+{
+    pub time: String,
+    pub event: EventMetadata,
+    pub source_event: EventMetadata,
+    pub element_name: String,
+    pub element_type: String,
+    pub details: DefaultDiscProcessLogType<ItemType>,
+}
+
+impl<ItemType: Clone + Debug + Serialize> Serialize for DiscProcessLog<ItemType>
+where
+    ItemType: Clone + Debug + Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("DiscProcessLog", 9)?;
+
+        state.serialize_field("time", &self.time)?;
+        state.serialize_field("event", &self.event)?;
+        state.serialize_field("source_event", &self.source_event)?;
+        state.serialize_field("element_name", &self.element_name)?;
+        state.serialize_field("element_type", &self.element_type)?;
+        let details = self.details.clone();
+        let (event_type, quantity, resources, reason): (&str, usize, Option<Vec<ItemType>>, Option<&'static str>) = match details {
+            DefaultDiscProcessLogType::WithdrawRequest { quantity } => ("WithdrawRequest", quantity, None, None),
+            DefaultDiscProcessLogType::ProcessStart { quantity, resources } => ("ProcessStart", quantity, Some(resources), None),
+            DefaultDiscProcessLogType::ProcessSuccess { quantity, resources } => ("ProcessSuccess", quantity, Some(resources), None),
+            DefaultDiscProcessLogType::ProcessFailure { reason } => ("ProcessFailure", 0, None, Some(reason)),
+            DefaultDiscProcessLogType::ProcessStopped { reason } => ("ProcessStopped", 0, None, Some(reason)),
+            DefaultDiscProcessLogType::ProcessContinue { reason } => ("ProcessContinue", 0, None, Some(reason)),
+            DefaultDiscProcessLogType::StateChange { new_state: _ } => ("StateChange", 0, None, None),
+        };
+        state.serialize_field("event_type", &event_type)?;
+        state.serialize_field("quantity", &quantity)?;
+        state.serialize_field("resources", &resources)?;
+        state.serialize_field("reason", &reason)?;
+        state.end()
+    }
+}
+
+#[derive(Debug, Display, Clone, Serialize)]
+pub enum DefaultDiscProcessLogType<ItemType>
+where
+    ItemType: Clone + Debug + Serialize,
+{
+    WithdrawRequest { quantity: usize },
+    ProcessStart { quantity: usize, resources: Vec<ItemType> },
+    ProcessSuccess { quantity: usize, resources: Vec<ItemType> },
+    ProcessFailure { reason: &'static str },
+    ProcessStopped { reason: &'static str },
+    ProcessContinue { reason: &'static str },
+    StateChange { new_state: DiscStockState },
+}
+
 
 #[derive(WithMethods)]
 pub struct DefaultDiscProcess<

@@ -25,6 +25,24 @@ impl StockState for DiscStockState {
     }
 }
 
+impl DiscStockState {
+    pub fn occupied(&self) -> usize {
+        match self {
+            DiscStockState::Normal { occupied, .. } => *occupied,
+            DiscStockState::Full { occupied, .. } => *occupied,
+            DiscStockState::Empty { occupied, .. } => *occupied,
+        }
+    }
+
+    pub fn empty(&self) -> usize {
+        match self {
+            DiscStockState::Normal { empty, .. } => *empty,
+            DiscStockState::Full { empty, .. } => *empty,
+            DiscStockState::Empty { empty, .. } => *empty,
+        }
+    }
+}
+
 pub struct VecDequeStock<T> {
     inner: VecDeque<T>,
     access: VecDequeAccess,
@@ -222,34 +240,6 @@ pub trait DiscStock<
     fn log_type_remove_one(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Option<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
     fn log_type_remove_multi(&mut self, source_event: &mut EventMetadata, balance: usize, resource: Vec<ResourceType>, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
     fn log_type_state_change(&mut self, source_event: &mut EventMetadata, new_state: StateType, cx: &mut Context<Self>) -> impl Future<Output = EventMetadata> + Send;
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct DiscProcessLog<ItemType>
-where
-    ItemType: Clone + Serialize + Debug,
-{
-    pub time: String,
-    pub event: EventMetadata,
-    pub source_event: EventMetadata,
-    pub element_name: String,
-    pub element_type: String,
-    pub details: DefaultDiscProcessLogType<ItemType>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "event_type")]
-pub enum DefaultDiscProcessLogType<ItemType>
-where
-    ItemType: Clone + Debug + Serialize,
-{
-    WithdrawRequest { quantity: usize },
-    ProcessStart { quantity: usize, resources: Vec<ItemType> },
-    ProcessSuccess { quantity: usize, resources: Vec<ItemType> },
-    ProcessFailure { reason: &'static str },
-    ProcessStopped { reason: &'static str },
-    ProcessContinue { reason: &'static str },
-    StateChange { new_state: DiscStockState },
 }
 
 pub trait Emptyable {
