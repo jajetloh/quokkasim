@@ -1,9 +1,10 @@
-use quokkasim::prelude::*;
+use quokkasim::prelude::{*, Error as QuokkaSimError};
 use core::f64;
 use std::collections::HashMap;
 use std::time::{Duration};
 use std::fmt::Debug;
-use serde::{Serialize};    
+use serde::{Serialize};
+use std::error::Error;
 
 #[derive(Clone, Debug, Serialize)]
 struct Reactants {
@@ -341,7 +342,7 @@ impl Connect<DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>
             &mut ReactionVessel,
             &Address<ReactionVessel>,
             Option<usize>
-    )) -> Result<(), String> {
+    )) -> Result<(), Box<dyn Error>> {
         match b.2 {
             Some(0) => {
                 // Connect to oil input port
@@ -353,11 +354,14 @@ impl Connect<DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>
                 b.0.req_upstream_methanol.connect(DefaultContStock::get_state_async, a.1.clone());
                 b.0.withdraw_upstream_methanol.connect(DefaultContStock::remove, a.1.clone());
             },
-            Some(_) => {
-                return Err("Invalid port index when connecting DefaultContStock to ReactionVessel".to_string());
-            }
-            None => {
-                return Err("Must specify port index when connecting DefaultContStock to ReactionVessel".to_string());
+            _ => {
+                return Err(Box::new(QuokkaSimError::UndefinedConnection(UndefinedConnectionError {
+                    from: a.0.element_name.clone(),
+                    from_n: a.2,
+                    to: b.0.element_name.clone(),
+                    to_n: b.2,
+                    message: String::new(),
+                })));
             }
         };
         a.0.state_emitter.connect(ReactionVessel::update_state, b.1.clone());
@@ -378,7 +382,7 @@ impl Connect<ReactionVessel, DefaultContStock<Reactants, ContStockState, ContSto
             &mut DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>>,
             &Address<DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>>>,
             Option<usize>
-        )) -> Result<(), String> {
+        )) -> Result<(), Box<dyn Error>> {
         a.0.req_downstream.connect(DefaultContStock::get_state_async, b.1.clone());
         a.0.push_downstream.connect(DefaultContStock::add, b.1.clone());
         b.0.state_emitter.connect(ReactionVessel::update_state, a.1.clone());
@@ -669,7 +673,7 @@ impl Connect<DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>
             &mut Splitter,
             &Address<Splitter>,
             Option<usize>
-    )) -> Result<(), String> {
+    )) -> Result<(), Box<dyn Error>> {
         b.0.req_upstream.connect(DefaultContStock::get_state_async, a.1.clone());
         b.0.withdraw_upstream.connect(DefaultContStock::remove, a.1.clone());
         a.0.state_emitter.connect(Splitter::update_state, b.1.clone());
@@ -689,7 +693,7 @@ impl Connect<Splitter, DefaultContStock<Reactants, ContStockState, ContStockLog<
             &mut DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>>,
             &Address<DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>>>,
             Option<usize>
-        )) -> Result<(), String> {
+        )) -> Result<(), Box<dyn Error>> {
         match a.2 {
             Some(0) => {
                 // Connect to downstream 1 port
@@ -701,11 +705,14 @@ impl Connect<Splitter, DefaultContStock<Reactants, ContStockState, ContStockLog<
                 a.0.req_downstream_2.connect(DefaultContStock::get_state_async, b.1.clone());
                 a.0.push_downstream_2.connect(DefaultContStock::add, b.1.clone());
             },
-            Some(_) => {
-                return Err("Invalid port index when connecting Splitter to DefaultContStock".to_string());
-            }
-            None => {
-                return Err("Must specify port index when connecting Splitter to DefaultContStock".to_string());
+            _ => {
+                return Err(Box::new(QuokkaSimError::UndefinedConnection(UndefinedConnectionError {
+                    from: a.0.element_name.clone(),
+                    from_n: a.2,
+                    to: b.0.element_name.clone(),
+                    to_n: b.2,
+                    message: String::new(),
+                })));
             }
         };
         b.0.state_emitter.connect(Splitter::update_state, a.1.clone());

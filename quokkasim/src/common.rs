@@ -44,3 +44,28 @@ impl EventMetadata {
 pub trait StockState {
     fn is_same_state(&self, other: &Self) -> bool;
 }
+
+#[derive(Debug, Clone)]
+pub struct UndefinedConnectionError {
+    pub from: String,
+    pub from_n: Option<usize>,
+    pub to: String,
+    pub to_n: Option<usize>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum Error {
+    UndefinedConnection(UndefinedConnectionError),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::UndefinedConnection(err) => write!(f, "Undefined connection: {}", err.message),
+        }
+    }
+}
+
+// this is the missing bit
+impl std::error::Error for Error {}

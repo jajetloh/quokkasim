@@ -1059,7 +1059,7 @@ dependencies = [
 
 [[package]]
 name = "quokkasim"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "quokkasim_derive_macros"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1092,7 +1092,7 @@ dependencies = [
 
 [[package]]
 name = "quokkasim_examples"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 dependencies = [
  "clap",
  "csv",
@@ -1113,7 +1113,7 @@ dependencies = [
 
 [[package]]
 name = "quokkasim_reexports"
-version = "0.3.0-alpha.4"
+version = "0.3.0-alpha.5"
 dependencies = [
  "nexosim",
 ]

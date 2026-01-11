@@ -119,7 +119,7 @@ impl Connect<WorkerShiftManager, DefaultDiscStock<Worker, DiscStockState, DiscSt
         &mut self,
         a: (&mut WorkerShiftManager, &Address<WorkerShiftManager>, Option<usize>),
         b: (&mut DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>, &Address<DefaultDiscStock<Worker, DiscStockState, DiscStockLog<Worker>>>, Option<usize>),
-    ) -> Result<(), String> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         a.0.add_worker.map_connect(|(worker, event)| (Some(worker.clone()), event.clone()),DefaultDiscStock::add_one, b.1.clone());
         a.0.remove_worker.connect(DefaultDiscStock::remove_one, b.1.clone());
         Ok(())
