@@ -152,7 +152,7 @@ impl Model for ReactionVessel {
     }
 }
 
-impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
+impl ContProcessCore for ReactionVessel {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
@@ -181,7 +181,7 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
     }
 }
 
-impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
+impl ContProcessUpdateSinceLast<Reactants> for ReactionVessel {
     fn update_process_state_since_prev_event(
         &mut self, source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
@@ -221,7 +221,7 @@ impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Reacti
     }
 }
 
-impl ContProcessUpdateDecisionLogic<Reactants, ContProcessLog<Reactants>> for ReactionVessel {
+impl ContProcessUpdateDecisionLogic<Reactants> for ReactionVessel {
     fn update_state_decision_logic(
             &mut self,
             source_event_id: &mut EventMetadata,
@@ -328,7 +328,7 @@ impl ContProcessUpdateDecisionLogic<Reactants, ContProcessLog<Reactants>> for Re
     }
 }
 
-impl ContProcessUpdateForNextEvent<Reactants, ContProcessLog<Reactants>> for ReactionVessel {}
+impl ContProcessUpdateForNextEvent for ReactionVessel {}
 
 impl Connect<DefaultContStock<Reactants, ContStockState, ContStockLog<Reactants>>, ReactionVessel> for Connection {
     fn connect(
@@ -468,7 +468,7 @@ impl Model for Splitter {
     }
 }
 
-impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for Splitter {
+impl ContProcessCore for Splitter {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
@@ -498,7 +498,7 @@ impl ContProcessCore<Reactants, ContProcessLog<Reactants>> for Splitter {
     }
 }
 
-impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Splitter {
+impl ContProcessUpdateSinceLast<Reactants> for Splitter {
     fn update_process_state_since_prev_event(
         &mut self, source_event_id: &mut EventMetadata,
         cx: &mut Context<Self>,
@@ -544,7 +544,7 @@ impl ContProcessUpdateSinceLast<Reactants, ContProcessLog<Reactants>> for Splitt
     }
 }
 
-impl ContProcessUpdateDecisionLogic<Reactants, ContProcessLog<Reactants>> for Splitter {
+impl ContProcessUpdateDecisionLogic<Reactants> for Splitter {
 fn update_state_decision_logic(
             &mut self,
             source_event_id: &mut EventMetadata,
@@ -649,7 +649,7 @@ fn update_state_decision_logic(
     }
 }
 
-impl ContProcessUpdateForNextEvent<Reactants, ContProcessLog<Reactants>> for Splitter {}
+impl ContProcessUpdateForNextEvent for Splitter {}
 
 impl Splitter {
     pub fn with_splitter_fn<F>(mut self, splitter_fn: F) -> Self

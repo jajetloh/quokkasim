@@ -28,7 +28,7 @@ impl<
 > Connect<DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>, DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>> for Connection
 where
     DefaultContStock<ResourceType, ContStockState, ContStockLog<ResourceType>>: ContStock<ResourceType, ContStockState>,
-    DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>: ContProcessCore,
 {
     fn connect(
         &mut self,

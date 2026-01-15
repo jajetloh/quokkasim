@@ -362,7 +362,7 @@ where
 }
 
 impl<ResourceType: ContResource + 'static>
-    ContProcessCore<ResourceType, ContProcessLog<ResourceType>>
+    ContProcessCore
     for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
 where
     ContProcessLog<ResourceType>: Serialize,
@@ -405,10 +405,10 @@ where
     }
 }
 
-impl<ResourceType> ContProcessUpdateSinceLast<ResourceType, ContProcessLog<ResourceType>> for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
+impl<ResourceType> ContProcessUpdateSinceLast<ResourceType> for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {
     fn update_process_state_since_prev_event(
         &mut self, source_event_id: &mut EventMetadata,
@@ -449,10 +449,10 @@ where
     }
 }
 
-impl<ResourceType> ContProcessUpdateDecisionLogic<ResourceType, ContProcessLog<ResourceType>> for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
+impl<ResourceType> ContProcessUpdateDecisionLogic<ResourceType> for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {
     fn update_state_decision_logic(
             &mut self,
@@ -555,10 +555,10 @@ where
     }
 }
 
-impl<ResourceType> ContProcessUpdateForNextEvent<ResourceType, ContProcessLog<ResourceType>> for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
+impl<ResourceType> ContProcessUpdateForNextEvent for DefaultContProcess<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {}
 
 /* #endregion DefaultContProcess */
@@ -647,7 +647,7 @@ where
 }
 
 impl<ResourceType: ContResource + 'static>
-    ContProcessCore<ResourceType, ContProcessLog<ResourceType>>
+    ContProcessCore
     for DefaultContSource<ResourceType, ContProcessLog<ResourceType>>
 where
     ContProcessLog<ResourceType>: Serialize,
@@ -692,10 +692,10 @@ where
 }
 
 
-impl<ResourceType> ContProcessUpdateSinceLast<ResourceType, ContProcessLog<ResourceType>> for DefaultContSource<ResourceType, ContProcessLog<ResourceType>>
+impl<ResourceType> ContProcessUpdateSinceLast<ResourceType> for DefaultContSource<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {
     fn update_process_state_since_prev_event(
         &mut self, source_event_id: &mut EventMetadata,
@@ -738,11 +738,10 @@ where
 
 impl<ResourceType> ContProcessUpdateDecisionLogic<
     ResourceType,
-    ContProcessLog<ResourceType>,
 > for DefaultContSource<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {
     fn update_state_decision_logic(
             &mut self,
@@ -833,11 +832,11 @@ where
     }
 }
 
-impl<ResourceType, LogRecordType> ContProcessUpdateForNextEvent<ResourceType, LogRecordType> for DefaultContSource<ResourceType, LogRecordType>
+impl<ResourceType, LogRecordType> ContProcessUpdateForNextEvent for DefaultContSource<ResourceType, LogRecordType>
 where
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + Debug + Serialize + 'static,
-    Self: ContProcessCore<ResourceType, LogRecordType>,
+    Self: ContProcessCore,
 {}
 
 /* #endregion DefaultContSource */
@@ -924,7 +923,7 @@ where
 }
 
 impl<ResourceType: ContResource + 'static>
-    ContProcessCore<ResourceType, ContProcessLog<ResourceType>>
+    ContProcessCore
     for DefaultContSink<ResourceType, ContProcessLog<ResourceType>>
 where
     ContProcessLog<ResourceType>: Serialize,
@@ -967,10 +966,10 @@ where
     }
 }
 
-impl<ResourceType> ContProcessUpdateSinceLast<ResourceType, ContProcessLog<ResourceType>> for DefaultContSink<ResourceType, ContProcessLog<ResourceType>>
+impl<ResourceType> ContProcessUpdateSinceLast<ResourceType> for DefaultContSink<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {
     fn update_process_state_since_prev_event(
         &mut self, source_event_id: &mut EventMetadata,
@@ -1005,10 +1004,10 @@ where
     }
 }
 
-impl<ResourceType> ContProcessUpdateDecisionLogic<ResourceType, ContProcessLog<ResourceType>> for DefaultContSink<ResourceType, ContProcessLog<ResourceType>>
+impl<ResourceType> ContProcessUpdateDecisionLogic<ResourceType> for DefaultContSink<ResourceType, ContProcessLog<ResourceType>>
 where
     ResourceType: ContResource + 'static,
-    Self: ContProcessCore<ResourceType, ContProcessLog<ResourceType>>,
+    Self: ContProcessCore,
 {
     fn update_state_decision_logic(
             &mut self,
@@ -1098,10 +1097,10 @@ where
     }
 }
 
-impl<ResourceType, LogRecordType> ContProcessUpdateForNextEvent<ResourceType, LogRecordType> for DefaultContSink<ResourceType, LogRecordType>
+impl<ResourceType, LogRecordType> ContProcessUpdateForNextEvent for DefaultContSink<ResourceType, LogRecordType>
 where
     ResourceType: ContResource + 'static,
     LogRecordType: Clone + Send + Debug + Serialize + 'static,
-    Self: ContProcessCore<ResourceType, LogRecordType>,
+    Self: ContProcessCore,
 {}
 /* #endregion DefaultContSource */

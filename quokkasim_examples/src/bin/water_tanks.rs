@@ -49,7 +49,7 @@ impl Model for PipeProcess {
     }
 }
 
-impl ContProcessCore<f64, ContProcessLog<f64>> for PipeProcess {
+impl ContProcessCore for PipeProcess {
     fn element_name(&self) -> &str { &self.element_name }
     fn element_code(&self) -> &str { &self.element_code }
     fn element_type(&self) -> &str { &self.element_type }
@@ -77,7 +77,7 @@ impl ContProcessCore<f64, ContProcessLog<f64>> for PipeProcess {
     }
 }
 
-impl ContProcessUpdateSinceLast<f64, ContProcessLog<f64>> for PipeProcess {
+impl ContProcessUpdateSinceLast<f64> for PipeProcess {
     fn update_process_state_since_prev_event(
             &mut self, source_event_id: &mut EventMetadata,
             cx: &mut Context<Self>,

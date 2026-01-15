@@ -160,8 +160,7 @@ impl<T> ContResource for T where T: ContArithmetic + Clone + Send + Debug + Defa
 
 pub trait ContProcessUpdateSinceLast<
     ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,
->: ContProcessCore<ResourceType, LogRecordType>
+>: ContProcessCore
 {
     // Resolves the state of this process from the previous update time to now.
     // Handles some edge case handling and logging as well.
@@ -195,8 +194,7 @@ pub trait ContProcessUpdateSinceLast<
 
 pub trait ContProcessUpdateDecisionLogic<
     ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,  
->: ContProcessCore<ResourceType, LogRecordType>
+>: ContProcessCore
 {
     fn update_state_decision_logic(
         &mut self,
@@ -210,10 +208,7 @@ pub trait ContProcessUpdateDecisionLogic<
 
 }
 
-pub trait ContProcessUpdateForNextEvent<
-    ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,
->: ContProcessCore<ResourceType, LogRecordType>
+pub trait ContProcessUpdateForNextEvent: ContProcessCore
 {
     fn update_state_for_next_event(
         &mut self,
@@ -264,10 +259,7 @@ pub trait ContProcessUpdateForNextEvent<
     }
 }
 
-pub trait ContProcessCore<
-    ResourceType: ContResource + 'static,
-    LogRecordType: Clone + Send + 'static,
->: Model
+pub trait ContProcessCore: Model
 {
     fn element_name(&self) -> &str;
     fn element_code(&self) -> &str;
