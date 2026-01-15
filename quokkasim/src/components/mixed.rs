@@ -682,7 +682,7 @@ where
                             Some(ContStockState::Empty { .. })
                             | Some(ContStockState::Normal { .. }),
                         ) => {
-                            let requested = self.process_quantity_distr.sample();
+                            let _requested = self.process_quantity_distr.sample();
 
                             *source_event = self.log_type_withdraw_request(source_event, 1, cx).await;
 

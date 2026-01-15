@@ -1556,7 +1556,7 @@ impl<
             duration_since_prev: Duration
         ) -> impl Future<Output = ()> {
         async move {
-            for (time_left, resources, destination_name) in &mut self.process_state.iter_mut() {
+            for (time_left, _resources, _destination_name) in &mut self.process_state.iter_mut() {
                 *time_left = time_left.saturating_sub(duration_since_prev);
             }
             let completed = self.process_state.extract_if(.., |(time_left, _, _)| time_left.is_zero()).collect::<Vec<_>>();
@@ -1625,7 +1625,7 @@ impl<
 
             let dummy_fn = |_: &Self, _: ItemType| { (Duration::ZERO, String::from("dummy_fn")) };
             let mut travel_routing_fn = mem::replace(&mut self.travel_routing_fn, Box::new(dummy_fn));
-            let (travel_duration, destination_name) = travel_routing_fn(&self, item.clone());
+            let (travel_duration, destination_name) = travel_routing_fn(self, item.clone());
             self.travel_routing_fn = travel_routing_fn;
             if !self.req_destination.contains_key(&destination_name) {
                 panic!("No requestor found for destination {}", destination_name);
@@ -1664,7 +1664,7 @@ impl<
 
                 let dummy_fn = |_: &Self, _: ItemType| { (Duration::ZERO, String::from("dummy_fn")) };
                 let mut travel_routing_fn = mem::replace(&mut self.travel_routing_fn, Box::new(dummy_fn));
-                let (travel_duration, destination_name) = travel_routing_fn(&self, item.clone());
+                let (travel_duration, destination_name) = travel_routing_fn(self, item.clone());
                 self.travel_routing_fn = travel_routing_fn;
                 if !self.req_destination.contains_key(&destination_name) {
                     panic!("No requestor found for destination {}", destination_name);

@@ -14,6 +14,12 @@ pub trait Connect<A: Model, B: Model> {
 
 pub struct Connection;
 
+impl Default for Connection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Connection {
     pub fn new() -> Self {
         Connection
@@ -334,7 +340,7 @@ where
         a.0.req_downstream.connect(DefaultTravelProcess::get_state_async, b.1.clone());
         a.0.push_downstream.map_connect(|x| {
             let payload = (x.0.first().unwrap().clone(), x.1.clone());
-            return payload
+            payload
         }, DefaultTravelProcess::add, b.1.clone());
         Ok(())
     }

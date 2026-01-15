@@ -65,7 +65,7 @@ fn create_bench() {
 
     let start_time = MonotonicTime::try_from_date_time(2025, 7, 1, 0, 0, 0, 0).unwrap();
     let duration = Duration::from_secs_f64( 0.25 * 3600.);
-    let (mut sim, sched) = sim_init.init(start_time).unwrap();
+    let (mut sim, _sched) = sim_init.init(start_time).unwrap();
 
     let time_at_start = SystemTime::now();
     sim.step_until(start_time + duration).unwrap();

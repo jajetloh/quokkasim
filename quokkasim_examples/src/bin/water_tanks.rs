@@ -1,7 +1,7 @@
 // Hybrid simulation POC
 
 use quokkasim::prelude::*;
-use std::{collections::HashMap, hash::Hash, ops::{Add, Deref, DerefMut, Mul}, sync::Arc, time::{Duration, SystemTime}};
+use std::{collections::HashMap, hash::Hash, ops::{Add, Deref, DerefMut, Mul}, sync::Arc, time::Duration};
 
 struct PipeProcess {
     // Identification
@@ -41,7 +41,7 @@ struct PipeProcess {
 impl Model for PipeProcess {
     fn init(
         self,
-        ctx: &mut Context<Self>,
+        _ctx: &mut Context<Self>,
     ) -> impl Future<Output = InitializedModel<Self>> {
         async move {
             self.into()
@@ -80,8 +80,8 @@ impl ContProcessCore for PipeProcess {
 impl ContProcessUpdateSinceLast<f64> for PipeProcess {
     fn update_process_state_since_prev_event(
             &mut self, source_event_id: &mut EventMetadata,
-            cx: &mut Context<Self>,
-            duration_since_prev: Duration
+            _cx: &mut Context<Self>,
+            _duration_since_prev: Duration
         ) -> impl Future<Output = ()> {
         async move {
             // Implementation of process state update logic goes here
@@ -114,7 +114,7 @@ impl PipeProcess {
         }
     }
 
-    fn process_quantity(&mut self, payload: (f64, EventMetadata)) -> impl Future<Output = ()> + Send {
+    fn process_quantity(&mut self, payload: (f64, EventMetadata)) -> impl Future<Output = ()> {
         async move {
             let received = self.withdraw_input.send(payload.clone()).await.next().unwrap();
             self.push_output.send((received, payload.1)).await;
@@ -210,7 +210,7 @@ impl IntegrationService {
         self.process_rate_functions.insert(params.0.clone(), (params.0, params.1, params.2, params.3));
     }
 
-    fn register_rate_function_test(&mut self, params: (String, f64)) {
+    fn register_rate_function_test(&mut self, _params: (String, f64)) {
 
     }
 
@@ -384,7 +384,7 @@ fn main() {
 
     let mut model_time = MonotonicTime::EPOCH;
 
-    let (mut sim, mut sched) = sim_init.init(model_time).unwrap();
+    let (mut sim, _sched) = sim_init.init(model_time).unwrap();
 
     let e = EventMetadata::from_scheduler();
     for _ in 0..400 {
@@ -394,14 +394,10 @@ fn main() {
     }
 
     for x in stock_logger.into_reader() {
-        if x.element_name == "Tank 1" {
-            match x.details {
-                ContStockLogType::Remove { balance, resource } => {
-                    println!("{} | {}", x.time, balance);
-                },
-                _ => {}
+        if x.element_name == "Tank 1"
+            && let ContStockLogType::Remove { balance, resource: _ } = x.details {
+                println!("{} | {}", x.time, balance);
             }
-        }
     }
     
 

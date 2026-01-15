@@ -294,11 +294,10 @@ where
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
-            if let Some((scheduled_time, _)) = self.scheduled_event() {
-                if *scheduled_time <= cx.time() {
+            if let Some((scheduled_time, _)) = self.scheduled_event()
+                && *scheduled_time <= cx.time() {
                     *self.scheduled_event() = None;
                 }
-            }
 
             let duration_since_prev = cx.time().duration_since(*self.previous_check_time());
 

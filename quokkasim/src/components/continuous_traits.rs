@@ -170,11 +170,10 @@ pub trait ContProcessUpdateSinceLast<
         cx: &mut Context<Self>,
     ) -> impl Future<Output = ()> {
         async move {
-            if let Some((scheduled_time, _)) = self.scheduled_event() {
-                if *scheduled_time <= cx.time() {
+            if let Some((scheduled_time, _)) = self.scheduled_event()
+                && *scheduled_time <= cx.time() {
                     *self.scheduled_event() = None;
                 }
-            }
 
             let duration_since_prev = cx.time().duration_since(*self.previous_check_time());
 
@@ -300,7 +299,7 @@ pub trait ContStock<
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             self.resource().add(payload.0.clone());
-            let event_id = self.log_type_add(&mut payload.1.clone(), payload.0.clone(), &mut cx).await;
+            let event_id = self.log_type_add(&mut payload.1.clone(), payload.0.clone(), cx).await;
 
             let previous_state = self.previous_state().clone();
             let current_state = self.get_state().clone();
@@ -318,7 +317,7 @@ pub trait ContStock<
         async move {
             *self.previous_state() = Some(self.get_state().clone());
             let removed = self.resource().remove(payload.0);
-            let event_id = self.log_type_remove(&mut payload.1.clone(), removed.clone(), &mut cx).await;
+            let event_id = self.log_type_remove(&mut payload.1.clone(), removed.clone(), cx).await;
 
             let previous_state = self.previous_state().clone();
             let current_state = self.get_state().clone();

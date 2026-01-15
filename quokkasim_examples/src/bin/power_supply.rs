@@ -1,6 +1,6 @@
 use quokkasim::prelude::*;
 use core::f64;
-use std::{collections::HashMap, hash::Hash, ops::{Add, Deref, DerefMut, Mul}, sync::Arc, time::{Duration, SystemTime}};
+use std::time::Duration;
 
 struct Interpolator {
     points: Vec<(Duration, f64)>,

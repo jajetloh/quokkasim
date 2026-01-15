@@ -192,7 +192,7 @@ impl<ResourceType: ContArithmetic + Clone + Serialize> Serialize for ContStockLo
         state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let details: ContStockLogType<ResourceType> = self.details.clone().into();
+        let details: ContStockLogType<ResourceType> = self.details.clone();
         let (event_type, balance, resource): (&str, f64, Option<ResourceType>) =
             match details {
                 ContStockLogType::Add { balance, resource } => ("Add", balance, Some(resource)),
@@ -235,7 +235,7 @@ impl<ResourceType: ContResource> Serialize for ContProcessLog<ResourceType>
         state.serialize_field("source_event_id", &self.source_event_id)?;
         state.serialize_field("element_name", &self.element_name)?;
         state.serialize_field("element_type", &self.element_type)?;
-        let details: DefaultContProcessLogType<ResourceType> = self.details.clone().into();
+        let details: DefaultContProcessLogType<ResourceType> = self.details.clone();
         let (event_type, total, resource, reason): (&str, Option<f64>, Option<ResourceType>, Option<String>) =
             match details {
                 DefaultContProcessLogType::WithdrawRequest { quantity } => ("WithdrawRequest", Some(quantity), None, None),

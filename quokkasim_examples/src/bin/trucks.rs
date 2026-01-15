@@ -26,13 +26,13 @@ impl<ResourceType> LoadResource<ResourceType> for Truck<ResourceType> where Reso
                 if res.total() <= quantity {
                     let moved = self.unload_resource_all();
                     if moved.is_none() {
-                        return ResourceType::default();
+                        ResourceType::default()
                     } else {
-                        return moved.unwrap();
+                        moved.unwrap()
                     }
                 } else {
                     let moved = res.remove(quantity);
-                    return moved;
+                    moved
                 }
             },
             None => {
@@ -95,7 +95,7 @@ fn main() {
     
     let mut loaded_travel_distr = df.create(DistributionConfig::Uniform { min: 60., max: 120. }).unwrap();
     let mut empty_travel_distr = df.create(DistributionConfig::Uniform { min: 30., max: 90. }).unwrap();
-    truck_travel_manager.travel_routing_fn = Box::new(move |p, truck| {
+    truck_travel_manager.travel_routing_fn = Box::new(move |_p, truck| {
         match truck.contents {
             Some(_) => {
                 let travel_time = loaded_travel_distr.sample();
@@ -197,7 +197,7 @@ fn main() {
         .add_model(stockpile_2, stockpile_2_mailbox, "Stockpile2".to_string());
     let start_time = MonotonicTime::try_from_date_time(2026, 1, 1, 0, 0, 0, 0).unwrap();
     let sim_duration = Duration::from_secs(86400); // 1 day
-    let (mut simu, sched) = sim_init.init(start_time).unwrap();
+    let (mut simu, _sched) = sim_init.init(start_time).unwrap();
     simu.step_until(start_time + sim_duration).unwrap();
 
     for log_entry in process_logger.into_reader() {

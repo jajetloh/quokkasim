@@ -91,8 +91,8 @@ impl WorkerShiftManager {
 impl DiscProcessCore<Worker, DiscProcessLog<Worker>> for WorkerShiftManager {
     fn update_state(
             &mut self,
-            source_event: EventMetadata,
-            cx: &mut Context<Self>,
+            _source_event: EventMetadata,
+            _cx: &mut Context<Self>,
         ) -> impl Future<Output = ()> + Send {
         async move {
         }
